@@ -10,6 +10,7 @@ from app.schemas import UserCreate, UserRead, UserUpdate
 
 
 from app.routes import router as crud_router
+from app.routes.devonthink_sync_routes import router as devonthink_router
 from app.config import config
 
 from app.users import (
@@ -76,6 +77,7 @@ if config.AUTH_TYPE == "GOOGLE":
     )
 
 app.include_router(crud_router, prefix="/api/v1", tags=["crud"])
+app.include_router(devonthink_router, prefix="/devonthink", tags=["devonthink"])
 
 
 @app.get("/verify-token")

@@ -166,6 +166,10 @@ class ScientificPaper(BaseModel, TimestampMixin):
     processing_status = Column(String, nullable=False, default="pending")  # pending, processing, completed, failed
     extraction_metadata = Column(JSON, nullable=True)  # Metadata about extraction process
     
+    # DEVONthink source tracking
+    dt_source_uuid = Column(String(255), nullable=True, index=True)  # DEVONthink source UUID
+    dt_source_path = Column(Text, nullable=True)  # DEVONthink source path
+    
     # Relations
     document_id = Column(Integer, ForeignKey("documents.id", ondelete='CASCADE'), nullable=False)
     document = relationship("Document", back_populates="scientific_paper")
@@ -232,6 +236,55 @@ class SearchSourceConnector(BaseModel, TimestampMixin):
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete='CASCADE'), nullable=False)
     user = relationship("User", back_populates="search_source_connectors")
 
+class DevonthinkSyncStatus(str, Enum):
+    PENDING = "pending"
+    SYNCED = "synced"
+    ERROR = "error"
+    UPDATED = "updated"
+
+class DevonthinkSync(BaseModel, TimestampMixin):
+    __tablename__ = "devonthink_sync"
+    
+    # DEVONthink identifiers
+    dt_uuid = Column(String(255), unique=True, nullable=False, index=True)  # DEVONthink UUID
+    dt_path = Column(Text, nullable=True)  # DEVONthink location path
+    dt_modified_date = Column(TIMESTAMP(timezone=True), nullable=True)  # Last modified in DT
+    
+    # Local identifiers
+    local_uuid = Column(UUID(as_uuid=True), unique=True, nullable=False, index=True)  # Local paper UUID
+    
+    # Sync tracking
+    last_sync_date = Column(TIMESTAMP(timezone=True), nullable=True)  # Last sync to our system
+    sync_status = Column(SQLAlchemyEnum(DevonthinkSyncStatus), nullable=False, default=DevonthinkSyncStatus.PENDING)
+    error_message = Column(Text, nullable=True)  # Error details if sync failed
+    
+    # Relations
+    scientific_paper_id = Column(Integer, ForeignKey("scientific_papers.id", ondelete='CASCADE'), nullable=True)
+    scientific_paper = relationship("ScientificPaper")
+    
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete='CASCADE'), nullable=False)
+    user = relationship("User", back_populates="devonthink_syncs")
+
+class DevonthinkFolder(BaseModel, TimestampMixin):
+    __tablename__ = "devonthink_folders"
+    
+    # DEVONthink folder identifiers
+    dt_uuid = Column(String(255), unique=True, nullable=False, index=True)  # DEVONthink folder UUID
+    dt_path = Column(Text, nullable=False, index=True)  # DEVONthink location path
+    folder_name = Column(String, nullable=False)
+    
+    # Hierarchy
+    parent_dt_uuid = Column(String(255), nullable=True, index=True)  # Parent folder UUID
+    depth_level = Column(Integer, nullable=False, default=0)  # Depth in hierarchy
+    
+    # Sync tracking
+    sync_status = Column(SQLAlchemyEnum(DevonthinkSyncStatus), nullable=False, default=DevonthinkSyncStatus.PENDING)
+    last_sync_date = Column(TIMESTAMP(timezone=True), nullable=True)
+    
+    # Relations
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete='CASCADE'), nullable=False)
+    user = relationship("User", back_populates="devonthink_folders")
+
 if config.AUTH_TYPE == "GOOGLE":
     class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
         pass
@@ -243,11 +296,15 @@ if config.AUTH_TYPE == "GOOGLE":
         )
         search_spaces = relationship("SearchSpace", back_populates="user")
         search_source_connectors = relationship("SearchSourceConnector", back_populates="user")
+        devonthink_syncs = relationship("DevonthinkSync", back_populates="user")
+        devonthink_folders = relationship("DevonthinkFolder", back_populates="user")
 else:
     class User(SQLAlchemyBaseUserTableUUID, Base):
 
         search_spaces = relationship("SearchSpace", back_populates="user")
         search_source_connectors = relationship("SearchSourceConnector", back_populates="user")
+        devonthink_syncs = relationship("DevonthinkSync", back_populates="user")
+        devonthink_folders = relationship("DevonthinkFolder", back_populates="user")
 
 
 engine = create_async_engine(DATABASE_URL)

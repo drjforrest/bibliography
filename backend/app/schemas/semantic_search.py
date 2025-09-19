@@ -7,7 +7,7 @@ class SemanticSearchRequest(BaseModel):
     """Request schema for semantic search."""
     query: str = Field(..., min_length=1, description="Search query")
     search_space_id: Optional[int] = Field(None, description="Search space to filter by")
-    search_type: str = Field("hybrid", regex="^(semantic|keyword|hybrid)$", description="Type of search to perform")
+    search_type: str = Field("hybrid", pattern="^(semantic|keyword|hybrid)$", description="Type of search to perform")
     limit: int = Field(10, ge=1, le=50, description="Maximum number of results")
     min_confidence: float = Field(0.0, ge=0.0, le=1.0, description="Minimum extraction confidence score")
     include_abstracts: bool = Field(True, description="Whether to include abstracts in results")
