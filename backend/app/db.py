@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from enum import Enum
+from typing import List, Optional
 
 from fastapi import Depends
 
@@ -9,7 +10,9 @@ from sqlalchemy import (
     ARRAY,
     Boolean,
     Column,
+    Date,
     Enum as SQLAlchemyEnum,
+    Float,
     ForeignKey,
     Integer,
     JSON,
@@ -50,6 +53,7 @@ class DocumentType(str, Enum):
     YOUTUBE_VIDEO = "YOUTUBE_VIDEO"
     GITHUB_CONNECTOR = "GITHUB_CONNECTOR"
     LINEAR_CONNECTOR = "LINEAR_CONNECTOR"
+    SCIENTIFIC_PAPER = "SCIENTIFIC_PAPER"
 
 class SearchSourceConnectorType(str, Enum):
     SERPER_API = "SERPER_API" # NOT IMPLEMENTED YET : DON'T REMEMBER WHY : MOST PROBABLY BECAUSE WE NEED TO CRAWL THE RESULTS RETURNED BY IT
@@ -104,6 +108,7 @@ class Document(BaseModel, TimestampMixin):
     search_space_id = Column(Integer, ForeignKey("searchspaces.id", ondelete='CASCADE'), nullable=False)
     search_space = relationship("SearchSpace", back_populates="documents")
     chunks = relationship("Chunk", back_populates="document", cascade="all, delete-orphan")
+    scientific_paper = relationship("ScientificPaper", back_populates="document", uselist=False, cascade="all, delete-orphan")
 
 class Chunk(BaseModel, TimestampMixin):
     __tablename__ = "chunks"
@@ -113,6 +118,84 @@ class Chunk(BaseModel, TimestampMixin):
     
     document_id = Column(Integer, ForeignKey("documents.id", ondelete='CASCADE'), nullable=False)
     document = relationship("Document", back_populates="chunks")
+
+class ScientificPaper(BaseModel, TimestampMixin):
+    __tablename__ = "scientific_papers"
+    
+    # Basic bibliographic information
+    title = Column(String, nullable=False, index=True)
+    authors = Column(ARRAY(String), nullable=True)  # List of author names
+    journal = Column(String, nullable=True, index=True)
+    volume = Column(String, nullable=True)
+    issue = Column(String, nullable=True)
+    pages = Column(String, nullable=True)  # e.g., "123-145" or "e12345"
+    publication_date = Column(Date, nullable=True, index=True)
+    publication_year = Column(Integer, nullable=True, index=True)
+    
+    # Identifiers
+    doi = Column(String, nullable=True, unique=True, index=True)
+    pmid = Column(String, nullable=True, unique=True, index=True)  # PubMed ID
+    arxiv_id = Column(String, nullable=True, unique=True, index=True)
+    isbn = Column(String, nullable=True)
+    issn = Column(String, nullable=True)
+    
+    # Content
+    abstract = Column(Text, nullable=True)
+    keywords = Column(ARRAY(String), nullable=True)
+    full_text = Column(Text, nullable=True)  # Extracted PDF text
+    
+    # File information
+    file_path = Column(String, nullable=False)  # Path to PDF file
+    file_size = Column(Integer, nullable=True)  # File size in bytes
+    file_hash = Column(String, nullable=True, index=True)  # SHA256 hash for deduplication
+    
+    # Citation and reference information
+    citation_count = Column(Integer, nullable=True, default=0)
+    references = Column(JSON, nullable=True)  # List of cited papers
+    cited_by = Column(JSON, nullable=True)  # Papers that cite this one
+    
+    # Categories and subjects
+    subject_areas = Column(ARRAY(String), nullable=True)  # Research areas/fields
+    tags = Column(ARRAY(String), nullable=True)  # User-defined tags
+    
+    # Quality metrics
+    confidence_score = Column(Float, nullable=True)  # Extraction confidence
+    is_open_access = Column(Boolean, nullable=True, default=False)
+    
+    # Processing status
+    processing_status = Column(String, nullable=False, default="pending")  # pending, processing, completed, failed
+    extraction_metadata = Column(JSON, nullable=True)  # Metadata about extraction process
+    
+    # Relations
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete='CASCADE'), nullable=False)
+    document = relationship("Document", back_populates="scientific_paper")
+    
+    annotations = relationship("PaperAnnotation", back_populates="paper", cascade="all, delete-orphan")
+
+class PaperAnnotation(BaseModel, TimestampMixin):
+    __tablename__ = "paper_annotations"
+    
+    # Annotation content
+    content = Column(Text, nullable=False)
+    annotation_type = Column(String, nullable=False, default="note")  # note, highlight, bookmark
+    
+    # Location in PDF
+    page_number = Column(Integer, nullable=True)
+    x_coordinate = Column(Float, nullable=True)
+    y_coordinate = Column(Float, nullable=True)
+    width = Column(Float, nullable=True)
+    height = Column(Float, nullable=True)
+    
+    # Metadata
+    color = Column(String, nullable=True)  # For highlights
+    is_private = Column(Boolean, nullable=False, default=True)
+    
+    # Relations
+    paper_id = Column(Integer, ForeignKey("scientific_papers.id", ondelete='CASCADE'), nullable=False)
+    paper = relationship("ScientificPaper", back_populates="annotations")
+    
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete='CASCADE'), nullable=False)
+    user = relationship("User")
 
 class Podcast(BaseModel, TimestampMixin):
     __tablename__ = "podcasts"

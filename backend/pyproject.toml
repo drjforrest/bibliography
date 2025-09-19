@@ -32,4 +32,10 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "validators>=0.34.0",
     "youtube-transcript-api>=1.0.3",
+    "pymupdf>=1.25.0",
+    "watchdog>=6.1.1",
+    "python-magic>=0.4.27",
+    "bibtexparser>=1.4.0",
+    "scholarly>=1.7.11",
+    "crossref-commons>=0.13.1",
 ]

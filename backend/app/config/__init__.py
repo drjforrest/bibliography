@@ -39,6 +39,10 @@ class Config:
     # Database
     DATABASE_URL = os.getenv("DATABASE_URL")
     
+    # PDF Storage
+    PDF_STORAGE_ROOT = os.getenv("PDF_STORAGE_ROOT", str(BASE_DIR / "data" / "pdfs"))
+    WATCHED_FOLDER = os.getenv("WATCHED_FOLDER", str(BASE_DIR / "data" / "watched"))
+    
     NEXT_FRONTEND_URL = os.getenv("NEXT_FRONTEND_URL")
     
     
