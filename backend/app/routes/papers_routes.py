@@ -127,6 +127,64 @@ async def search_papers(
     )
 
 
+@router.get("/by-folder")
+async def get_papers_by_folder(
+    folder_path: str = Query(...),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get papers in a specific DEVONthink folder path.
+    """
+    from sqlalchemy import select
+    from app.db import ScientificPaper
+
+    stmt = select(ScientificPaper).where(
+        ScientificPaper.dt_source_path.like(f"{folder_path}%")
+    ).limit(100)
+
+    result = await session.execute(stmt)
+    papers = result.scalars().all()
+
+    return {
+        "papers": [PaperResponse.from_orm(paper) for paper in papers],
+        "folder_path": folder_path,
+        "total": len(papers)
+    }
+
+
+@router.get("/{paper_id}/pdf")
+async def get_paper_pdf(
+    paper_id: int,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get PDF file for viewing (not download).
+    """
+    paper_manager = PaperManagerService(session)
+    paper = await paper_manager.get_paper_by_id(paper_id)
+
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    # Get full file path
+    full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+
+    # Return file for inline viewing
+    with open(full_path, 'rb') as f:
+        pdf_bytes = f.read()
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type='application/pdf',
+        headers={"Content-Disposition": "inline"}
+    )
+
+
 @router.get("/{paper_id}/download")
 async def download_paper(
     paper_id: int,
@@ -138,21 +196,21 @@ async def download_paper(
     """
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)
-    
+
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
-    
+
     # Get full file path
     full_path = paper_manager.file_storage.get_full_path(paper.file_path)
-    
+
     if not full_path.exists():
         raise HTTPException(status_code=404, detail="PDF file not found on disk")
-    
+
     # Generate a nice filename
     filename = f"{paper.title[:50]}.pdf" if paper.title else f"paper_{paper_id}.pdf"
     # Clean filename for download
     filename = "".join(c for c in filename if c.isalnum() or c in (' ', '-', '_', '.')).strip()
-    
+
     return FileResponse(
         path=str(full_path),
         filename=filename,

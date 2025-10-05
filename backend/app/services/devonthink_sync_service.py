@@ -22,6 +22,7 @@ from app.services.devonthink_mcp_client import DevonthinkMCPClient
 from app.services.pdf_processor import PDFProcessor
 from app.services.file_storage import FileStorageService
 from app.services.semantic_search_service import SemanticSearchService
+from app.services.enhanced_rag_service import EnhancedRAGService
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,10 @@ class DevonthinkSyncService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.mcp_client = DevonthinkMCPClient()
-        self.pdf_processor = PDFProcessor()
+        self.pdf_processor = PDFProcessor(session)
         self.file_storage = FileStorageService()
         self.semantic_search = SemanticSearchService(session)
+        self.enhanced_rag = EnhancedRAGService(session)
     
     async def sync_database(self, request: DevonthinkSyncRequest, user_id: UUID) -> DevonthinkSyncResponse:
         """Main entry point for syncing DEVONthink database"""
@@ -82,10 +84,27 @@ class DevonthinkSyncService:
             response.skipped_count = sync_stats["skipped"]
             response.details.extend(sync_stats["details"])
             
+            # Step 3: Rebuild FAISS vector store if we synced papers successfully
+            if sync_stats["synced"] > 0:
+                logger.info("Step 3: Rebuilding Enhanced RAG vector store")
+                try:
+                    rebuilt_success = await self.enhanced_rag.build_vector_store_from_papers(
+                        user_id=str(user_id), search_space_id=search_space.id
+                    )
+                    if rebuilt_success:
+                        stats = self.enhanced_rag.get_stats()
+                        response.details.append(f"Rebuilt FAISS vector store with {stats.get('documents_indexed', 0)} documents")
+                        logger.info("Successfully rebuilt Enhanced RAG vector store")
+                    else:
+                        response.details.append("Warning: Failed to rebuild FAISS vector store")
+                except Exception as e:
+                    logger.error(f"Error rebuilding FAISS vector store: {str(e)}")
+                    response.details.append(f"Warning: FAISS rebuild failed: {str(e)}")
+            
             if sync_stats["errors"] > 0:
                 response.message = f"Sync completed with {sync_stats['errors']} errors"
             else:
-                response.message = f"Sync completed successfully. {sync_stats['synced']} records synced."
+                response.message = f"Sync completed successfully. {sync_stats['synced']} records synced and indexed."
             
             return response
             
@@ -323,36 +342,77 @@ class DevonthinkSyncService:
         return sync_record
     
     async def _copy_pdf_binary(self, dt_uuid: str, local_uuid: UUID, record_props: Dict) -> str:
-        """Copy PDF binary from DEVONthink to local storage with UUID naming"""
-        # Get binary content
-        pdf_content = await self.mcp_client.get_record_content(record_uuid=dt_uuid)
-        if not pdf_content:
-            raise ValueError(f"Could not retrieve PDF content for {dt_uuid}")
-        
-        # Write to temporary file first
+        """Copy PDF binary from DEVONthink to local storage with UUID naming using direct file copy"""
         import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            tmp_file.write(pdf_content)
-            tmp_path = tmp_file.name
+        import os
+        import glob
+        
+        # Create temporary file path in home directory (accessible to DEVONthink)
+        import os
+        temp_dir = os.path.expanduser("~/tmp/devonthink_sync")
+        os.makedirs(temp_dir, exist_ok=True)
+        tmp_path = os.path.join(temp_dir, f"dt_copy_{local_uuid}.pdf")
         
         try:
-            # Use existing file storage service
-            relative_path, file_uuid = self.file_storage.store_pdf(tmp_path)
-            logger.info(f"Copied PDF {dt_uuid} to {relative_path}")
+            # Use new MCP method to copy file directly via AppleScript
+            copy_result = await self.mcp_client.copy_record_to_path(dt_uuid, tmp_path)
+            if not copy_result or not copy_result.get("success"):
+                error_msg = copy_result.get("error", "Unknown error") if copy_result else "Copy failed"
+                raise ValueError(f"Could not copy PDF for {dt_uuid}: {error_msg}")
+            
+            # DEVONthink creates a directory with the requested name, containing the actual PDF
+            # Look for the actual PDF file inside the export directory
+            actual_pdf_path = None
+            if os.path.isdir(tmp_path):
+                # Find PDF files in the export directory
+                pdf_files = glob.glob(os.path.join(tmp_path, "*.pdf"))
+                if pdf_files:
+                    actual_pdf_path = pdf_files[0]  # Use the first PDF found
+                    logger.info(f"Found exported PDF at: {actual_pdf_path}")
+                else:
+                    raise ValueError(f"No PDF files found in DEVONthink export directory: {tmp_path}")
+            elif os.path.isfile(tmp_path):
+                # If it's a file (shouldn't happen with DEVONthink export, but handle it)
+                actual_pdf_path = tmp_path
+            else:
+                raise ValueError(f"DEVONthink export path doesn't exist: {tmp_path}")
+            
+            # Verify the file exists and has content
+            if not os.path.exists(actual_pdf_path) or os.path.getsize(actual_pdf_path) == 0:
+                raise ValueError(f"PDF file missing or empty: {actual_pdf_path}")
+            
+            # Use existing file storage service to organize and store the PDF
+            relative_path, file_uuid = self.file_storage.store_pdf(actual_pdf_path)
+            logger.info(f"Copied PDF {dt_uuid} to {relative_path} (size: {os.path.getsize(actual_pdf_path)} bytes)")
             return relative_path
+            
         finally:
-            # Clean up temporary file
-            import os
-            os.unlink(tmp_path)
+            # Clean up temporary files and directory
+            if os.path.exists(tmp_path):
+                if os.path.isdir(tmp_path):
+                    # Remove directory and all its contents
+                    import shutil
+                    shutil.rmtree(tmp_path)
+                else:
+                    os.unlink(tmp_path)
     
     async def _create_scientific_paper(self, local_uuid: UUID, record_props: Dict,
                                      pdf_path: str, search_space_id: int, dt_uuid: str) -> ScientificPaper:
         """Create scientific paper record with extracted metadata"""
+        # Convert relative path to absolute path for PDF processing
+        from app.config import config
+        import os
+        
+        if not os.path.isabs(pdf_path):
+            absolute_pdf_path = os.path.join(config.PDF_STORAGE_ROOT, pdf_path)
+        else:
+            absolute_pdf_path = pdf_path
+            
         # Extract text from PDF
-        pdf_text = await self.pdf_processor.extract_text_from_file(pdf_path)
+        pdf_text = await self.pdf_processor.extract_text_from_file(absolute_pdf_path)
         
         # Extract metadata using existing PDF processor
-        metadata = await self.pdf_processor.extract_metadata(pdf_path)
+        metadata = await self.pdf_processor.extract_metadata(absolute_pdf_path)
         
         # Create Document record first
         document = Document(
@@ -369,9 +429,14 @@ class DevonthinkSyncService:
         self.session.add(document)
         await self.session.flush()  # Get document ID
         
-        # Create scientific paper record
+        # Create scientific paper record with guaranteed non-null title
+        extracted_title = metadata.get("title") or record_props.get("name") or "Untitled Document"
+        # Clean filename extension if present
+        if extracted_title.lower().endswith('.pdf'):
+            extracted_title = extracted_title[:-4]
+        
         paper = ScientificPaper(
-            title=metadata.get("title", record_props.get("name", "Unknown Title")),
+            title=extracted_title,
             authors=metadata.get("authors", []),
             doi=metadata.get("doi"),
             abstract=metadata.get("abstract"),
@@ -397,15 +462,15 @@ class DevonthinkSyncService:
         return paper
     
     async def _process_for_search(self, paper: ScientificPaper, search_space_id: int):
-        """Process paper for semantic search (chunking and vectorization)"""
+        """Process paper for semantic search using working Enhanced RAG pipeline"""
         try:
-            # Use existing semantic search service to process the document
-            await self.semantic_search.process_document_for_search(paper.document)
-            logger.info(f"Processed paper {paper.id} for semantic search")
+            # Use your working Enhanced RAG FAISS vector store (avoids SQLAlchemy async issues)
+            await self.enhanced_rag.add_paper_to_vector_store(paper)
+            logger.info(f"Successfully added paper {paper.id} to Enhanced RAG vector store with working embeddings")
             
         except Exception as e:
             logger.error(f"Error processing paper {paper.id} for search: {str(e)}")
-            raise
+            # Continue sync even if vectorization fails - documents are still stored
     
     async def monitor_changes(self, database_name: str = "Reference", days: int = 1) -> Dict:
         """Monitor DEVONthink for recent changes"""

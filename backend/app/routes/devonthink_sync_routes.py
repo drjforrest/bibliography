@@ -4,8 +4,11 @@ from sqlalchemy import select, func
 from typing import List
 from uuid import UUID
 from datetime import datetime, timezone
+import logging
 
-from app.db import get_async_session, DevonthinkSync, DevonthinkFolder, DevonthinkSyncStatus, SearchSpace
+logger = logging.getLogger(__name__)
+
+from app.db import get_async_session, get_async_session_context, DevonthinkSync, DevonthinkFolder, DevonthinkSyncStatus, SearchSpace
 from app.schemas.devonthink_schemas import (
     DevonthinkSyncRequest, DevonthinkSyncResponse, DevonthinkSyncStatus as SyncStatusSchema,
     DevonthinkFolderHierarchy, DevonthinkMonitorResponse
@@ -17,10 +20,64 @@ from app.db import User
 router = APIRouter(tags=["devonthink"])
 
 
+async def _run_sync_in_background(request: DevonthinkSyncRequest, user_id: UUID):
+    """
+    Wrapper function to run sync in proper async context for background tasks.
+    This creates its own database session to avoid context issues.
+    """
+    try:
+        async with get_async_session_context() as session:
+            sync_service = DevonthinkSyncService(session)
+            result = await sync_service.sync_database(request, user_id)
+            await sync_service.close()
+            return result
+    except Exception as e:
+        logger.error(f"Background sync failed for user {user_id}: {str(e)}")
+        raise
+
+
 @router.get("/health")
 async def devonthink_health_check():
     """Health check endpoint for DEVONthink sync functionality."""
     return {"status": "healthy", "service": "devonthink-sync", "endpoints_available": True}
+
+
+@router.post("/sync-local", response_model=DevonthinkSyncResponse)
+async def sync_devonthink_database_local(
+    request: DevonthinkSyncRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Local development sync endpoint - NO AUTHENTICATION REQUIRED.
+    
+    Sync DEVONthink database with bibliography system using hardcoded user ID.
+    Only for local development!
+    """
+    try:
+        # Use hardcoded user ID for local development
+        USER_ID = UUID("960bc239-c12e-4559-bb86-a5072df1f4a6")
+        
+        sync_service = DevonthinkSyncService(session)
+        
+        # For large syncs, run in background
+        if request.folder_path is None:  # Full database sync
+            background_tasks.add_task(
+                _run_sync_in_background, request, USER_ID
+            )
+            return DevonthinkSyncResponse(
+                success=True,
+                message=f"Full database sync started in background for user {USER_ID}. Check sync status for progress.",
+                details=["Background sync initiated for entire database", f"Using local user ID: {USER_ID}"]
+            )
+        else:
+            # Smaller folder sync can run in foreground
+            response = await sync_service.sync_database(request, USER_ID)
+            await sync_service.close()
+            return response
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 
 @router.post("/sync", response_model=DevonthinkSyncResponse)

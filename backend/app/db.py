@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from enum import Enum
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
 from fastapi import Depends
@@ -141,6 +142,7 @@ class ScientificPaper(BaseModel, TimestampMixin):
     
     # Content
     abstract = Column(Text, nullable=True)
+    lay_summary = Column(Text, nullable=True)  # AI-generated lay summary for general audiences
     keywords = Column(ARRAY(String), nullable=True)
     full_text = Column(Text, nullable=True)  # Extracted PDF text
     
@@ -329,6 +331,11 @@ async def create_db_and_tables():
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+
+@asynccontextmanager
+async def get_async_session_context() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
 

@@ -204,17 +204,234 @@ class SemanticSearchService:
         subject_counts = {}
         for subject in all_subjects:
             subject_counts[subject] = subject_counts.get(subject, 0) + 1
-        subject_areas = sorted(subject_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        top_subjects = sorted(subject_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         
         return {
             "total_papers": total_papers,
-            "avg_confidence": round(avg_confidence, 3),
-            "avg_search_score": round(sum(r.get("score", 0.0) for r in results) / len(results), 3),
-            "top_journals": [{"journal": j, "count": c} for j, c in top_journals],
-            "publication_years": [{"year": y, "count": c} for y, c in publication_years],
-            "top_authors": [{"author": a, "count": c} for a, c in top_authors],
-            "subject_areas": [{"area": s, "count": c} for s, c in subject_areas]
+            "avg_confidence": round(avg_confidence, 2),
+            "top_journals": top_journals,
+            "publication_years": publication_years,
+            "top_authors": top_authors,
+            "subject_areas": top_subjects
         }
+    
+    async def process_document_for_search(self, document: Document):
+        """Process a document for semantic search by creating chunks and embeddings"""
+        try:
+            logger.info(f"Processing document {document.id} for semantic search")
+            
+            # Generate embedding for the full document using working HuggingFace embeddings
+            if document.content and not document.embedding:
+                try:
+                    from langchain_community.embeddings import HuggingFaceEmbeddings
+                    
+                    # Use the working embedding model
+                    embeddings = HuggingFaceEmbeddings(
+                        model_name="all-MiniLM-L6-v2",
+                        model_kwargs={"device": "cpu"}
+                    )
+                    
+                    content_to_embed = document.content[:8000]  # Limit content length
+                    embedding = embeddings.embed_query(content_to_embed)
+                    document.embedding = embedding
+                    logger.info(f"Generated embedding for document {document.id} using HuggingFace model")
+                except Exception as e:
+                    logger.warning(f"Failed to generate embedding for document {document.id}: {str(e)}")
+                    # Continue without embedding
+            
+            # Flush changes after embedding generation
+            if document.embedding:
+                await self.session.flush()
+            
+            # Create chunks for more granular search
+            await self._create_document_chunks_with_working_embeddings(document)
+            
+            logger.info(f"Successfully processed document {document.id} for search")
+            
+        except Exception as e:
+            logger.error(f"Error processing document {document.id} for search: {str(e)}")
+            raise
+    
+    async def _create_document_chunks(self, document: Document):
+        """Create searchable chunks from document content"""
+        try:
+            if not document.content:
+                return
+            
+            # Simple chunking strategy - split by paragraphs or fixed size
+            content = document.content
+            chunk_size = 1000  # characters
+            overlap = 200      # characters
+            
+            chunks = []
+            start = 0
+            chunk_id = 1
+            
+            while start < len(content):
+                end = min(start + chunk_size, len(content))
+                
+                # Try to break at sentence or paragraph boundary
+                if end < len(content):
+                    # Look for sentence ending within the last 100 characters
+                    sentence_end = content.rfind('.', start + chunk_size - 100, end)
+                    if sentence_end > start:
+                        end = sentence_end + 1
+                
+                chunk_content = content[start:end].strip()
+                
+                if chunk_content:
+                    # Generate embedding for this chunk using sync approach
+                    try:
+                        chunk_embedding = config.embedding_model_instance.embed_query(chunk_content)
+                    except Exception as e:
+                        logger.warning(f"Failed to generate embedding for chunk: {str(e)}")
+                        chunk_embedding = None
+                    
+                    # Create chunk record
+                    chunk = Chunk(
+                        content=chunk_content,
+                        embedding=chunk_embedding,
+                        document_id=document.id
+                    )
+                    
+                    self.session.add(chunk)
+                    chunks.append(chunk)
+                
+                # Move to next chunk with overlap
+                start = max(start + chunk_size - overlap, end)
+                chunk_id += 1
+                
+                # Limit number of chunks to prevent excessive processing
+                if len(chunks) >= 50:
+                    break
+            
+            await self.session.flush()
+            logger.info(f"Created {len(chunks)} chunks for document {document.id}")
+            
+        except Exception as e:
+            logger.error(f"Error creating chunks for document {document.id}: {str(e)}")
+            raise
+    
+    async def _create_document_chunks_simple(self, document: Document):
+        """Create searchable chunks from document content without embeddings"""
+        try:
+            if not document.content:
+                return
+            
+            # Simple chunking strategy - split by paragraphs or fixed size
+            content = document.content
+            chunk_size = 1000  # characters
+            overlap = 200      # characters
+            
+            chunks = []
+            start = 0
+            chunk_id = 1
+            
+            while start < len(content):
+                end = min(start + chunk_size, len(content))
+                
+                # Try to break at sentence or paragraph boundary
+                if end < len(content):
+                    # Look for sentence ending within the last 100 characters
+                    sentence_end = content.rfind('.', start + chunk_size - 100, end)
+                    if sentence_end > start:
+                        end = sentence_end + 1
+                
+                chunk_content = content[start:end].strip()
+                
+                if chunk_content:
+                    # Create chunk record without embedding for now
+                    chunk = Chunk(
+                        content=chunk_content,
+                        embedding=None,  # Skip embedding generation
+                        document_id=document.id
+                    )
+                    
+                    self.session.add(chunk)
+                    chunks.append(chunk)
+                
+                # Move to next chunk with overlap
+                start = max(start + chunk_size - overlap, end)
+                chunk_id += 1
+                
+                # Limit number of chunks to prevent excessive processing
+                if len(chunks) >= 50:
+                    break
+            
+            await self.session.flush()
+            logger.info(f"Created {len(chunks)} chunks for document {document.id} (without embeddings)")
+            
+        except Exception as e:
+            logger.error(f"Error creating simple chunks for document {document.id}: {str(e)}")
+            raise
+    
+    async def _create_document_chunks_with_working_embeddings(self, document: Document):
+        """Create searchable chunks from document content with working embeddings"""
+        try:
+            if not document.content:
+                return
+            
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            
+            # Initialize the working embedding model
+            embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2",
+                model_kwargs={"device": "cpu"}
+            )
+            
+            # Simple chunking strategy - split by paragraphs or fixed size
+            content = document.content
+            chunk_size = 1000  # characters
+            overlap = 200      # characters
+            
+            chunks = []
+            start = 0
+            chunk_id = 1
+            
+            while start < len(content):
+                end = min(start + chunk_size, len(content))
+                
+                # Try to break at sentence or paragraph boundary
+                if end < len(content):
+                    # Look for sentence ending within the last 100 characters
+                    sentence_end = content.rfind('.', start + chunk_size - 100, end)
+                    if sentence_end > start:
+                        end = sentence_end + 1
+                
+                chunk_content = content[start:end].strip()
+                
+                if chunk_content:
+                    # Generate embedding for this chunk using working model
+                    try:
+                        chunk_embedding = embeddings.embed_query(chunk_content)
+                    except Exception as e:
+                        logger.warning(f"Failed to generate embedding for chunk: {str(e)}")
+                        chunk_embedding = None
+                    
+                    # Create chunk record
+                    chunk = Chunk(
+                        content=chunk_content,
+                        embedding=chunk_embedding,
+                        document_id=document.id
+                    )
+                    
+                    self.session.add(chunk)
+                    chunks.append(chunk)
+                
+                # Move to next chunk with overlap
+                start = max(start + chunk_size - overlap, end)
+                chunk_id += 1
+                
+                # Limit number of chunks to prevent excessive processing
+                if len(chunks) >= 50:
+                    break
+            
+            await self.session.flush()
+            logger.info(f"Created {len(chunks)} chunks with embeddings for document {document.id}")
+            
+        except Exception as e:
+            logger.error(f"Error creating chunks with embeddings for document {document.id}: {str(e)}")
+            raise
     
     async def similar_papers_search(
         self,

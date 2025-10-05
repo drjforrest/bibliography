@@ -70,6 +70,9 @@ class PDFProcessor:
             # Extract references (basic implementation)
             references = self._extract_references(full_text)
             
+            # Get page count before closing
+            page_count = len(doc)
+            
             # Close the document
             doc.close()
             
@@ -91,7 +94,7 @@ class PDFProcessor:
                 'references': references,
                 'extraction_metadata': {
                     'processed_at': datetime.utcnow().isoformat(),
-                    'pdf_pages': len(doc) if 'doc' in locals() else 0,
+                    'pdf_pages': page_count,
                     'pdf_metadata': metadata,
                     'extraction_confidence': self._calculate_confidence_score(title, authors, abstract)
                 },
@@ -123,8 +126,11 @@ class PDFProcessor:
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
             text = page.get_text()
+            # Clean null bytes and other problematic characters for PostgreSQL
+            text = text.replace('\x00', '').replace('\ufffd', '')
             full_text += f"\n--- Page {page_num + 1} ---\n{text}\n"
-        return full_text.strip()
+        # Final cleanup of null bytes and replacement characters
+        return full_text.replace('\x00', '').replace('\ufffd', '').strip()
     
     def _extract_title(self, doc: fitz.Document, metadata: Dict, full_text: str) -> Optional[str]:
         """Extract title from PDF using multiple strategies."""
@@ -198,6 +204,43 @@ class PDFProcessor:
                             authors.append(author)
         
         return authors[:10]  # Limit to reasonable number
+    
+    async def extract_text_from_file(self, file_path: str) -> str:
+        """Extract text from PDF file - wrapper for sync service compatibility"""
+        try:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"PDF file not found: {file_path}")
+            
+            doc = fitz.open(file_path)
+            full_text = self._extract_full_text(doc)
+            doc.close()
+            return full_text
+            
+        except Exception as e:
+            logger.error(f"Error extracting text from {file_path}: {str(e)}")
+            return ""
+    
+    async def extract_metadata(self, file_path: str) -> Dict:
+        """Extract metadata from PDF file - wrapper for sync service compatibility"""
+        try:
+            result = await self.process_pdf(file_path)
+            
+            # Return simplified metadata format expected by sync service
+            return {
+                'title': result.get('title'),
+                'authors': result.get('authors', []),
+                'doi': result.get('doi'),
+                'abstract': result.get('abstract'),
+                'publication_year': result.get('publication_year'),
+                'publication_date': None,  # Would need date parsing from year
+                'journal': result.get('journal'),
+                'keywords': result.get('keywords', []),
+                'confidence_score': result.get('extraction_metadata', {}).get('extraction_confidence')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error extracting metadata from {file_path}: {str(e)}")
+            return {}
     
     def _is_valid_author_name(self, name: str) -> bool:
         """Check if a string looks like a valid author name."""

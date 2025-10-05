@@ -11,6 +11,9 @@ from app.schemas import UserCreate, UserRead, UserUpdate
 
 from app.routes import router as crud_router
 from app.routes.devonthink_sync_routes import router as devonthink_router
+from app.routes.enhanced_rag_routes import router as enhanced_rag_router
+from app.routes.automated_ingestion_routes import router as automated_ingestion_router
+from app.routes.admin_routes import router as admin_router
 from app.config import config
 
 from app.users import (
@@ -78,6 +81,9 @@ if config.AUTH_TYPE == "GOOGLE":
 
 app.include_router(crud_router, prefix="/api/v1", tags=["crud"])
 app.include_router(devonthink_router, prefix="/devonthink", tags=["devonthink"])
+app.include_router(enhanced_rag_router, tags=["enhanced-rag"])
+app.include_router(automated_ingestion_router, tags=["automated-ingestion"])
+app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
 
 
 @app.get("/verify-token")
