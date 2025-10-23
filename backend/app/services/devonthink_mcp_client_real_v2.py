@@ -202,9 +202,13 @@ class DevonthinkMCPClientRealV2:
             logger.error(f"Error getting databases: {str(e)}")
             return []
     
-    async def search_records(self, query: str, database_name: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+    async def search_records(self, query: str, database_name: str = None, limit: int = None) -> List[Dict[str, Any]]:
         """Search for records in DEVONthink with pagination support"""
         try:
+            # Handle None limit by setting a reasonable default
+            if limit is None:
+                limit = 1000  # Default to 1000 if no limit specified
+            
             # Use smaller batch sizes to prevent MCP response overflow
             batch_size = min(limit, 50)  # Limit to 50 records per batch
             all_results = []

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Professor's Message Board</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2c3e50",
+            "secondary": "#ecf0f1",
+            "accent": "#27ae60",
+            "text-primary": "#34495e",
+            "background-light": "#f6f7f8",
+            "background-dark": "#101922",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "0.75rem",
+            "xl": "1rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-text-primary">
+<div class="flex h-screen">
+<!-- Left Column: Navigation Panel -->
+<aside class="w-1/4 bg-white dark:bg-gray-800 p-6 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700">
+<div>
+<div class="flex items-center gap-3 mb-8">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-12" data-alt="University logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCcECkDV0tOZVSJPC32BjmcbNw0s3rbcqPQ8Z98zXs1AnSwzEMtJbRFpXBF-4O__Q3igb94REKNeFyLOJSk5PrK5PpPtYC3BOeD0vEItqhHq1ul35LpitKfWatDF9r6hjZn5N5Acr1TVdzMOUx3AA0kTxKyJlU9u-fW7gV8VMF0pMnxBmkzt-6AVA8eAD50B5v6cmdD8cannnQhVFcWSefobbT1bXC9c2PI26TJab6yJCkKtsseH2bns93hAw9y3KMfQnA_rcOtrRKP");'></div>
+<div class="flex flex-col">
+<h1 class="text-lg font-bold text-primary dark:text-white">Digital Library</h1>
+<p class="text-sm text-gray-500 dark:text-gray-400">Professor Portal</p>
+</div>
+</div>
+<div class="mb-6">
+<label class="flex flex-col min-w-40 h-11 w-full">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-gray-500 flex border-none bg-secondary dark:bg-gray-700 items-center justify-center pl-3 rounded-l-lg border-r-0">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-r-lg text-text-primary dark:text-white focus:outline-none focus:ring-0 border-none bg-secondary dark:bg-gray-700 h-full placeholder:text-gray-500 dark:placeholder-gray-400 px-2 text-sm" placeholder="Search topics..." value=""/>
+</div>
+</label>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-secondary dark:bg-gray-700" href="#">
+<span class="material-symbols-outlined text-primary dark:text-accent">campaign</span>
+<p class="text-sm font-medium text-primary dark:text-white">General Announcements</p>
+<span class="ml-auto w-2 h-2 bg-accent rounded-full"></span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-secondary dark:hover:bg-gray-700" href="#">
+<span class="material-symbols-outlined text-text-primary dark:text-gray-300">science</span>
+<p class="text-sm font-medium text-text-primary dark:text-gray-300">Research Methodologies</p>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-secondary dark:hover:bg-gray-700" href="#">
+<span class="material-symbols-outlined text-text-primary dark:text-gray-300">groups</span>
+<p class="text-sm font-medium text-text-primary dark:text-gray-300">Upcoming Conferences</p>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-secondary dark:hover:bg-gray-700" href="#">
+<span class="material-symbols-outlined text-text-primary dark:text-gray-300">description</span>
+<p class="text-sm font-medium text-text-primary dark:text-gray-300">Paper-Specific Discussions</p>
+<span class="ml-auto w-2 h-2 bg-accent rounded-full"></span>
+</a>
+</nav>
+</div>
+<button class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-accent text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-green-600 transition-colors">
+<span class="material-symbols-outlined">add</span>
+<span class="truncate">Add New Topic</span>
+</button>
+</aside>
+<!-- Right Column: Message Thread -->
+<main class="w-3/4 flex flex-col h-screen">
+<header class="flex-shrink-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700">
+<div class="flex flex-wrap justify-between items-center gap-3">
+<h2 class="text-3xl font-extrabold tracking-tight text-primary dark:text-white">General Announcements</h2>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<!-- Message 1 -->
+<div class="flex w-full flex-row items-start justify-start gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-11 shrink-0" data-alt="Dr. Eleanor Vance avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBMNXPy3tkziIIN5AdGgxBYXE5l5MWIEx8yUwVMhv7ugVdwdDB1kmkg0XbUwpzUsdF6ieEUFKXCxxF594Yj94u7qkvmqMzuCdMn8nqxQhAg3lPWM4BMopj1ESgcWN6zahUYqam9fdH4yfVVGt9qHKFGznO_Qy6rUYnPpqwA3Uz3HI0EHOywz_h_iT1btv-CtTnwJyKZZ_6ghEPNUFniTbH1snzZtpVAyg2VG56Qx4zjZVCHNXzEofmiiawW1yarFdkQMry9nBij2luY");'></div>
+<div class="flex h-full flex-1 flex-col items-start justify-start">
+<div class="flex w-full flex-row items-center justify-start gap-x-3">
+<p class="text-base font-bold text-text-primary dark:text-white">Dr. Eleanor Vance</p>
+<p class="text-sm text-gray-500 dark:text-gray-400">2 hours ago</p>
+</div>
+<p class="text-base text-text-primary dark:text-gray-300 mt-1">
+              Just a reminder that the deadline for conference submissions is this Friday. Please ensure all papers are uploaded to the shared drive by then.
+            </p>
+<div class="flex w-full flex-row items-center justify-start gap-4 pt-3">
+<button class="flex items-center gap-2 text-sm text-gray-500 hover:text-primary dark:hover:text-accent transition-colors">
+<span class="material-symbols-outlined text-lg">reply</span>
+<span>Reply</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Threaded Reply 1 -->
+<div class="flex w-full flex-row items-start justify-start gap-4 pl-16">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-11 shrink-0" data-alt="Dr. Ben Carter avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBfwzE6V2DcmDn-oHpeU58twCywYFsrvTuYUKlAASLWdE0FCmVQlXHWqSzuQjNp8KKd2zI4AwjN7-RYfKvNkG8NN7m7a0opa2ZpCQ_Lck20bhRNBV_xaQ8pJJU6S32Q9Y34eaKEWMcWydl80OWnNzVIuBIlgpVTW0iMhT0oOp7JWsP-xDjKt0q_x5mBmA4BbaRlhx9D8l0GmSAHC-y2Pz7NURubznsHeg3HDVLPMA0fgrKwfWVZY8sBDRDip7bOk6Ji1lXto4ixDdK6");'></div>
+<div class="flex h-full flex-1 flex-col items-start justify-start">
+<div class="flex w-full flex-row items-center justify-start gap-x-3">
+<p class="text-base font-bold text-text-primary dark:text-white">Dr. Ben Carter</p>
+<p class="text-sm text-gray-500 dark:text-gray-400">1 hour ago</p>
+</div>
+<p class="text-base text-text-primary dark:text-gray-300 mt-1">
+              Thanks for the reminder, Eleanor. I've just uploaded mine. Looking forward to everyone's feedback.
+            </p>
+<div class="flex w-full flex-row items-center justify-start gap-4 pt-3">
+<button class="flex items-center gap-2 text-sm text-gray-500 hover:text-primary dark:hover:text-accent transition-colors">
+<span class="material-symbols-outlined text-lg">reply</span>
+<span>Reply</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Message 2 -->
+<div class="flex w-full flex-row items-start justify-start gap-4 pt-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-11 shrink-0" data-alt="Dr. Olivia Chen avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDDX5tsmUVQ72YlTPLkWrpLh7pkOxoJzfAgVU2cazQ-OItwDtcGx7mSDXq5Ci-vbsN_V3E1JR1cKBn8qxVpkpOZp-Qj0fiWhJM14twYwUA9OE3lfKRz_SZnkH1GE1kp-F1ln73_7q9mqp0S1LL1e452VDQZkwC5Mc2USMQIJn0kwaV9vr6f10DyxIOt6kZVn2GZiC177aqNR7z7wRd8L7dJjZ2sFpZxAAzdhMQxvlCZnWxH4g0SFTJGCT9Z58uaK02GRfsfBJPugIVu");'></div>
+<div class="flex h-full flex-1 flex-col items-start justify-start">
+<div class="flex w-full flex-row items-center justify-start gap-x-3">
+<p class="text-base font-bold text-text-primary dark:text-white">Dr. Olivia Chen</p>
+<p class="text-sm text-gray-500 dark:text-gray-400">45 minutes ago</p>
+</div>
+<p class="text-base text-text-primary dark:text-gray-300 mt-1">
+              Has anyone had a chance to review the new guidelines for the university's research grant proposals? I have a few questions.
+            </p>
+<div class="flex w-full flex-row items-center justify-start gap-4 pt-3">
+<button class="flex items-center gap-2 text-sm text-gray-500 hover:text-primary dark:hover:text-accent transition-colors">
+<span class="material-symbols-outlined text-lg">reply</span>
+<span>Reply</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<footer class="flex-shrink-0 bg-white dark:bg-gray-800 p-6 border-t border-gray-200 dark:border-gray-700">
+<div class="flex items-start gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-11 shrink-0" data-alt="Current user avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA9XcEFw2VwLpC5_4H4ZwRYWSfxCSF-8AMU1iRo7iT31x2YBPoje4H61KfQH3MoEsuU2J2HgD38YJ7rLCsaTKh6rON3Z4J3M_dT83i8lHETbe5fs1COejXiVmSCdbrBD0Lm-tR8-FGLK8lG7xecRlm8pws779lKpPI38ygWGD92hj1poC0RcUiWGyodp85ga95SjEkNLTZH6mFHEl7YHjXIFF-Odml7bBElOxorTsJlsvXgBxXnXuVaE_nw13d3WDScmgzW98AdNu20");'></div>
+<div class="flex-1">
+<textarea class="form-textarea w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-text-primary dark:text-white placeholder:text-gray-400 focus:ring-primary focus:border-primary" placeholder="Write a message..." rows="3"></textarea>
+<div class="flex justify-end mt-2">
+<button class="flex items-center justify-center gap-2 rounded-lg h-10 px-5 bg-accent text-white text-sm font-bold leading-normal hover:bg-green-600 transition-colors">
+<span>Send</span>
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+</footer>
+</main>
+</div>
+</body></html>

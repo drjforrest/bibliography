@@ -23,6 +23,7 @@ from app.services.pdf_processor import PDFProcessor
 from app.services.file_storage import FileStorageService
 from app.services.semantic_search_service import SemanticSearchService
 from app.services.enhanced_rag_service import EnhancedRAGService
+from app.services.embedding_service import EmbeddingService
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class DevonthinkSyncService:
         self.file_storage = FileStorageService()
         self.semantic_search = SemanticSearchService(session)
         self.enhanced_rag = EnhancedRAGService(session)
+        self.embedding_service = EmbeddingService(session)
     
     async def sync_database(self, request: DevonthinkSyncRequest, user_id: UUID) -> DevonthinkSyncResponse:
         """Main entry point for syncing DEVONthink database"""
@@ -67,10 +69,14 @@ class DevonthinkSyncService:
                 details=[]
             )
             
-            # Step 1: Map directory structure
+            # Step 1: Map directory structure (optional - skip if get_open_databases fails)
             logger.info("Step 1: Mapping directory structure")
-            hierarchy = await self._map_directory_hierarchy(request.database_name, user_id, request.folder_path)
-            response.details.append(f"Mapped {len(hierarchy)} folders")
+            try:
+                hierarchy = await self._map_directory_hierarchy(request.database_name, user_id, request.folder_path)
+                response.details.append(f"Mapped {len(hierarchy)} folders")
+            except Exception as e:
+                logger.warning(f"Directory mapping failed (continuing without it): {str(e)}")
+                response.details.append("Directory mapping skipped due to MCP issue - sync will continue")
             
             # Step 2: Sync records
             logger.info("Step 2: Syncing records")
@@ -462,11 +468,28 @@ class DevonthinkSyncService:
         return paper
     
     async def _process_for_search(self, paper: ScientificPaper, search_space_id: int):
-        """Process paper for semantic search using working Enhanced RAG pipeline"""
+        """Process paper for semantic search using both pgvector and Enhanced RAG"""
         try:
-            # Use your working Enhanced RAG FAISS vector store (avoids SQLAlchemy async issues)
-            await self.enhanced_rag.add_paper_to_vector_store(paper)
-            logger.info(f"Successfully added paper {paper.id} to Enhanced RAG vector store with working embeddings")
+            # Step 1: Populate pgvector embeddings in PostgreSQL
+            logger.info(f"Generating pgvector embeddings for paper {paper.id}")
+            
+            # Embed the document itself
+            doc_embedded = await self.embedding_service.embed_document(paper.document_id)
+            if doc_embedded:
+                logger.info(f"Successfully embedded document {paper.document_id} in pgvector")
+            
+            # Create and embed chunks
+            chunks_embedded = await self.embedding_service.create_and_embed_chunks(paper.document)
+            if chunks_embedded:
+                logger.info(f"Successfully created and embedded chunks for document {paper.document_id}")
+            
+            # Step 2: Also add to Enhanced RAG FAISS store for compatibility
+            try:
+                await self.enhanced_rag.add_paper_to_vector_store(paper)
+                logger.info(f"Successfully added paper {paper.id} to Enhanced RAG FAISS vector store")
+            except Exception as rag_error:
+                logger.warning(f"Enhanced RAG indexing failed for paper {paper.id}: {str(rag_error)}")
+                # Don't fail the whole process if just FAISS fails
             
         except Exception as e:
             logger.error(f"Error processing paper {paper.id} for search: {str(e)}")

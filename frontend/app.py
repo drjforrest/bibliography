@@ -7,6 +7,7 @@ import base64
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/api/v1"
+AUTH_BASE_URL = "http://localhost:8000"
 
 # Session state initialization
 if 'authenticated' not in st.session_state:
@@ -19,8 +20,9 @@ if 'user' not in st.session_state:
 class BibliographyAPI:
     """API client for the bibliography backend."""
     
-    def __init__(self, base_url: str, token: Optional[str] = None):
+    def __init__(self, base_url: str, auth_base_url: str = None, token: Optional[str] = None):
         self.base_url = base_url
+        self.auth_base_url = auth_base_url or base_url
         self.token = token
     
     @property
@@ -33,7 +35,7 @@ class BibliographyAPI:
     def login(self, email: str, password: str) -> Dict:
         """Login and get authentication token."""
         response = requests.post(
-            f"{self.base_url}/auth/jwt/login",
+            f"{self.auth_base_url}/auth/jwt/login",
             data={"username": email, "password": password},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -180,7 +182,7 @@ class BibliographyAPI:
         """Trigger DEVONthink sync."""
         response = requests.post(
             "http://localhost:8000/devonthink/sync",
-            json={"database_name": database_name},
+            json={"database_name": database_name, "search_space_id": 2},
             headers=self.headers
         )
         return response.json() if response.status_code == 200 else {"error": response.text}
@@ -320,7 +322,7 @@ def login_page():
         submit = st.form_submit_button("Login")
         
         if submit and email and password:
-            api = BibliographyAPI(API_BASE_URL)
+            api = BibliographyAPI(API_BASE_URL, AUTH_BASE_URL)
             result = api.login(email, password)
             
             if "access_token" in result:
@@ -333,7 +335,7 @@ def login_page():
 
 def main_app():
     """Main application interface."""
-    api = BibliographyAPI(API_BASE_URL, st.session_state.token)
+    api = BibliographyAPI(API_BASE_URL, AUTH_BASE_URL, st.session_state.token)
     
     # Sidebar
     st.sidebar.title("📚 Bibliography")

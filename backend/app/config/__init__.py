@@ -7,6 +7,12 @@ from dotenv import load_dotenv
 from langchain_community.chat_models import ChatLiteLLM
 from rerankers import Reranker
 
+# Try to import OpenAI embeddings from the new package
+try:
+    from langchain_openai import OpenAIEmbeddings
+except ImportError:
+    from langchain_community.embeddings import OpenAIEmbeddings
+
 
 # Get the base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -79,15 +85,42 @@ class Config:
     else:
         strategic_llm_instance = ChatLiteLLM(model=STRATEGIC_LLM)
 
-    # Chonkie Configuration | Edit this to your needs
+    # Embedding Configuration
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
-    embedding_model_instance = AutoEmbeddings.get_embeddings(EMBEDDING_MODEL)
-    chunker_instance = RecursiveChunker(
-        chunk_size=getattr(embedding_model_instance, 'max_seq_length', 512)
-    )
-    code_chunker_instance = CodeChunker(
-        chunk_size=getattr(embedding_model_instance, 'max_seq_length', 512)
-    )
+    
+    # Configure embedding model based on the type
+    if EMBEDDING_MODEL and EMBEDDING_MODEL.startswith("openai://"):
+        # Ollama via OpenAI API compatibility
+        model_name = EMBEDDING_MODEL.replace("openai://", "")
+        try:
+            # Try with newer langchain-openai parameters
+            embedding_model_instance = OpenAIEmbeddings(
+                model=model_name,
+                base_url=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
+                api_key=os.getenv("OPENAI_API_KEY", "ollama")
+            )
+        except:
+            # Fallback to older parameter names
+            embedding_model_instance = OpenAIEmbeddings(
+                model=model_name,
+                openai_api_base=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
+                openai_api_key=os.getenv("OPENAI_API_KEY", "ollama")
+            )
+        
+        # Set dimension manually for known models
+        if "nomic" in model_name:
+            embedding_model_instance.dimension = 768
+        else:
+            embedding_model_instance.dimension = 1536  # Default OpenAI dimension
+    else:
+        # Use Chonkie AutoEmbeddings for other models
+        embedding_model_instance = AutoEmbeddings.get_embeddings(EMBEDDING_MODEL)
+    
+    # Configure chunkers
+    chunk_size = getattr(embedding_model_instance, 'dimension', 512)
+    # Use a reasonable chunk size (not the embedding dimension)
+    chunker_instance = RecursiveChunker(chunk_size=512)
+    code_chunker_instance = CodeChunker(chunk_size=512)
     
     # Reranker's Configuration | Pinecode, Cohere etc. Read more at https://github.com/AnswerDotAI/rerankers?tab=readme-ov-file#usage
     RERANKERS_MODEL_NAME = os.getenv("RERANKERS_MODEL_NAME")
