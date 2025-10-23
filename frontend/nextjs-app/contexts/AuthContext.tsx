@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await axios.post(`${API_BASE_URL}/api/v1/auth/jwt/login`, formData, {
+      const response = await axios.post(`${API_BASE_URL}/auth/jwt/login`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { access_token } = response.data;
 
       // Get user info
-      const userResponse = await axios.get(`${API_BASE_URL}/api/v1/users/me`, {
+      const userResponse = await axios.get(`${API_BASE_URL}/users/me`, {
         headers: {
           Authorization: `Bearer ${access_token}`,
         },
@@ -78,10 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/v1/auth/register`, {
+      const response = await axios.post(`${API_BASE_URL}/auth/register`, {
         email,
         password,
-        name,
+        is_active: true,
+        is_verified: false,
       });
 
       // Auto-login after registration
@@ -104,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return;
 
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/v1/users/me`, {
+      const response = await axios.get(`${API_BASE_URL}/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

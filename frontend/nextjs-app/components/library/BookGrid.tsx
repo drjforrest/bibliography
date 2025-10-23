@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import type { Paper, ViewMode } from '@/types';
-import BookCard from './BookCard';
+import type { Paper, ViewMode } from "@/types";
+import BookCard from "./BookCard";
 
 interface BookGridProps {
   papers: Paper[];
@@ -25,7 +25,7 @@ export default function BookGrid({ papers, view }: BookGridProps) {
     );
   }
 
-  if (view === 'list') {
+  if (view === "list") {
     return (
       <div className="space-y-4">
         {papers.map((paper) => (
@@ -38,7 +38,7 @@ export default function BookGrid({ papers, view }: BookGridProps) {
               style={{
                 backgroundImage: paper.coverImage
                   ? `url(${paper.coverImage})`
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
               }}
             />
             <div className="flex-1">
@@ -46,21 +46,21 @@ export default function BookGrid({ papers, view }: BookGridProps) {
                 {paper.title}
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                {paper.authors.join(', ')} {paper.year && `(${paper.year})`}
+                {paper.authors.join(", ")} {paper.year && `(${paper.year})`}
               </p>
               {paper.abstract && (
                 <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
                   {paper.abstract}
                 </p>
               )}
-              {paper.topics && paper.topics.length > 0 && (
+              {paper.tags && paper.tags.length > 0 && (
                 <div className="flex gap-2 mt-2">
-                  {paper.topics.map((topic, index) => (
+                  {paper.tags.map((tag, index) => (
                     <span
                       key={index}
                       className="text-xs px-2 py-1 bg-primary/10 text-primary dark:bg-primary/20 dark:text-blue-300 rounded"
                     >
-                      {topic}
+                      {tag}
                     </span>
                   ))}
                 </div>

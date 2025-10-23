@@ -2,6 +2,30 @@
 
 A comprehensive bibliography management system for scientific papers with PDF processing, metadata extraction, citation formatting, and team collaboration features.
 
+## ⚡ Quick Start (Development)
+
+**Start the entire development environment with one command:**
+
+```bash
+./dev.sh
+```
+
+This will:
+- ✅ Check all prerequisites
+- ✅ Start FastAPI backend on http://localhost:8000
+- ✅ Start Next.js frontend on http://localhost:3000
+- ✅ Show helpful logs and status
+
+**Or use helper scripts:**
+```bash
+./scripts/setup-db.sh         # Initialize database
+./scripts/create-user.sh      # Create your first user
+./scripts/import-data.sh      # Import your 250 papers
+./scripts/health-check.sh     # Check if services are running
+```
+
+📖 **For complete development setup**, see [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)
+
 ## Features ✨
 
 ### Core Functionality

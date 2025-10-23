@@ -18,6 +18,7 @@ from sqlalchemy import (
     Integer,
     JSON,
     String,
+    Table,
     Text,
     text,
     TIMESTAMP
@@ -175,33 +176,63 @@ class ScientificPaper(BaseModel, TimestampMixin):
     # Relations
     document_id = Column(Integer, ForeignKey("documents.id", ondelete='CASCADE'), nullable=False)
     document = relationship("Document", back_populates="scientific_paper")
-    
+
     annotations = relationship("PaperAnnotation", back_populates="paper", cascade="all, delete-orphan")
+    tag_objects = relationship("Tag", secondary="paper_tags", back_populates="papers")
 
 class PaperAnnotation(BaseModel, TimestampMixin):
     __tablename__ = "paper_annotations"
-    
+
     # Annotation content
     content = Column(Text, nullable=False)
     annotation_type = Column(String, nullable=False, default="note")  # note, highlight, bookmark
-    
+
     # Location in PDF
     page_number = Column(Integer, nullable=True)
     x_coordinate = Column(Float, nullable=True)
     y_coordinate = Column(Float, nullable=True)
     width = Column(Float, nullable=True)
     height = Column(Float, nullable=True)
-    
+
     # Metadata
     color = Column(String, nullable=True)  # For highlights
     is_private = Column(Boolean, nullable=False, default=True)
-    
+
     # Relations
     paper_id = Column(Integer, ForeignKey("scientific_papers.id", ondelete='CASCADE'), nullable=False)
     paper = relationship("ScientificPaper", back_populates="annotations")
-    
+
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete='CASCADE'), nullable=False)
     user = relationship("User")
+
+# Many-to-many association table for papers and tags
+paper_tags = Table(
+    'paper_tags',
+    Base.metadata,
+    Column('paper_id', Integer, ForeignKey('scientific_papers.id', ondelete='CASCADE'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+)
+
+class Tag(BaseModel, TimestampMixin):
+    __tablename__ = "tags"
+
+    # Tag information
+    name = Column(String(100), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    color = Column(String(20), nullable=True, default="#3B82F6")  # Hex color code
+    icon = Column(String(50), nullable=True)  # Material icon name
+
+    # Hierarchy support
+    parent_id = Column(Integer, ForeignKey("tags.id", ondelete='CASCADE'), nullable=True, index=True)
+    parent = relationship("Tag", remote_side="Tag.id", backref="children")
+
+    # User ownership
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete='CASCADE'), nullable=False, index=True)
+    user = relationship("User", back_populates="tags")
+
+    # Many-to-many relationship with papers
+    papers = relationship("ScientificPaper", secondary=paper_tags, back_populates="tag_objects")
 
 class Podcast(BaseModel, TimestampMixin):
     __tablename__ = "podcasts"
@@ -300,6 +331,7 @@ if config.AUTH_TYPE == "GOOGLE":
         search_source_connectors = relationship("SearchSourceConnector", back_populates="user")
         devonthink_syncs = relationship("DevonthinkSync", back_populates="user")
         devonthink_folders = relationship("DevonthinkFolder", back_populates="user")
+        tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
 else:
     class User(SQLAlchemyBaseUserTableUUID, Base):
 
@@ -307,6 +339,7 @@ else:
         search_source_connectors = relationship("SearchSourceConnector", back_populates="user")
         devonthink_syncs = relationship("DevonthinkSync", back_populates="user")
         devonthink_folders = relationship("DevonthinkFolder", back_populates="user")
+        tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
 
 
 engine = create_async_engine(DATABASE_URL)
