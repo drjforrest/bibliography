@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class PaperResponse(BaseModel):
@@ -26,6 +26,12 @@ class PaperResponse(BaseModel):
     processing_status: str
     file_size: Optional[int]
     created_at: datetime
+    
+    @field_validator('keywords', 'subject_areas', 'tags', mode='before')
+    @classmethod
+    def convert_none_to_list(cls, v):
+        """Convert None values to empty lists for list fields."""
+        return v if v is not None else []
     
     class Config:
         from_attributes = True

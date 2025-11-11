@@ -16,21 +16,19 @@ export default function SearchBar({ onSearch, placeholder = 'Search for papers o
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex-1 max-w-xl">
-      <label className="flex flex-col min-w-40 h-12 w-full">
-        <div className="flex w-full flex-1 items-stretch rounded-lg h-full">
-          <div className="text-gray-500 dark:text-gray-400 flex border-none bg-white dark:bg-gray-800/50 items-center justify-center pl-4 rounded-l-lg border-r-0">
-            <span className="material-symbols-outlined">search</span>
-          </div>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-r-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary border-none bg-white dark:bg-gray-800/50 h-full placeholder:text-gray-500 dark:placeholder:text-gray-400 px-4 text-base font-normal leading-normal"
-            placeholder={placeholder}
-          />
+    <form onSubmit={handleSubmit} className="w-full">
+      <div className="relative h-12">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+          <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">search</span>
         </div>
-      </label>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full h-full pl-12 pr-4 rounded-lg bg-white dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 border-none focus:outline-none focus:ring-2 focus:ring-primary text-base"
+          placeholder={placeholder}
+        />
+      </div>
     </form>
   );
 }

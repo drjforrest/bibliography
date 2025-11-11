@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service Label -->
+    <key>Label</key>
+    <string>com.bibliography.ingestion</string>
+
+    <!-- Program to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/drjforrest/dev/devprojects/bibliography/scripts/ingest-from-macbook.sh</string>
+        <string>--watch</string>
+    </array>
+
+    <!-- Run at load (startup) -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep alive - restart if crashes -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Standard output and error logs -->
+    <key>StandardOutPath</key>
+    <string>/Users/drjforrest/.bibliography_ingestion_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/drjforrest/.bibliography_ingestion_stderr.log</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/drjforrest/dev/devprojects/bibliography</string>
+
+    <!-- User to run as -->
+    <key>UserName</key>
+    <string>drjforrest</string>
+
+    <!-- Throttle interval - don't restart more than once every 60 seconds -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+</dict>
+</plist>

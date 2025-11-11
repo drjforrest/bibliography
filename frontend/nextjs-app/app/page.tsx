@@ -6,100 +6,66 @@ import Sidebar from "@/components/layout/Sidebar";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
 import BookGrid from "@/components/library/BookGrid";
-import type { Paper, ViewMode, SortOption, Topic } from "@/types";
-import Image from "next/image";
-
-// Mock data for development
-const mockPapers: Paper[] = [
-  {
-    id: 1,
-    title: "The Pragmatic Programmer",
-    authors: ["Andrew Hunt", "David Thomas"],
-    year: 1999,
-    coverImage:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDKrJUbDwy6bfMq2zxhPjrGL5qtm8390pRj2yxjf8yKHMd5aspoH8ZFm4DthSk_Py_qIBrErhvbZQNcMBxPnb6v6l4_mwT98viXCu2_y1zmxUBre_yQXjgbu-cLyW7MMCjWHeZ_vd7JYN30Xzl3ByoyOMFM6Ll__4f10FcudRvvSbvNBq9hIUBCvKGJsJKhw41Bg4KjyIlrukEhUqD9W2oc6ssMv6GLsGJNF8AxZwapgyslFC2gWIVLjeKhpkG1zuPB-CyRG_ZVrkvP",
-    keywords: [],
-    subject_areas: [],
-    tags: [],
-    processing_status: "completed",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    title: "Clean Code",
-    authors: ["Robert C. Martin"],
-    year: 2008,
-    coverImage:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDdsQSmHI3UOSMSN3TQCOxzdvGukNYNP0L8_RcX39wUZAimlaxJa9pd2q8AX8BCtrgg7unbG1DJMzELJPTlzC3FVOKfRXZ1WDzL9GNc1khkht_B3AuJEtvcegJWtPHn7yaHFfMOYnvbs7QCAmavIU_8Ra0Lp05BFkMUzI1fcccSjVsJMnGuvePw9UyoDhO-P1hU_isM95zDdU3xSUwfcuGR2019ywlBok1_xHGgPsv_hMEtS_CIscNaS6qa3POtn5mvHqGtYFh9xb0l",
-    keywords: [],
-    subject_areas: [],
-    tags: [],
-    processing_status: "completed",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    title: "Design Patterns",
-    authors: ["Erich Gamma", "Richard Helm", "Ralph Johnson", "John Vlissides"],
-    year: 1994,
-    coverImage:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAlzMhM8rt50pxy1-xp1cs9XJKZOEQ_lRtpI6-9zBiixsMw4B6vmvsYG3HABYrwLq4eyX_QvvlnImQGn_W4lLcdbO8XQ44_MuM4lIvJ7QNO4RIINFuIxBR9x4lOS8fTooLQ-vED8AcNjtRyiHp93aXialj5POCeehd8ul_tJm_xjrwORvwgQQ6uDQs6RAvrSq_0gEROXUTW9K_KUB7gf1BCLQuBFQ0bzeOj3vUZqwLK90mqvfmRyhXDCMLLySEbsQPOpK1M5z3qGttF",
-    keywords: [],
-    subject_areas: [],
-    tags: [],
-    processing_status: "completed",
-    created_at: new Date().toISOString(),
-  },
-];
-
-const mockTopics: Topic[] = [
-  {
-    id: "1",
-    name: "Computer Science",
-    children: [
-      { id: "1-1", name: "Machine Learning" },
-      { id: "1-2", name: "Cybersecurity" },
-    ],
-  },
-  {
-    id: "2",
-    name: "History",
-    children: [
-      { id: "2-1", name: "Ancient Rome" },
-      { id: "2-2", name: "World War II" },
-    ],
-  },
-  {
-    id: "3",
-    name: "Physics",
-    children: [
-      { id: "3-1", name: "Quantum Mechanics" },
-      { id: "3-2", name: "Astrophysics" },
-    ],
-  },
-];
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Paper, ViewMode, SortOption, Topic, Tag } from "@/types";
 
 export default function HomePage() {
-  const [papers, setPapers] = useState<Paper[]>(mockPapers);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [papers, setPapers] = useState<Paper[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSearch = (query: string) => {
+  // Fetch papers and tags on mount (only when authenticated)
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [papersData, tagsData] = await Promise.all([
+          api.getPapers({ limit: 100 }),
+          api.getTagHierarchy(),
+        ]);
+        setPapers(papersData.papers || []);
+        
+        // Convert tags to topics format for sidebar
+        const convertedTopics: Topic[] = (tagsData.tags || []).map((tag: Tag) => ({
+          id: tag.id.toString(),
+          name: tag.name,
+          children: tag.children?.map((child: Tag) => ({
+            id: child.id.toString(),
+            name: child.name,
+          })),
+        }));
+        setTopics(convertedTopics);
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [isAuthenticated, authLoading]);
+
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    // In production, this would call the API
-    // For now, just filter mock data
-    if (query) {
-      const filtered = mockPapers.filter(
-        (paper) =>
-          paper.title?.toLowerCase().includes(query.toLowerCase()) ||
-          paper.authors.some((author) =>
-            author.toLowerCase().includes(query.toLowerCase()),
-          ),
-      );
-      setPapers(filtered);
-    } else {
-      setPapers(mockPapers);
+    try {
+      if (query) {
+        const result = await api.searchPapers(query);
+        setPapers(result.papers || []);
+      } else {
+        const result = await api.getPapers({ limit: 100 });
+        setPapers(result.papers || []);
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
     }
   };
 
@@ -110,7 +76,9 @@ export default function HomePage() {
         case "title":
           return (a.title || "").localeCompare(b.title || "");
         case "author":
-          return a.authors[0].localeCompare(b.authors[0]);
+          const authorA = (a.authors && a.authors[0]) || "";
+          const authorB = (b.authors && b.authors[0]) || "";
+          return authorA.localeCompare(authorB);
         case "date":
         default:
           return (
@@ -124,23 +92,16 @@ export default function HomePage() {
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen bg-background-light dark:bg-background-dark">
-        <Image
-          src="/HERO-Lab-logo-no-words.png"
-          alt="Logo"
-          width={200}
-          height={200}
-        />
-        <div className="flex flex-col flex-1">
-          <Sidebar topics={mockTopics} />
+        <Sidebar topics={topics} />
 
-          <main className="flex-1 p-6">
+        <main className="flex-1 p-6">
             <div className="flex flex-col h-full">
               {/* Search and View Toggle */}
-              <div className="flex items-center justify-between mb-6 gap-4">
-                <SearchBar onSearch={handleSearch} />
-                <div className="flex items-center gap-4">
-                  <ViewToggle view={viewMode} onViewChange={setViewMode} />
+              <div className="flex items-center mb-6 gap-4">
+                <div className="flex-1 max-w-2xl">
+                  <SearchBar onSearch={handleSearch} />
                 </div>
+                <ViewToggle view={viewMode} onViewChange={setViewMode} />
               </div>
 
               {/* Sort Options */}
@@ -194,11 +155,20 @@ export default function HomePage() {
 
               {/* Papers Grid/List */}
               <div className="flex-1 overflow-y-auto">
-                <BookGrid papers={papers} view={viewMode} />
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-gray-500 dark:text-gray-400">Loading papers...</p>
+                  </div>
+                ) : papers.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-gray-500 dark:text-gray-400">No papers found</p>
+                  </div>
+                ) : (
+                  <BookGrid papers={papers} view={viewMode} />
+                )}
               </div>
             </div>
           </main>
-        </div>
       </div>
     </ProtectedRoute>
   );

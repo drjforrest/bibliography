@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,13 +35,12 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-3 mb-8 w-full hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-lg transition-colors"
           >
-            <div
-              className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10"
-              style={{
-                backgroundImage: user?.avatar
-                  ? `url(${user.avatar})`
-                  : `url(https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')})`
-              }}
+            <Image
+              src="/HERO-Lab-logo-no-words.png"
+              alt="HERO Lab Logo"
+              width={40}
+              height={40}
+              className="rounded-full"
             />
             <div className="flex flex-col flex-1 text-left">
               <h1 className="text-base font-medium leading-normal text-gray-900 dark:text-white">
