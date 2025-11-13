@@ -57,6 +57,11 @@ class DocumentType(str, Enum):
     LINEAR_CONNECTOR = "LINEAR_CONNECTOR"
     SCIENTIFIC_PAPER = "SCIENTIFIC_PAPER"
 
+class LiteratureType(str, Enum):
+    PEER_REVIEWED = "PEER_REVIEWED"  # Scientific peer-reviewed articles
+    GREY_LITERATURE = "GREY_LITERATURE"  # Reports, white papers, monographs
+    NEWS = "NEWS"  # News articles (coming soon)
+
 class SearchSourceConnectorType(str, Enum):
     SERPER_API = "SERPER_API" # NOT IMPLEMENTED YET : DON'T REMEMBER WHY : MOST PROBABLY BECAUSE WE NEED TO CRAWL THE RESULTS RETURNED BY IT
     TAVILY_API = "TAVILY_API"
@@ -123,7 +128,10 @@ class Chunk(BaseModel, TimestampMixin):
 
 class ScientificPaper(BaseModel, TimestampMixin):
     __tablename__ = "scientific_papers"
-    
+
+    # Literature type (room classification)
+    literature_type = Column(SQLAlchemyEnum(LiteratureType), nullable=False, default=LiteratureType.PEER_REVIEWED, index=True)
+
     # Basic bibliographic information
     title = Column(String, nullable=False, index=True)
     authors = Column(ARRAY(String), nullable=True)  # List of author names
@@ -133,7 +141,7 @@ class ScientificPaper(BaseModel, TimestampMixin):
     pages = Column(String, nullable=True)  # e.g., "123-145" or "e12345"
     publication_date = Column(Date, nullable=True, index=True)
     publication_year = Column(Integer, nullable=True, index=True)
-    
+
     # Identifiers
     doi = Column(String, nullable=True, unique=True, index=True)
     pmid = Column(String, nullable=True, unique=True, index=True)  # PubMed ID

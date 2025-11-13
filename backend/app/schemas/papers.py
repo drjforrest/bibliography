@@ -1,11 +1,20 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, field_validator
+from enum import Enum
+
+
+class LiteratureType(str, Enum):
+    """Literature type for room classification."""
+    PEER_REVIEWED = "PEER_REVIEWED"
+    GREY_LITERATURE = "GREY_LITERATURE"
+    NEWS = "NEWS"
 
 
 class PaperResponse(BaseModel):
     """Response schema for scientific paper data."""
     id: int
+    literature_type: str = "PEER_REVIEWED"  # Room classification
     title: Optional[str]
     authors: List[str] = []
     journal: Optional[str]

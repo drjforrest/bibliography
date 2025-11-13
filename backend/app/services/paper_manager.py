@@ -29,17 +29,19 @@ class PaperManagerService:
         self.pdf_processor = PDFProcessor(session)
         self.file_storage = FileStorageService()
     
-    async def process_pdf_file(self, file_path: str, user_id: str, search_space_id: int, 
+    async def process_pdf_file(self, file_path: str, user_id: str, search_space_id: int,
+                              literature_type: str = "PEER_REVIEWED",
                               move_file: bool = True) -> Optional[Dict]:
         """
         Process a PDF file completely: extract metadata, store file, save to database.
-        
+
         Args:
             file_path: Path to the PDF file to process
             user_id: ID of the user adding the paper
             search_space_id: ID of the search space to add the paper to
+            literature_type: Type of literature (PEER_REVIEWED, GREY_LITERATURE, NEWS)
             move_file: Whether to move the file to managed storage (vs. copy)
-            
+
         Returns:
             Dictionary with processing results and paper information
         """
@@ -84,7 +86,8 @@ class PaperManagerService:
                 extracted_data=extracted_data,
                 stored_path=stored_path,
                 file_uuid=file_uuid,
-                search_space_id=search_space_id
+                search_space_id=search_space_id,
+                literature_type=literature_type
             )
             
             logger.info(f"Successfully processed PDF: {file_path} -> Paper ID: {paper_id}")
@@ -112,10 +115,11 @@ class PaperManagerService:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
     
-    async def _create_paper_records(self, extracted_data: Dict, stored_path: str, 
-                                   file_uuid: str, search_space_id: int) -> int:
+    async def _create_paper_records(self, extracted_data: Dict, stored_path: str,
+                                   file_uuid: str, search_space_id: int,
+                                   literature_type: str = "PEER_REVIEWED") -> int:
         """Create Document and ScientificPaper records in the database."""
-        
+
         # Create Document record
         document = Document(
             title=extracted_data.get('title', 'Untitled Paper'),
@@ -128,12 +132,13 @@ class PaperManagerService:
             },
             search_space_id=search_space_id
         )
-        
+
         self.session.add(document)
         await self.session.flush()  # Get the document ID
-        
+
         # Create ScientificPaper record
         scientific_paper = ScientificPaper(
+            literature_type=literature_type,
             title=extracted_data.get('title'),
             authors=extracted_data.get('authors', []),
             journal=extracted_data.get('journal'),
@@ -154,10 +159,10 @@ class PaperManagerService:
             confidence_score=extracted_data.get('extraction_metadata', {}).get('extraction_confidence', 0.0),
             document_id=document.id
         )
-        
+
         self.session.add(scientific_paper)
         await self.session.commit()
-        
+
         return scientific_paper.id
     
     async def get_paper_by_id(self, paper_id: int) -> Optional[ScientificPaper]:
@@ -166,16 +171,20 @@ class PaperManagerService:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
     
-    async def get_papers_by_user(self, user_id: str, search_space_id: Optional[int] = None, 
+    async def get_papers_by_user(self, user_id: str, search_space_id: Optional[int] = None,
+                                literature_type: Optional[str] = None,
                                 limit: int = 50, offset: int = 0) -> List[ScientificPaper]:
-        """Get papers for a user, optionally filtered by search space."""
+        """Get papers for a user, optionally filtered by search space and literature type."""
         stmt = select(ScientificPaper).join(Document)
-        
+
         if search_space_id:
             stmt = stmt.where(Document.search_space_id == search_space_id)
-        
+
+        if literature_type:
+            stmt = stmt.where(ScientificPaper.literature_type == literature_type)
+
         stmt = stmt.limit(limit).offset(offset).order_by(ScientificPaper.created_at.desc())
-        
+
         result = await self.session.execute(stmt)
         return result.scalars().all()
     

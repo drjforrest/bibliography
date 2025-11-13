@@ -16,6 +16,10 @@ if 'token' not in st.session_state:
     st.session_state.token = None
 if 'user' not in st.session_state:
     st.session_state.user = None
+if 'selected_room' not in st.session_state:
+    st.session_state.selected_room = None
+if 'room_stats' not in st.session_state:
+    st.session_state.room_stats = None
 
 class BibliographyAPI:
     """API client for the bibliography backend."""
@@ -41,15 +45,25 @@ class BibliographyAPI:
         )
         return response.json() if response.status_code == 200 else {"error": response.text}
     
-    def get_papers(self, search_space_id: Optional[int] = None, limit: int = 50) -> Dict:
+    def get_papers(self, search_space_id: Optional[int] = None, literature_type: Optional[str] = None, limit: int = 50) -> Dict:
         """Get list of papers."""
         params = {"limit": limit}
         if search_space_id:
             params["search_space_id"] = search_space_id
-        
+        if literature_type:
+            params["literature_type"] = literature_type
+
         response = requests.get(
             f"{self.base_url}/papers/",
             params=params,
+            headers=self.headers
+        )
+        return response.json() if response.status_code == 200 else {"error": response.text}
+
+    def get_room_stats(self) -> Dict:
+        """Get paper counts by room/literature type."""
+        response = requests.get(
+            f"{self.base_url}/papers/stats/by-room",
             headers=self.headers
         )
         return response.json() if response.status_code == 200 else {"error": response.text}
@@ -67,15 +81,19 @@ class BibliographyAPI:
         )
         return response.json() if response.status_code == 200 else {"error": response.text}
     
-    def upload_paper(self, file, search_space_id: int) -> Dict:
+    def upload_paper(self, file, search_space_id: int, literature_type: str = "PEER_REVIEWED") -> Dict:
         """Upload a PDF paper."""
         files = {"file": (file.name, file, "application/pdf")}
-        data = {"search_space_id": search_space_id, "move_file": True}
-        
+        data = {
+            "search_space_id": search_space_id,
+            "literature_type": literature_type,
+            "move_file": True
+        }
+
         headers = {}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        
+
         response = requests.post(
             f"{self.base_url}/papers/upload",
             files=files,
@@ -311,6 +329,97 @@ class BibliographyAPI:
         )
         return response.json() if response.status_code == 200 else {"error": response.text}
 
+def show_lobby(api: BibliographyAPI):
+    """Display lobby with room selection."""
+    st.title("📚 Research Library Lobby")
+    st.markdown("### Select a Literature Collection")
+
+    # Get room statistics
+    with st.spinner("Loading library statistics..."):
+        room_stats = api.get_room_stats()
+
+    if "error" in room_stats:
+        st.error("Could not load library statistics")
+        room_stats = {"PEER_REVIEWED": 0, "GREY_LITERATURE": 0, "NEWS": 0, "total": 0}
+
+    # Create three columns for the three rooms
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("### 🔬 Scientific Articles")
+        st.markdown("**Peer-Reviewed Research Papers**")
+        st.markdown(f"**{room_stats.get('PEER_REVIEWED', 0)} papers**")
+        st.markdown("---")
+        st.markdown("Access your curated collection of peer-reviewed scientific articles, research papers, and academic publications.")
+        if st.button("📖 Enter", key="enter_peer_reviewed", type="primary", use_container_width=True):
+            st.session_state.selected_room = "PEER_REVIEWED"
+            st.rerun()
+
+    with col2:
+        st.markdown("### 📊 Grey Literature")
+        st.markdown("**Reports, White Papers & Monographs**")
+        st.markdown(f"**{room_stats.get('GREY_LITERATURE', 0)} documents**")
+        st.markdown("---")
+        st.markdown("Browse technical reports, policy documents, white papers, and other grey literature sources.")
+        if st.button("📖 Enter", key="enter_grey_lit", type="primary", use_container_width=True):
+            st.session_state.selected_room = "GREY_LITERATURE"
+            st.rerun()
+
+    with col3:
+        st.markdown("### 📰 News Articles")
+        st.markdown("**Coming Soon**")
+        st.markdown(f"**{room_stats.get('NEWS', 0)} articles**")
+        st.markdown("---")
+        st.markdown("Stay informed with curated news articles and current events.")
+        if st.button("📖 Coming Soon", key="enter_news", disabled=True, use_container_width=True):
+            pass
+
+    # Overall statistics
+    st.markdown("---")
+    st.markdown(f"### 📈 Total Collection: {room_stats.get('total', 0)} documents")
+
+
+def show_room_interface(api: BibliographyAPI):
+    """Display the selected room interface."""
+    # Back button in sidebar
+    st.sidebar.markdown("---")
+    if st.sidebar.button("⬅️ Back to Lobby"):
+        st.session_state.selected_room = None
+        st.rerun()
+
+    # Room title mapping
+    room_titles = {
+        "PEER_REVIEWED": "🔬 Scientific Peer-Reviewed Articles",
+        "GREY_LITERATURE": "📊 Grey Literature Collection",
+        "NEWS": "📰 News Articles"
+    }
+
+    room_title = room_titles.get(st.session_state.selected_room, "Library")
+    st.title(room_title)
+
+    # Get search spaces
+    search_spaces_result = api.get_search_spaces()
+    search_spaces = search_spaces_result.get("search_spaces", []) if "error" not in search_spaces_result else []
+
+    # Main content tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📚 Library", "🔍 Search", "💬 Chat", "📊 Dashboard", "🔧 Admin"])
+
+    with tab1:
+        library_browser_tab(api)
+
+    with tab2:
+        search_tab(api, search_spaces)
+
+    with tab3:
+        chat_tab(api, search_spaces)
+
+    with tab4:
+        dashboard_tab(api)
+
+    with tab5:
+        admin_tab(api)
+
+
 def login_page():
     """Display login page."""
     st.title("📚 Bibliography Manager")
@@ -336,35 +445,20 @@ def login_page():
 def main_app():
     """Main application interface."""
     api = BibliographyAPI(API_BASE_URL, AUTH_BASE_URL, st.session_state.token)
-    
+
     # Sidebar
     st.sidebar.title("📚 Bibliography")
     if st.sidebar.button("Logout"):
         st.session_state.authenticated = False
         st.session_state.token = None
+        st.session_state.selected_room = None
         st.rerun()
-    
-    # Get search spaces
-    search_spaces_result = api.get_search_spaces()
-    search_spaces = search_spaces_result.get("search_spaces", []) if "error" not in search_spaces_result else []
-    
-    # Main content
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📚 Library", "🔍 Search", "💬 Chat", "📊 Dashboard", "🔧 Admin"])
 
-    with tab1:
-        library_browser_tab(api)
-
-    with tab2:
-        search_tab(api, search_spaces)
-
-    with tab3:
-        chat_tab(api, search_spaces)
-
-    with tab4:
-        dashboard_tab(api)
-
-    with tab5:
-        admin_tab(api)
+    # If no room selected, show lobby
+    if st.session_state.selected_room is None:
+        show_lobby(api)
+    else:
+        show_room_interface(api)
 
 def chat_tab(api: BibliographyAPI, search_spaces: List[Dict]):
     """AI Chat interface with RAG."""
@@ -453,6 +547,15 @@ def chat_tab(api: BibliographyAPI, search_spaces: List[Dict]):
 def library_browser_tab(api: BibliographyAPI):
     """Library browser with file tree, PDF viewer, and annotations."""
     st.header("📚 Research Library")
+
+    # Show active room filter
+    if st.session_state.selected_room:
+        room_labels = {
+            "PEER_REVIEWED": "🔬 Peer-Reviewed Articles",
+            "GREY_LITERATURE": "📊 Grey Literature",
+            "NEWS": "📰 News Articles"
+        }
+        st.info(f"Filtering: {room_labels.get(st.session_state.selected_room, st.session_state.selected_room)}")
 
     # Initialize session state
     if 'selected_paper' not in st.session_state:
@@ -710,10 +813,10 @@ def semantic_search_panel(api: BibliographyAPI, search_spaces: List[Dict]):
 def browse_papers_tab(api: BibliographyAPI, search_spaces: List[Dict]):
     """Browse papers tab."""
     st.header("📖 Browse Papers")
-    
+
     # Filter options
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         search_space_options = {ss["name"]: ss["id"] for ss in search_spaces}
         search_space_options["All Spaces"] = None
@@ -722,27 +825,28 @@ def browse_papers_tab(api: BibliographyAPI, search_spaces: List[Dict]):
             options=list(search_space_options.keys()),
             index=0
         )
-    
+
     with col2:
         limit = st.number_input("Papers to show", min_value=10, max_value=100, value=20)
-    
+
     search_space_id = search_space_options[selected_space]
-    
-    # Get papers
-    papers_result = api.get_papers(search_space_id=search_space_id, limit=limit)
-    
+
+    # Get papers - use room filter if in a room
+    literature_type = st.session_state.selected_room if st.session_state.selected_room else None
+    papers_result = api.get_papers(search_space_id=search_space_id, literature_type=literature_type, limit=limit)
+
     if "error" in papers_result:
         st.error(f"Error loading papers: {papers_result['error']}")
         return
-    
+
     papers = papers_result.get("papers", [])
-    
+
     if not papers:
         st.info("No papers found. Try uploading some PDFs!")
         return
-    
+
     st.write(f"Found {len(papers)} papers")
-    
+
     # Display papers
     for paper in papers:
         with st.expander(f"📄 {paper.get('title', 'Untitled')}"):
@@ -790,32 +894,46 @@ def search_papers_tab(api: BibliographyAPI, search_spaces: List[Dict]):
 def upload_papers_tab(api: BibliographyAPI, search_spaces: List[Dict]):
     """Upload papers tab."""
     st.header("📤 Upload Papers")
-    
+
     if not search_spaces:
         st.warning("You need to create a search space first.")
         return
-    
+
     search_space_options = {ss["name"]: ss["id"] for ss in search_spaces}
-    
+
+    # Default literature type based on current room
+    default_lit_type = st.session_state.selected_room if st.session_state.selected_room else "PEER_REVIEWED"
+
     with st.form("upload_form"):
-        selected_space = st.selectbox(
-            "Upload to Search Space",
-            options=list(search_space_options.keys())
-        )
-        
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            selected_space = st.selectbox(
+                "Upload to Search Space",
+                options=list(search_space_options.keys())
+            )
+
+        with col2:
+            literature_type = st.selectbox(
+                "Literature Type",
+                options=["PEER_REVIEWED", "GREY_LITERATURE", "NEWS"],
+                index=["PEER_REVIEWED", "GREY_LITERATURE", "NEWS"].index(default_lit_type),
+                help="Select the type of literature you are uploading"
+            )
+
         uploaded_file = st.file_uploader(
             "Choose PDF file",
             type="pdf",
             accept_multiple_files=False
         )
-        
+
         submit = st.form_submit_button("📤 Upload Paper")
-        
+
         if submit and uploaded_file:
             search_space_id = search_space_options[selected_space]
-            
+
             with st.spinner("Processing PDF... This may take a few moments."):
-                result = api.upload_paper(uploaded_file, search_space_id)
+                result = api.upload_paper(uploaded_file, search_space_id, literature_type)
             
             if "error" in result:
                 st.error(f"Upload failed: {result['error']}")

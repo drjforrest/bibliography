@@ -23,6 +23,7 @@ router = APIRouter(prefix="/papers", tags=["papers"])
 async def upload_pdf(
     file: UploadFile = File(...),
     search_space_id: int = Form(...),
+    literature_type: str = Form("PEER_REVIEWED"),
     move_file: bool = Form(True),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
@@ -32,24 +33,32 @@ async def upload_pdf(
     """
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
-    
+
+    # Validate literature_type
+    from app.db import LiteratureType
+    try:
+        lit_type = LiteratureType(literature_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid literature_type. Must be one of: {[t.value for t in LiteratureType]}")
+
     # Save uploaded file to temporary location
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
         content = await file.read()
         temp_file.write(content)
         temp_path = temp_file.name
-    
+
     try:
         paper_manager = PaperManagerService(session)
         result = await paper_manager.process_pdf_file(
             file_path=temp_path,
             user_id=str(user.id),
             search_space_id=search_space_id,
+            literature_type=literature_type,
             move_file=move_file
         )
-        
+
         return PaperUploadResponse(**result)
-        
+
     finally:
         # Clean up temporary file
         try:
@@ -61,6 +70,7 @@ async def upload_pdf(
 @router.get("/", response_model=PaperListResponse)
 async def get_papers(
     search_space_id: Optional[int] = Query(None),
+    literature_type: Optional[str] = Query(None, description="Filter by literature type: PEER_REVIEWED, GREY_LITERATURE, NEWS"),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
     user: User = Depends(current_active_user),
@@ -68,15 +78,17 @@ async def get_papers(
 ):
     """
     Get paginated list of papers for the current user.
+    Optionally filter by literature_type (room).
     """
     paper_manager = PaperManagerService(session)
     papers = await paper_manager.get_papers_by_user(
         user_id=str(user.id),
         search_space_id=search_space_id,
+        literature_type=literature_type,
         limit=limit,
         offset=offset
     )
-    
+
     return PaperListResponse(
         papers=[PaperResponse.from_orm(paper) for paper in papers],
         total=len(papers),
@@ -335,7 +347,7 @@ async def get_watcher_status(
     """
     paper_manager = PaperManagerService(session)
     status = paper_manager.get_watcher_status()
-    
+
     if not status:
         return WatcherStatusResponse(
             is_running=False,
@@ -343,5 +355,42 @@ async def get_watcher_status(
             folder_exists=False,
             pdf_count=0
         )
-    
+
     return WatcherStatusResponse(**status)
+
+
+@router.get("/stats/by-room")
+async def get_papers_by_room(
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get paper counts by literature type (room).
+    """
+    from sqlalchemy import select, func
+    from app.db import ScientificPaper, Document, SearchSpace
+
+    # Count papers by literature type for user's search spaces
+    stmt = select(
+        ScientificPaper.literature_type,
+        func.count(ScientificPaper.id).label('count')
+    ).join(
+        Document, Document.id == ScientificPaper.document_id
+    ).join(
+        SearchSpace, SearchSpace.id == Document.search_space_id
+    ).where(
+        SearchSpace.user_id == user.id
+    ).group_by(
+        ScientificPaper.literature_type
+    )
+
+    result = await session.execute(stmt)
+    room_stats = {row[0]: row[1] for row in result.fetchall()}
+
+    # Ensure all rooms are represented
+    return {
+        "PEER_REVIEWED": room_stats.get("PEER_REVIEWED", 0),
+        "GREY_LITERATURE": room_stats.get("GREY_LITERATURE", 0),
+        "NEWS": room_stats.get("NEWS", 0),
+        "total": sum(room_stats.values())
+    }
