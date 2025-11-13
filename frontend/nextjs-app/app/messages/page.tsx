@@ -1,104 +1,79 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import TopicList from '@/components/messages/TopicList';
-import MessageThread from '@/components/messages/MessageThread';
 import MessageComposer from '@/components/messages/MessageComposer';
-import type { MessageTopic, Message } from '@/types';
-
-// Mock data
-const mockTopics: MessageTopic[] = [
-  {
-    id: 'general',
-    name: 'General Announcements',
-    icon: 'campaign',
-    unreadCount: 1,
-    lastMessage: new Date(),
-  },
-  {
-    id: 'research',
-    name: 'Research Methodologies',
-    icon: 'science',
-  },
-  {
-    id: 'conferences',
-    name: 'Upcoming Conferences',
-    icon: 'groups',
-  },
-  {
-    id: 'discussions',
-    name: 'Paper-Specific Discussions',
-    icon: 'description',
-    unreadCount: 1,
-  },
-];
-
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    topicId: 'general',
-    userId: 'user1',
-    user: {
-      id: 'user1',
-      name: 'Dr. Eleanor Vance',
-      email: 'eleanor@example.com',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMNXPy3tkziIIN5AdGgxBYXE5l5MWIEx8yUwVMhv7ugVdwdDB1kmkg0XbUwpzUsdF6ieEUFKXCxxF594Yj94u7qkvmqMzuCdMn8nqxQhAg3lPWM4BMopj1ESgcWN6zahUYqam9fdH4yfVVGt9qHKFGznO_Qy6rUYnPpqwA3Uz3HI0EHOywz_h_iT1btv-CtTnwJyKZZ_6ghEPNUFniTbH1snzZtpVAyg2VG56Qx4zjZVCHNXzEofmiiawW1yarFdkQMry9nBij2luY',
-    },
-    content: 'Just a reminder that the deadline for conference submissions is this Friday. Please ensure all papers are uploaded to the shared drive by then.',
-    createdAt: new Date(Date.now() - 7200000), // 2 hours ago
-    replies: [
-      {
-        id: '2',
-        topicId: 'general',
-        userId: 'user2',
-        user: {
-          id: 'user2',
-          name: 'Dr. Ben Carter',
-          email: 'ben@example.com',
-          avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBfwzE6V2DcmDn-oHpeU58twCywYFsrvTuYUKlAASLWdE0FCmVQlXHWqSzuQjNp8KKd2zI4AwjN7-RYfKvNkG8NN7m7a0opa2ZpCQ_Lck20bhRNBV_xaQ8pJJU6S32Q9Y34eaKEWMcWydl80OWnNzVIuBIlgpVTW0iMhT0oOp7JWsP-xDjKt0q_x5mBmA4BbaRlhx9D8l0GmSAHC-y2Pz7NURubznsHeg3HDVLPMA0fgrKwfWVZY8sBDRDip7bOk6Ji1lXto4ixDdK6',
-        },
-        content: "Thanks for the reminder, Eleanor. I've just uploaded mine. Looking forward to everyone's feedback.",
-        createdAt: new Date(Date.now() - 3600000), // 1 hour ago
-        parentId: '1',
-      },
-    ],
-  },
-  {
-    id: '3',
-    topicId: 'general',
-    userId: 'user3',
-    user: {
-      id: 'user3',
-      name: 'Dr. Olivia Chen',
-      email: 'olivia@example.com',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDX5tsmUVQ72YlTPLkWrpLh7pkOxoJzfAgVU2cazQ-OItwDtcGx7mSDXq5Ci-vbsN_V3E1JR1cKBn8qxVpkpOZp-Qj0fiWhJM14twYwUA9OE3lfKRz_SZnkH1GE1kp-F1ln73_7q9mqp0S1LL1e452VDQZkwC5Mc2USMQIJn0kwaV9vr6f10DyxIOt6kZVn2GZiC177aqNR7z7wRd8L7dJjZ2sFpZxAAzdhMQxvlCZnWxH4g0SFTJGCT9Z58uaK02GRfsfBJPugIVu',
-    },
-    content: "Has anyone had a chance to review the new guidelines for the university's research grant proposals? I have a few questions.",
-    createdAt: new Date(Date.now() - 2700000), // 45 minutes ago
-  },
-];
+import MessageThread from '@/components/messages/MessageThread';
+import TopicList from '@/components/messages/TopicList';
+import { api } from '@/lib/api';
+import type { Message, MessageTopic } from '@/types';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function MessagesPage() {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [currentTopic] = useState('general');
+  const [topics, setTopics] = useState<MessageTopic[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentTopicId, setCurrentTopicId] = useState<string>('');
+  const [isLoadingTopics, setIsLoadingTopics] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleSendMessage = (content: string) => {
-    const newMessage: Message = {
-      id: `${Date.now()}`,
-      topicId: currentTopic,
-      userId: 'current-user',
-      user: {
-        id: 'current-user',
-        name: 'You',
-        email: 'you@example.com',
-      },
-      content,
-      createdAt: new Date(),
+  // Fetch message topics on mount
+  useEffect(() => {
+    const fetchTopics = async () => {
+      try {
+        setIsLoadingTopics(true);
+        const topicsData = await api.getMessageTopics();
+        setTopics(topicsData);
+        // Set first topic as current if available
+        if (topicsData.length > 0 && !currentTopicId) {
+          setCurrentTopicId(topicsData[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch message topics:', error);
+        setError('Failed to load message topics');
+      } finally {
+        setIsLoadingTopics(false);
+      }
     };
-    setMessages([...messages, newMessage]);
+
+    fetchTopics();
+  }, [currentTopicId]);
+
+  // Fetch messages when topic changes
+  useEffect(() => {
+    if (!currentTopicId) return;
+
+    const fetchMessages = async () => {
+      try {
+        setIsLoadingMessages(true);
+        const messagesData = await api.getMessages(currentTopicId);
+        setMessages(messagesData);
+      } catch (error) {
+        console.error('Failed to fetch messages:', error);
+        setError('Failed to load messages');
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    };
+
+    fetchMessages();
+  }, [currentTopicId]);
+
+  const handleSendMessage = async (content: string) => {
+    try {
+      const newMessage = await api.createMessage({
+        topicId: currentTopicId,
+        userId: 'current-user', // This will be set by the backend from auth
+        content,
+      });
+
+      // Add the new message to the current messages
+      setMessages([...messages, newMessage]);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setError('Failed to send message');
+    }
   };
 
   const handleReply = (messageId: string) => {
@@ -111,6 +86,22 @@ export default function MessagesPage() {
       <div className="flex h-screen bg-background-light dark:bg-background-dark text-text-primary">
         {/* Left Column: Navigation Panel */}
         <aside className="w-1/4 bg-white dark:bg-gray-800 p-6 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700">
+          {isLoadingTopics ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500 dark:text-gray-400">Loading topics...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center">
+              <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
         <div>
           <div className="flex items-center gap-3 mb-8">
             <div
@@ -139,31 +130,43 @@ export default function MessagesPage() {
             </label>
           </div>
 
-          <TopicList topics={mockTopics} />
+          <TopicList topics={topics} onTopicSelect={setCurrentTopicId} />
         </div>
 
-        <button className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-accent text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-green-600 transition-colors">
-          <span className="material-symbols-outlined">add</span>
-          <span className="truncate">Add New Topic</span>
-        </button>
-      </aside>
+              <button className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-accent text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-green-600 transition-colors">
+                <span className="material-symbols-outlined">add</span>
+                <span className="truncate">Add New Topic</span>
+              </button>
+            </>
+          )}
+        </aside>
 
       {/* Right Column: Message Thread */}
-      <main className="w-3/4 flex flex-col h-screen">
-        <header className="flex-shrink-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-wrap justify-between items-center gap-3">
-            <h2 className="text-3xl font-extrabold tracking-tight text-primary dark:text-white">
-              General Announcements
-            </h2>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-6">
-          <MessageThread messages={messages} onReply={handleReply} />
+    <main className="w-3/4 flex flex-col h-screen">
+      <header className="flex-shrink-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <h2 className="text-3xl font-extrabold tracking-tight text-primary dark:text-white">
+            {topics.find(t => t.id === currentTopicId)?.name || 'Messages'}
+          </h2>
         </div>
+      </header>
 
-        <MessageComposer onSend={handleSendMessage} />
-      </main>
+      <div className="flex-1 overflow-y-auto p-6">
+        {isLoadingMessages ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-gray-500 dark:text-gray-400">Loading messages...</p>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-red-500 dark:text-red-400">{error}</p>
+          </div>
+        ) : (
+          <MessageThread messages={messages} onReply={handleReply} />
+        )}
+      </div>
+
+      <MessageComposer onSend={handleSendMessage} />
+    </main>
       </div>
     </ProtectedRoute>
   );

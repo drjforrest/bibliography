@@ -67,6 +67,30 @@ async def upload_pdf(
             pass
 
 
+@router.post("/search", response_model=PaperListResponse)
+async def search_papers(
+    search_request: PaperSearchRequest,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Search papers by query string.
+    """
+    paper_manager = PaperManagerService(session)
+    papers = await paper_manager.search_papers(
+        query=search_request.query,
+        search_space_id=search_request.search_space_id,
+        limit=search_request.limit
+    )
+
+    return PaperListResponse(
+        papers=[PaperResponse.from_orm(paper) for paper in papers],
+        total=len(papers),
+        limit=search_request.limit,
+        offset=0
+    )
+
+
 @router.get("/", response_model=PaperListResponse)
 async def get_papers(
     search_space_id: Optional[int] = Query(None),
@@ -108,14 +132,14 @@ async def get_paper(
     """
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)
-    
+
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
-    
+
     return PaperResponse.from_orm(paper)
 
 
-@router.post("/search", response_model=PaperListResponse)
+@router.get("/by-folder")
 async def search_papers(
     search_request: PaperSearchRequest,
     user: User = Depends(current_active_user),

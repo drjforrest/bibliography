@@ -1,17 +1,24 @@
 'use client';
 
+import type { MessageTopic } from '@/types';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { MessageTopic } from '@/types';
 
 interface TopicListProps {
   topics: MessageTopic[];
+  onTopicSelect?: (topicId: string) => void;
 }
 
-export default function TopicList({ topics }: TopicListProps) {
+export default function TopicList({ topics, onTopicSelect }: TopicListProps) {
   const pathname = usePathname();
 
   const isActive = (topicId: string) => pathname === `/messages/${topicId}`;
+
+  const handleTopicClick = (topicId: string) => {
+    if (onTopicSelect) {
+      onTopicSelect(topicId);
+    }
+  };
 
   return (
     <nav className="flex flex-col gap-2">
@@ -19,6 +26,7 @@ export default function TopicList({ topics }: TopicListProps) {
         <Link
           key={topic.id}
           href={`/messages/${topic.id}`}
+          onClick={() => handleTopicClick(topic.id)}
           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg ${
             isActive(topic.id)
               ? 'bg-secondary dark:bg-gray-700'
