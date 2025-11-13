@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Topic } from '@/types';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+import APIKeySettings from './APIKeySettings';
 
 interface SidebarProps {
   topics?: Topic[];
@@ -70,6 +71,11 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
               </button>
             </div>
           )}
+        </div>
+
+        {/* API Key Settings */}
+        <div className="mb-6">
+          <APIKeySettings />
         </div>
 
         {/* Navigation */}

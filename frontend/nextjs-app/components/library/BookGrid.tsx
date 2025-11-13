@@ -6,9 +6,10 @@ import BookCard from "./BookCard";
 interface BookGridProps {
   papers: Paper[];
   view: ViewMode;
+  onChatWithDocument?: (documentId: number) => void;
 }
 
-export default function BookGrid({ papers, view }: BookGridProps) {
+export default function BookGrid({ papers, view, onChatWithDocument }: BookGridProps) {
   if (papers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -75,7 +76,11 @@ export default function BookGrid({ papers, view }: BookGridProps) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
       {papers.map((paper) => (
-        <BookCard key={paper.id} paper={paper} />
+        <BookCard
+          key={paper.id}
+          paper={paper}
+          onChatWithDocument={onChatWithDocument}
+        />
       ))}
     </div>
   );

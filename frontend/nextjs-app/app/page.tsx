@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/layout/Sidebar";
+import BookGrid from "@/components/library/BookGrid";
+import ChatPanel from "@/components/library/ChatPanel";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
-import BookGrid from "@/components/library/BookGrid";
-import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Paper, ViewMode, SortOption, Topic, Tag } from "@/types";
+import { api } from "@/lib/api";
+import type { Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
+import { useEffect, useState } from "react";
 
 export default function HomePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -18,6 +19,9 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
@@ -101,7 +105,20 @@ export default function HomePage() {
                 <div className="flex-1 max-w-2xl">
                   <SearchBar onSearch={handleSearch} />
                 </div>
-                <ViewToggle view={viewMode} onViewChange={setViewMode} />
+                <div className="flex items-center gap-2">
+                  <ViewToggle view={viewMode} onViewChange={setViewMode} />
+                  <button
+                    onClick={() => {
+                      setSelectedDocumentId(undefined);
+                      setChatMessages([]); // Clear messages for general library chat
+                      setIsChatOpen(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base">chat</span>
+                    <span className="hidden sm:inline">AI Chat</span>
+                  </button>
+                </div>
               </div>
 
               {/* Sort Options */}
@@ -164,11 +181,27 @@ export default function HomePage() {
                     <p className="text-gray-500 dark:text-gray-400">No papers found</p>
                   </div>
                 ) : (
-                  <BookGrid papers={papers} view={viewMode} />
+                  <BookGrid
+                    papers={papers}
+                    view={viewMode}
+                    onChatWithDocument={(documentId) => {
+                      setSelectedDocumentId(documentId);
+                      setChatMessages([]); // Clear messages for new document chat
+                      setIsChatOpen(true);
+                    }}
+                  />
                 )}
               </div>
             </div>
           </main>
+
+          <ChatPanel
+            isOpen={isChatOpen}
+            onToggle={() => setIsChatOpen(!isChatOpen)}
+            selectedDocumentId={selectedDocumentId}
+            initialMessages={chatMessages}
+            onMessagesChange={setChatMessages}
+          />
       </div>
     </ProtectedRoute>
   );

@@ -8,6 +8,7 @@ from .semantic_search_routes import router as semantic_search_router
 from .dashboard_routes import router as dashboard_router
 from .devonthink_sync_routes import router as devonthink_router
 from .tags_routes import router as tags_router
+from .user_routes import router as user_router
 
 router = APIRouter()
 
@@ -20,3 +21,4 @@ router.include_router(semantic_search_router)
 router.include_router(dashboard_router)
 router.include_router(devonthink_router)
 router.include_router(tags_router)
+router.include_router(user_router)

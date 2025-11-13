@@ -332,6 +332,10 @@ if config.AUTH_TYPE == "GOOGLE":
 
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
+        # AI API Keys for BYOK (Bring Your Own Key) functionality
+        openai_api_key = Column(String, nullable=True)
+        anthropic_api_key = Column(String, nullable=True)
+
         oauth_accounts: Mapped[list[OAuthAccount]] = relationship(
             "OAuthAccount", lazy="joined"
         )
@@ -342,6 +346,9 @@ if config.AUTH_TYPE == "GOOGLE":
         tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
 else:
     class User(SQLAlchemyBaseUserTableUUID, Base):
+        # AI API Keys for BYOK (Bring Your Own Key) functionality
+        openai_api_key = Column(String, nullable=True)
+        anthropic_api_key = Column(String, nullable=True)
 
         search_spaces = relationship("SearchSpace", back_populates="user")
         search_source_connectors = relationship("SearchSourceConnector", back_populates="user")
