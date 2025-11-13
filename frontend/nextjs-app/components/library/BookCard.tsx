@@ -2,6 +2,7 @@
 
 import type { Paper } from '@/types';
 import Link from 'next/link';
+import { useState } from 'react';
 
 interface BookCardProps {
   paper: Paper;
@@ -9,19 +10,48 @@ interface BookCardProps {
 }
 
 export default function BookCard({ paper, onChatWithDocument }: BookCardProps) {
+  const [imageError, setImageError] = useState(false);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  // Generate thumbnail URL if paper has an ID
+  const thumbnailUrl = paper.id
+    ? `${API_URL}/api/v1/papers/${paper.id}/thumbnail`
+    : null;
+
+  // Determine background image source
+  const getBackgroundImage = () => {
+    if (paper.coverImage) {
+      return `url(${paper.coverImage})`;
+    }
+    if (thumbnailUrl && !imageError) {
+      return `url(${thumbnailUrl})`;
+    }
+    return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+  };
+
+  const showFallbackText = !paper.coverImage && (!thumbnailUrl || imageError);
+
   return (
     <div className="group relative">
       <Link href={`/papers/${paper.id}`} className="flex flex-col gap-3">
         <div
           className="w-full bg-center bg-no-repeat aspect-[3/4] bg-cover rounded-lg shadow-md group-hover:shadow-xl transition-shadow cursor-pointer"
           style={{
-            backgroundImage: paper.coverImage
-              ? `url(${paper.coverImage})`
-              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            backgroundImage: getBackgroundImage(),
           }}
           title={paper.title}
         >
-          {!paper.coverImage && (
+          {/* Hidden image to detect loading errors */}
+          {thumbnailUrl && !imageError && (
+            <img
+              src={thumbnailUrl}
+              alt=""
+              className="hidden"
+              onError={() => setImageError(true)}
+            />
+          )}
+
+          {showFallbackText && (
             <div className="w-full h-full flex items-center justify-center p-4">
               <span className="text-white text-center font-medium line-clamp-4">{paper.title}</span>
             </div>

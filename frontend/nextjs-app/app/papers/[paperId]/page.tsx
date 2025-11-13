@@ -74,6 +74,7 @@ export default function PaperAnnotationPage() {
                 </div>
               ) : (
                 <PDFViewer
+                  paperId={parseInt(paperId)}
                   title={paper?.title || 'Document'}
                   content={paper?.abstract}
                 />

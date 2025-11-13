@@ -113,52 +113,67 @@ PDFs are stored as files (not database BLOBs) using UUID-based naming:
 
 ## DEVONthink Integration
 
-This system includes comprehensive integration with DEVONthink via the MCP (Model Context Protocol) server, enabling automated sync of your curated research library while preserving hierarchical folder structure.
+This system supports two methods for importing papers from DEVONthink:
 
-### DEVONthink Sync Features
+### Method 1: CSV Export (Recommended)
 
-- **Automated PDF Ingestion**: Syncs PDFs from DEVONthink "Reference" database
+**Simple, reliable workflow using DEVONthink Smart Rules:**
+
+1. **DEVONthink Smart Rule** exports selected records to:
+   - CSV file: `~/PDFs/Evidence_Library_Sync/active_library.csv`
+   - PDF files: `~/PDFs/Evidence_Library_Sync/{uuid}.pdf`
+
+2. **Import Script** processes the CSV and PDFs:
+   ```bash
+   python backend/scripts/import_from_devonthink_csv.py \
+     --csv ~/PDFs/Evidence_Library_Sync/active_library.csv \
+     --user-id YOUR_USER_ID
+   ```
+
+3. **Full Pipeline**: Automatically handles:
+   - PDF storage with UUID naming
+   - Metadata extraction from PDFs
+   - Thumbnail generation
+   - Vectorization for semantic search
+   - Duplicate detection (by DEVONthink UUID)
+
+**See**: `DEVONTHINK_CSV_WORKFLOW.md` for complete instructions
+
+**Advantages**:
+- Simple setup (just a Smart Rule)
+- Full control over which records to export
+- No additional servers required
+- Reliable and easy to troubleshoot
+
+### Method 2: MCP Server Integration (Advanced)
+
+**Full database sync with folder hierarchy preservation:**
+
+- **Automated PDF Ingestion**: Syncs PDFs from DEVONthink database via MCP server
 - **Hierarchy Preservation**: Maintains your DEVONthink folder structure
 - **Metadata Extraction**: Preserves custom fields and tags from DEVONthink
-- **UUID-based Storage**: Each paper gets a unique identifier for efficient management
 - **Incremental Sync**: Monitors for changes and syncs only new/modified files
-- **Vectorization Pipeline**: Automatically processes papers for semantic search
 
-### DEVONthink Sync API Endpoints
-
+**API Endpoints**:
 - `POST /api/v1/devonthink/sync` - Full database sync
 - `POST /api/v1/devonthink/sync/incremental` - Sync recent changes only
 - `GET /api/v1/devonthink/sync/status` - Check sync status of records
 - `GET /api/v1/devonthink/folders` - View preserved folder hierarchy
-- `POST /api/v1/devonthink/monitor` - Check for recent changes
-- `GET /api/v1/devonthink/stats` - Get sync statistics
 
-### DEVONthink Setup Requirements
+**Setup Requirements**:
+1. Install DEVONthink MCP server: `npx -y mcp-server-devonthink`
+2. Configure database name (default: "Reference")
+3. Run sync via API endpoints
 
-1. **DEVONthink MCP Server**: Install and configure the DEVONthink MCP server
-   ```bash
-   npx -y mcp-server-devonthink
-   ```
-
-2. **Database Structure**: Ensure your DEVONthink database is named "Reference" (configurable)
-
-3. **Folder Structure**: Your existing folder hierarchy in DEVONthink will be preserved
-
-### Database Models
-
-Additional models for DEVONthink integration:
+**Database Models**:
 - **DevonthinkSync**: Tracks sync status between DEVONthink and local system
 - **DevonthinkFolder**: Preserves DEVONthink folder hierarchy
 - **ScientificPaper**: Extended with `dt_source_uuid` and `dt_source_path` fields
 
-### Sync Workflow
-
-1. **Directory Mapping**: Recursively maps DEVONthink folder structure
-2. **Metadata Extraction**: Retrieves custom fields and properties from DEVONthink
-3. **UUID Assignment**: Assigns local UUID while tracking DEVONthink UUID
-4. **Binary Copy**: Copies PDF files using UUID-based naming
-5. **Vectorization**: Processes content for semantic search
-6. **Monitoring**: Continuously watches for changes in DEVONthink
+**Advantages**:
+- Preserves folder hierarchy
+- Automatic monitoring for changes
+- Full database sync capability
 
 ## Environment Variables
 
@@ -169,6 +184,40 @@ Required for backend operation:
 - `EMBEDDING_MODEL` - Model for semantic search
 - `PDF_STORAGE_ROOT` - PDF file storage directory
 - `WATCHED_FOLDER` - Auto-processing folder path
+
+## Thumbnail Generation & PDF Viewing
+
+**✅ FULLY IMPLEMENTED - January 2025**
+
+The system now includes complete support for PDF thumbnails and viewing:
+
+### Backend Features
+- **Thumbnail Generator Service** (`app/services/thumbnail_generator.py`)
+  - Generates 300x400px thumbnails from PDF first pages
+  - UUID-based storage matching PDF structure
+  - Automatic caching with on-demand generation
+  - Batch processing support
+
+- **API Endpoints** (`app/routes/papers_routes.py`)
+  - `GET /api/v1/papers/{paper_id}/thumbnail` - Serve thumbnail
+  - `GET /api/v1/papers/{paper_id}/pdf` - Serve PDF for viewing
+  - `POST /api/v1/papers/thumbnails/generate-batch` - Batch generation
+
+### Frontend Features
+- **BookCard Component**: Displays thumbnails with graceful fallback
+- **PDFViewer Component**: Real PDF viewing in iframe with zoom controls
+- **Automatic Generation**: Thumbnails created on first view and cached
+
+### File Structure
+```
+data/
+├── pdfs/           # UUID-based PDF storage
+│   └── YYYY/MM/{uuid}.pdf
+└── thumbnails/     # Thumbnail storage
+    └── YYYY/MM/{paper_id}.jpg
+```
+
+**See**: `THUMBNAIL_PDF_SETUP.md` and `QUICKSTART_THUMBNAILS.md` for details
 
 ## Current Status (Sept 20, 2025)
 

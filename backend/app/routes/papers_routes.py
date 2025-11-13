@@ -9,6 +9,7 @@ import io
 from app.db import get_async_session, User
 from app.services.paper_manager import PaperManagerService
 from app.services.citation_formatter import CitationFormatter
+from app.services.thumbnail_generator import ThumbnailGenerator
 from app.users import current_active_user
 from app.schemas.papers import (
     PaperResponse, PaperListResponse, PaperSearchRequest,
@@ -254,6 +255,55 @@ async def download_paper(
     )
 
 
+@router.get("/{paper_id}/thumbnail")
+async def get_paper_thumbnail(
+    paper_id: int,
+    regenerate: bool = Query(False, description="Force regenerate thumbnail"),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get thumbnail image for a paper. Generates it if it doesn't exist.
+    """
+    paper_manager = PaperManagerService(session)
+    paper = await paper_manager.get_paper_by_id(paper_id)
+
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    if not paper.file_path:
+        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+
+    # Initialize thumbnail generator
+    thumbnail_gen = ThumbnailGenerator()
+
+    # Generate thumbnail (will use cached version if exists and regenerate=False)
+    thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
+        paper.file_path,
+        paper_id,
+        force_regenerate=regenerate
+    )
+
+    if not thumbnail_relative_path:
+        raise HTTPException(status_code=500, detail="Failed to generate thumbnail")
+
+    # Get full thumbnail path
+    thumbnail_full_path = thumbnail_gen.get_thumbnail_path(thumbnail_relative_path)
+
+    if not thumbnail_full_path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail file not found")
+
+    # Return thumbnail image
+    return FileResponse(
+        path=str(thumbnail_full_path),
+        media_type='image/jpeg',
+        headers={
+            "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+            "Content-Disposition": "inline"
+        }
+    )
+
+
 @router.post("/{paper_id}/citation", response_model=CitationResponse)
 async def get_citation(
     paper_id: int,
@@ -417,4 +467,59 @@ async def get_papers_by_room(
         "GREY_LITERATURE": room_stats.get("GREY_LITERATURE", 0),
         "NEWS": room_stats.get("NEWS", 0),
         "total": sum(room_stats.values())
+    }
+
+
+@router.post("/thumbnails/generate-batch")
+async def generate_thumbnails_batch(
+    search_space_id: Optional[int] = Form(None),
+    force_regenerate: bool = Form(False),
+    limit: int = Form(100, le=500),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Generate thumbnails for multiple papers in batch.
+    Useful for initial setup or regenerating thumbnails.
+    """
+    from sqlalchemy import select
+    from app.db import ScientificPaper, Document, SearchSpace
+
+    # Build query to get papers
+    stmt = select(ScientificPaper).join(
+        Document, Document.id == ScientificPaper.document_id
+    ).join(
+        SearchSpace, SearchSpace.id == Document.search_space_id
+    ).where(
+        SearchSpace.user_id == user.id
+    )
+
+    if search_space_id:
+        stmt = stmt.where(Document.search_space_id == search_space_id)
+
+    stmt = stmt.limit(limit)
+
+    result = await session.execute(stmt)
+    papers = result.scalars().all()
+
+    if not papers:
+        return {
+            "message": "No papers found",
+            "success_count": 0,
+            "failure_count": 0,
+            "total": 0
+        }
+
+    # Generate thumbnails
+    thumbnail_gen = ThumbnailGenerator()
+    success_count, failure_count = thumbnail_gen.batch_generate_thumbnails(
+        papers,
+        force_regenerate=force_regenerate
+    )
+
+    return {
+        "message": f"Generated thumbnails for {success_count} papers",
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "total": len(papers)
     }
