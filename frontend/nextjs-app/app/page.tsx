@@ -6,9 +6,10 @@ import BookGrid from "@/components/library/BookGrid";
 import ChatPanel from "@/components/library/ChatPanel";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
+import LiteratureTypeFilter from "@/components/library/LiteratureTypeFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import type { Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
+import type { Paper, SortOption, Tag, Topic, ViewMode, LiteratureType } from "@/types";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
@@ -18,6 +19,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLiteratureType, setSelectedLiteratureType] = useState<LiteratureType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
@@ -34,7 +36,10 @@ export default function HomePage() {
       try {
         setIsLoading(true);
         const [papersData, tagsData] = await Promise.all([
-          api.getPapers({ limit: 100 }),
+          api.getPapers({ 
+            limit: 100,
+            literature_type: selectedLiteratureType || undefined,
+          }),
           api.getTagHierarchy(),
         ]);
         setPapers(papersData.papers || []);
@@ -56,7 +61,7 @@ export default function HomePage() {
       }
     };
     fetchData();
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, selectedLiteratureType]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -65,7 +70,10 @@ export default function HomePage() {
         const result = await api.searchPapers(query);
         setPapers(result.papers || []);
       } else {
-        const result = await api.getPapers({ limit: 100 });
+        const result = await api.getPapers({ 
+          limit: 100,
+          literature_type: selectedLiteratureType || undefined,
+        });
         setPapers(result.papers || []);
       }
     } catch (error) {
@@ -119,6 +127,14 @@ export default function HomePage() {
                     <span className="hidden sm:inline">AI Chat</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Literature Type Filter */}
+              <div className="mb-4">
+                <LiteratureTypeFilter
+                  selectedType={selectedLiteratureType}
+                  onTypeChange={setSelectedLiteratureType}
+                />
               </div>
 
               {/* Sort Options */}

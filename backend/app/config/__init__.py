@@ -2,10 +2,19 @@ import os
 from pathlib import Path
 import shutil
 
+import warnings
 from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatLiteLLM
 from rerankers import Reranker
+
+# Try to import ChatLiteLLM from the new package first
+try:
+    from langchain_litellm import ChatLiteLLM
+except ImportError:
+    # Suppress deprecation warning for old import
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        from langchain_community.chat_models import ChatLiteLLM
 
 # Try to import OpenAI embeddings from the new package
 try:
@@ -120,7 +129,8 @@ class Config:
     chunk_size = getattr(embedding_model_instance, 'dimension', 512)
     # Use a reasonable chunk size (not the embedding dimension)
     chunker_instance = RecursiveChunker(chunk_size=512)
-    code_chunker_instance = CodeChunker(chunk_size=512)
+    # Set language to 'python' to suppress auto-detection warning
+    code_chunker_instance = CodeChunker(chunk_size=512, language='python')
     
     # Reranker's Configuration | Pinecode, Cohere etc. Read more at https://github.com/AnswerDotAI/rerankers?tab=readme-ov-file#usage
     RERANKERS_MODEL_NAME = os.getenv("RERANKERS_MODEL_NAME")

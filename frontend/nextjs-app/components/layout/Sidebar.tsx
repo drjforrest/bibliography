@@ -20,6 +20,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
   const isActive = (path: string) => pathname === path;
 
   const navItems = [
+    { icon: 'dashboard', label: 'Dashboard', href: '/dashboard' },
     { icon: 'select_all', label: 'All', href: '/' },
     { icon: 'folder_open', label: 'Topics', href: '/topics' },
     { icon: 'bookmark', label: 'Favorites', href: '/favorites' },

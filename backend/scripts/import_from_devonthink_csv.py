@@ -30,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from app.db import ScientificPaper, Document, SearchSpace, DocumentType
+from app.db import ScientificPaper, Document, SearchSpace, DocumentType, LiteratureType
 from app.services.file_storage import FileStorageService
 from app.services.pdf_processor import PDFProcessor
 from app.services.thumbnail_generator import ThumbnailGenerator
@@ -45,14 +45,12 @@ logger = logging.getLogger(__name__)
 class DEVONthinkCSVImporter:
     """Import papers from DEVONthink CSV export."""
 
-    def __init__(self, session: AsyncSession, user_id: UUID):
-        self.session = session
+    def __init__(self, session_maker, user_id: UUID, default_literature_type: str = "PEER_REVIEWED"):
+        self.session_maker = session_maker
         self.user_id = user_id
+        self.default_literature_type = default_literature_type
         self.file_storage = FileStorageService()
-        self.pdf_processor = PDFProcessor(session)
         self.thumbnail_gen = ThumbnailGenerator()
-        self.embedding_service = EmbeddingService(session)
-        self.enhanced_rag = EnhancedRAGService(session)
 
         # Stats
         self.imported_count = 0
@@ -60,13 +58,13 @@ class DEVONthinkCSVImporter:
         self.error_count = 0
         self.errors = []
 
-    async def get_or_create_search_space(self, name: str = "DEVONthink Import") -> SearchSpace:
+    async def get_or_create_search_space(self, session: AsyncSession, name: str = "DEVONthink Import") -> SearchSpace:
         """Get or create a search space for imported papers."""
         stmt = select(SearchSpace).where(
             SearchSpace.name == name,
             SearchSpace.user_id == self.user_id
         )
-        result = await self.session.execute(stmt)
+        result = await session.execute(stmt)
         search_space = result.scalar_one_or_none()
 
         if not search_space:
@@ -76,8 +74,8 @@ class DEVONthinkCSVImporter:
                 user_id=self.user_id,
                 is_active=True
             )
-            self.session.add(search_space)
-            await self.session.commit()
+            session.add(search_space)
+            await session.commit()
             logger.info(f"Created search space: {name}")
 
         return search_space
@@ -86,48 +84,58 @@ class DEVONthinkCSVImporter:
         """Import papers from CSV file."""
         logger.info(f"Starting import from {csv_path}")
 
-        # Get or create search space
-        if search_space_id:
-            stmt = select(SearchSpace).where(SearchSpace.id == search_space_id)
-            result = await self.session.execute(stmt)
-            search_space = result.scalar_one_or_none()
-            if not search_space:
-                raise ValueError(f"Search space {search_space_id} not found")
-        else:
-            search_space = await self.get_or_create_search_space()
+        # Get or create search space using a fresh session
+        async with self.session_maker() as session:
+            if search_space_id:
+                stmt = select(SearchSpace).where(SearchSpace.id == search_space_id)
+                result = await session.execute(stmt)
+                search_space = result.scalar_one_or_none()
+                if not search_space:
+                    raise ValueError(f"Search space {search_space_id} not found")
+            else:
+                search_space = await self.get_or_create_search_space(session)
 
         # Read CSV with encoding handling for special characters
         with open(csv_path, 'r', encoding='utf-8', errors='replace') as f:
             reader = csv.DictReader(f)
 
             for row in reader:
-                try:
-                    await self.import_record(row, search_space.id)
-                    self.imported_count += 1
-                except Exception as e:
-                    self.error_count += 1
-                    error_msg = f"Error importing {row.get('Name', 'Unknown')}: {str(e)}"
-                    logger.error(error_msg)
-                    self.errors.append(error_msg)
+                # Each record gets its own fresh session to avoid greenlet errors
+                async with self.session_maker() as session:
+                    try:
+                        await self.import_record(session, row, search_space.id)
+                        self.imported_count += 1
+                    except Exception as e:
+                        self.error_count += 1
+                        error_msg = f"Error importing {row.get('Name', 'Unknown')}: {str(e)}"
+                        logger.error(error_msg)
+                        self.errors.append(error_msg)
 
-        # Rebuild vector store if we imported papers
+        # Note: Vectorization should be done separately via API endpoints or dedicated script
+        # to avoid session/async issues during batch imports
         if self.imported_count > 0:
-            logger.info("Rebuilding Enhanced RAG vector store...")
-            try:
-                rebuilt = await self.enhanced_rag.build_vector_store_from_papers(
-                    user_id=str(self.user_id),
-                    search_space_id=search_space.id
-                )
-                if rebuilt:
-                    stats = self.enhanced_rag.get_stats()
-                    logger.info(f"Vector store rebuilt with {stats.get('documents_indexed', 0)} documents")
-            except Exception as e:
-                logger.warning(f"Failed to rebuild vector store: {e}")
+            logger.info(f"Successfully imported {self.imported_count} papers")
+            logger.info("Run vectorization separately via API or dedicated script")
 
         # Print summary
         self.print_summary()
 
-    async def import_record(self, row: dict, search_space_id: int):
+    def _determine_literature_type(self, label: str) -> LiteratureType:
+        """Determine literature type from DEVONthink label or tags."""
+        label_lower = label.lower() if label else ""
+        
+        # Check for explicit type indicators in label
+        if any(term in label_lower for term in ['grey', 'gray', 'grey literature', 'gray literature']):
+            return LiteratureType.GREY_LITERATURE
+        elif any(term in label_lower for term in ['news', 'media', 'press']):
+            return LiteratureType.NEWS
+        elif any(term in label_lower for term in ['peer', 'journal', 'academic']):
+            return LiteratureType.PEER_REVIEWED
+        
+        # Default to the import-level default
+        return LiteratureType[self.default_literature_type]
+
+    async def import_record(self, session: AsyncSession, row: dict, search_space_id: int):
         """Import a single record from CSV row."""
         dt_uuid = row['DEVONthink UUID']
         name = row['Name']
@@ -135,6 +143,9 @@ class DEVONthinkCSVImporter:
         label = row['RecordLabel']
         finder_comment = row['Finder Comment']
         pdf_path = row['PDF Path']
+        
+        # Determine literature type
+        literature_type = self._determine_literature_type(label)
 
         logger.info(f"Importing: {name}")
 
@@ -144,11 +155,11 @@ class DEVONthinkCSVImporter:
             self.skipped_count += 1
             return
 
-        # Check if already imported (by DEVONthink UUID in extraction_metadata)
+        # Check if already imported (by DEVONthink UUID)
         stmt = select(ScientificPaper).where(
             ScientificPaper.dt_source_uuid == dt_uuid
         )
-        result = await self.session.execute(stmt)
+        result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
 
         if existing:
@@ -167,8 +178,9 @@ class DEVONthinkCSVImporter:
         # Step 2: Extract text and metadata from PDF
         logger.info(f"Extracting PDF content...")
         absolute_pdf_path = self.file_storage.get_full_path(relative_path)
-        pdf_text = await self.pdf_processor.extract_text_from_file(str(absolute_pdf_path))
-        metadata = await self.pdf_processor.extract_metadata(str(absolute_pdf_path))
+        pdf_processor = PDFProcessor(session)
+        pdf_text = await pdf_processor.extract_text_from_file(str(absolute_pdf_path))
+        metadata = await pdf_processor.extract_metadata(str(absolute_pdf_path))
 
         # Step 3: Create Document record
         document = Document(
@@ -185,8 +197,8 @@ class DEVONthinkCSVImporter:
                 "import_timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
-        self.session.add(document)
-        await self.session.flush()
+        session.add(document)
+        await session.flush()
 
         # Step 4: Create ScientificPaper record
         # Use extracted title if available, otherwise use DEVONthink name
@@ -195,6 +207,7 @@ class DEVONthinkCSVImporter:
             paper_title = paper_title[:-4]
 
         paper = ScientificPaper(
+            literature_type=literature_type,
             title=paper_title,
             authors=metadata.get("authors", []),
             doi=metadata.get("doi"),
@@ -212,11 +225,12 @@ class DEVONthinkCSVImporter:
             extraction_metadata={
                 "devonthink_description": description,
                 "finder_comment": finder_comment,
+                "literature_type": literature_type.value,
                 "extraction_timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
-        self.session.add(paper)
-        await self.session.flush()
+        session.add(paper)
+        await session.flush()
 
         logger.info(f"Created paper record: {paper.id}")
 
@@ -235,27 +249,12 @@ class DEVONthinkCSVImporter:
         except Exception as e:
             logger.warning(f"Thumbnail generation failed: {e}")
 
-        # Step 6: Vectorize for search
-        logger.info(f"Vectorizing content...")
-        try:
-            # Embed document
-            await self.embedding_service.embed_document(paper.document_id)
-
-            # Create and embed chunks
-            await self.embedding_service.create_and_embed_chunks(paper.document)
-
-            # Also add to Enhanced RAG (will be rebuilt in batch later)
-            try:
-                await self.enhanced_rag.add_paper_to_vector_store(paper)
-            except Exception as rag_error:
-                logger.warning(f"Enhanced RAG indexing failed: {rag_error}")
-
-            logger.info(f"Vectorization complete")
-        except Exception as e:
-            logger.warning(f"Vectorization failed: {e}")
+        # Step 6: Skip individual vectorization - will be done in batch after all imports
+        # This avoids greenlet/async session issues after rollbacks
+        logger.info(f"Deferring vectorization to batch process...")
 
         # Commit the transaction
-        await self.session.commit()
+        await session.commit()
         logger.info(f"Successfully imported: {name}")
 
     def _parse_date(self, date_str: Optional[str]):
@@ -300,6 +299,12 @@ async def main():
     parser.add_argument('--csv', required=True, help='Path to CSV file')
     parser.add_argument('--user-id', required=True, help='User UUID')
     parser.add_argument('--search-space-id', type=int, help='Optional search space ID')
+    parser.add_argument(
+        '--literature-type',
+        choices=['PEER_REVIEWED', 'GREY_LITERATURE', 'NEWS'],
+        default='PEER_REVIEWED',
+        help='Default literature type for imported papers (can be overridden by DEVONthink labels)'
+    )
     args = parser.parse_args()
 
     # Validate CSV file
@@ -314,13 +319,12 @@ async def main():
         logger.error(f"Invalid user ID format: {args.user_id}")
         sys.exit(1)
 
-    # Create async session
+    # Create async session maker
     engine = create_async_engine(config.DATABASE_URL)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with async_session() as session:
-        importer = DEVONthinkCSVImporter(session, user_id)
-        await importer.import_from_csv(args.csv, args.search_space_id)
+    importer = DEVONthinkCSVImporter(async_session_maker, user_id, args.literature_type)
+    await importer.import_from_csv(args.csv, args.search_space_id)
 
     await engine.dispose()
 

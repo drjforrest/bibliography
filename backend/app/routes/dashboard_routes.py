@@ -6,7 +6,7 @@ from app.db import get_async_session, User
 from app.services.dashboard_service import DashboardService
 from app.users import current_active_user
 from app.schemas.dashboard import (
-    UserDashboardResponse, GlobalDashboardResponse
+    UserDashboardResponse, GlobalDashboardResponse, DashboardStatsResponse
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -186,3 +186,22 @@ async def get_storage_statistics(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Storage stats failed: {str(e)}")
+
+
+@router.get("/stats", response_model=DashboardStatsResponse)
+async def get_dashboard_stats(
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get dashboard statistics with literature type breakdown and new papers since last login.
+    This endpoint automatically updates the user's last_login timestamp.
+    """
+    dashboard_service = DashboardService(session)
+    
+    try:
+        stats = await dashboard_service.get_literature_type_stats(str(user.id))
+        return stats
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dashboard stats failed: {str(e)}")

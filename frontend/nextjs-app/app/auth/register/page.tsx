@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -53,14 +54,15 @@ export default function RegisterPage() {
         {/* Logo and Title */}
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div
-              className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-16"
-              style={{
-                backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBQB0Iy4gj4Z7YJ7ZcQ4CllX-8s6LfLb-f_LFF1unwcytlASF8GVw-yZq4Aw1fOFrUN2EDkq1avn0FMPlqWO-EgIh4VnKtDHwSXy8ZaPi27yejSeRSelkbZxPs8AZVQpUMU5BqrkjoFq6qehifmlop1T5NmGhORioraGhE3ksBt1Gqgow448iBDF3qROI_yYNOxGLh6EzoSCgczFdy9xPscBf0Xcs_6_Hljk8PriuRpsckgezM-lYATrLDPkaIYF_7wLs5CHhyO3XHX")'
-              }}
+            <Image
+              src="/HERO-Lab-logo-no-words.png"
+              alt="HERO Lab Logo"
+              width={64}
+              height={64}
+              className="rounded-full"
             />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Join the Lab</h2>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Join HERO Lab</h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Create your account to access the digital library
           </p>

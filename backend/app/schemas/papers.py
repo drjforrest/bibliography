@@ -27,6 +27,7 @@ class PaperResponse(BaseModel):
     pmid: Optional[str]
     arxiv_id: Optional[str]
     abstract: Optional[str]
+    summary: Optional[str] = None  # DEVONthink Finder Comment (article summary)
     keywords: List[str] = []
     subject_areas: List[str] = []
     tags: List[str] = []
@@ -41,6 +42,17 @@ class PaperResponse(BaseModel):
     def convert_none_to_list(cls, v):
         """Convert None values to empty lists for list fields."""
         return v if v is not None else []
+    
+    def __init__(self, **data):
+        """Extract summary from extraction_metadata if available."""
+        # Check if we have extraction_metadata from the ORM object
+        if 'extraction_metadata' in data:
+            metadata = data.get('extraction_metadata', {})
+            if metadata and isinstance(metadata, dict):
+                # Extract finder_comment as summary
+                if not data.get('summary') and 'finder_comment' in metadata:
+                    data['summary'] = metadata['finder_comment']
+        super().__init__(**data)
     
     class Config:
         from_attributes = True

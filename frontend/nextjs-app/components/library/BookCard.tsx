@@ -1,6 +1,7 @@
 'use client';
 
 import type { Paper } from '@/types';
+import { LITERATURE_TYPE_LABELS, LITERATURE_TYPE_COLORS } from '@/types';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -35,12 +36,21 @@ export default function BookCard({ paper, onChatWithDocument }: BookCardProps) {
     <div className="group relative">
       <Link href={`/papers/${paper.id}`} className="flex flex-col gap-3">
         <div
-          className="w-full bg-center bg-no-repeat aspect-[3/4] bg-cover rounded-lg shadow-md group-hover:shadow-xl transition-shadow cursor-pointer"
+          className="w-full bg-center bg-no-repeat aspect-[3/4] bg-cover rounded-lg shadow-md group-hover:shadow-xl transition-shadow cursor-pointer relative"
           style={{
             backgroundImage: getBackgroundImage(),
           }}
           title={paper.title}
         >
+          {/* Literature Type Badge */}
+          {paper.literature_type && paper.literature_type !== 'PEER_REVIEWED' && (
+            <div className="absolute top-2 left-2 z-10">
+              <span className={`px-2 py-1 text-xs font-semibold rounded ${LITERATURE_TYPE_COLORS[paper.literature_type]}`}>
+                {LITERATURE_TYPE_LABELS[paper.literature_type]}
+              </span>
+            </div>
+          )}
+
           {/* Hidden image to detect loading errors */}
           {thumbnailUrl && !imageError && (
             <img

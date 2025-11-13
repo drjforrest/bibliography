@@ -106,3 +106,31 @@ class GlobalDashboardResponse(BaseModel):
     content_analytics: ContentAnalytics
     processing_stats: ProcessingStats
     storage_metrics: StorageMetrics
+
+
+class RecentPaperResponse(BaseModel):
+    """Minimal paper info for recent papers list"""
+    id: int
+    title: str
+    authors: Optional[List[str]] = None
+    created_at: datetime
+    literature_type: str
+    
+    class Config:
+        from_attributes = True
+
+
+class LiteratureTypeStats(BaseModel):
+    """Statistics for a specific literature type"""
+    literature_type: str
+    count: int
+    label: str  # Display name (e.g., "Peer-Reviewed")
+
+
+class DashboardStatsResponse(BaseModel):
+    """Dashboard statistics response with literature type breakdown"""
+    total_papers: int
+    by_literature_type: List[LiteratureTypeStats]
+    new_since_last_login: List[RecentPaperResponse]
+    new_since_last_login_count: int
+    last_login: Optional[datetime] = None

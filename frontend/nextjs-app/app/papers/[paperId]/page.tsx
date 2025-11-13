@@ -73,11 +73,27 @@ export default function PaperAnnotationPage() {
                   <p className="text-red-500 dark:text-red-400">{error}</p>
                 </div>
               ) : (
-                <PDFViewer
-                  paperId={parseInt(paperId)}
-                  title={paper?.title || 'Document'}
-                  content={paper?.abstract}
-                />
+                <>
+                  {/* Article Summary Section */}
+                  {paper?.summary && (
+                    <div className="mb-6 p-6 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-lg">
+                      <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-xl">summarize</span>
+                        Article Summary
+                      </h3>
+                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                        {paper.summary}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* PDF Viewer */}
+                  <PDFViewer
+                    paperId={parseInt(paperId)}
+                    title={paper?.title || 'Document'}
+                    content={paper?.abstract}
+                  />
+                </>
               )}
             </div>
           </div>

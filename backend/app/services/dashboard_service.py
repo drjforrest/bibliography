@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import (
     ScientificPaper, Document, SearchSpace, User, PaperAnnotation,
-    DocumentType
+    DocumentType, LiteratureType
+)
+from app.schemas.dashboard import (
+    DashboardStatsResponse, LiteratureTypeStats, RecentPaperResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -14,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 class DashboardService:
     """Service for generating dashboard analytics and database overviews."""
+    
+    # Literature type display labels
+    LITERATURE_TYPE_LABELS = {
+        LiteratureType.PEER_REVIEWED: "Peer-Reviewed",
+        LiteratureType.GREY_LITERATURE: "Grey Literature",
+        LiteratureType.NEWS: "News"
+    }
     
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -542,3 +552,85 @@ class DashboardService:
             "total_size_gb": round(total_size_bytes / (1024 * 1024 * 1024), 2),
             "avg_file_size_mb": round(float(avg_size_bytes) / (1024 * 1024), 2)
         }
+    
+    async def get_literature_type_stats(self, user_id: str) -> DashboardStatsResponse:
+        """
+        Get comprehensive dashboard statistics with literature type breakdown.
+        
+        Args:
+            user_id: User ID to get stats for
+            
+        Returns:
+            DashboardStatsResponse with total counts, breakdown by type, and recent papers
+        """
+        # Get user's last login time
+        user_stmt = select(User).where(User.id == user_id)
+        user_result = await self.session.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+        last_login = user.last_login if user else None
+        
+        # Get total paper count
+        total_stmt = select(func.count(ScientificPaper.id))
+        total_result = await self.session.execute(total_stmt)
+        total_papers = total_result.scalar_one()
+        
+        # Get counts by literature type
+        by_type_stats = []
+        for lit_type in LiteratureType:
+            count_stmt = select(func.count(ScientificPaper.id)).where(
+                ScientificPaper.literature_type == lit_type
+            )
+            result = await self.session.execute(count_stmt)
+            count = result.scalar_one()
+            
+            by_type_stats.append(
+                LiteratureTypeStats(
+                    literature_type=lit_type.value,
+                    count=count,
+                    label=self.LITERATURE_TYPE_LABELS.get(lit_type, lit_type.value)
+                )
+            )
+        
+        # Get papers added since last login
+        if last_login:
+            new_papers_stmt = (
+                select(ScientificPaper)
+                .where(ScientificPaper.created_at > last_login)
+                .order_by(ScientificPaper.created_at.desc())
+            )
+            new_papers_result = await self.session.execute(new_papers_stmt)
+            new_papers = new_papers_result.scalars().all()
+        else:
+            # If no last login, show recent 10 papers
+            new_papers_stmt = (
+                select(ScientificPaper)
+                .order_by(ScientificPaper.created_at.desc())
+                .limit(10)
+            )
+            new_papers_result = await self.session.execute(new_papers_stmt)
+            new_papers = new_papers_result.scalars().all()
+        
+        # Convert to response models
+        recent_papers = [
+            RecentPaperResponse(
+                id=paper.id,
+                title=paper.title,
+                authors=paper.authors,
+                created_at=paper.created_at,
+                literature_type=paper.literature_type.value
+            )
+            for paper in new_papers
+        ]
+        
+        # Update user's last_login to now
+        if user:
+            user.last_login = datetime.utcnow()
+            await self.session.commit()
+        
+        return DashboardStatsResponse(
+            total_papers=total_papers,
+            by_literature_type=by_type_stats,
+            new_since_last_login=recent_papers,
+            new_since_last_login_count=len(recent_papers),
+            last_login=last_login
+        )

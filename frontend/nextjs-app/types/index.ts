@@ -8,9 +8,25 @@ export interface User {
   is_verified?: boolean;
 }
 
+// Literature types
+export type LiteratureType = 'PEER_REVIEWED' | 'GREY_LITERATURE' | 'NEWS';
+
+export const LITERATURE_TYPE_LABELS: Record<LiteratureType, string> = {
+  PEER_REVIEWED: 'Peer-Reviewed',
+  GREY_LITERATURE: 'Grey Literature',
+  NEWS: 'News & Media'
+};
+
+export const LITERATURE_TYPE_COLORS: Record<LiteratureType, string> = {
+  PEER_REVIEWED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  GREY_LITERATURE: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+  NEWS: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+};
+
 // Paper/Book types
 export interface Paper {
   id: number;
+  literature_type?: LiteratureType;  // Type of literature (peer-reviewed, grey, news)
   title?: string;
   authors: string[];
   journal?: string;
@@ -24,6 +40,7 @@ export interface Paper {
   pmid?: string;
   arxiv_id?: string;
   abstract?: string;
+  summary?: string;  // DEVONthink Finder Comment (article summary)
   coverImage: string;
   keywords: string[];
   subject_areas: string[];
@@ -166,4 +183,27 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+// Dashboard types
+export interface LiteratureTypeStats {
+  literature_type: string;
+  count: number;
+  label: string;
+}
+
+export interface RecentPaper {
+  id: number;
+  title: string;
+  authors?: string[];
+  created_at: string;
+  literature_type: string;
+}
+
+export interface DashboardStats {
+  total_papers: number;
+  by_literature_type: LiteratureTypeStats[];
+  new_since_last_login: RecentPaper[];
+  new_since_last_login_count: number;
+  last_login?: string;
 }

@@ -335,6 +335,9 @@ if config.AUTH_TYPE == "GOOGLE":
         # AI API Keys for BYOK (Bring Your Own Key) functionality
         openai_api_key = Column(String, nullable=True)
         anthropic_api_key = Column(String, nullable=True)
+        
+        # Track last login for dashboard "new since last login" feature
+        last_login = Column(TIMESTAMP(timezone=True), nullable=True)
 
         oauth_accounts: Mapped[list[OAuthAccount]] = relationship(
             "OAuthAccount", lazy="joined"
@@ -349,6 +352,9 @@ else:
         # AI API Keys for BYOK (Bring Your Own Key) functionality
         openai_api_key = Column(String, nullable=True)
         anthropic_api_key = Column(String, nullable=True)
+        
+        # Track last login for dashboard "new since last login" feature
+        last_login = Column(TIMESTAMP(timezone=True), nullable=True)
 
         search_spaces = relationship("SearchSpace", back_populates="user")
         search_source_connectors = relationship("SearchSourceConnector", back_populates="user")
