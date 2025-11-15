@@ -5,7 +5,7 @@ import type { Message } from "@/types";
 interface MessageCardProps {
   message: Message;
   isReply?: boolean;
-  onReply?: (messageId: string) => void;
+  onReply?: (messageId: number) => void;
 }
 
 export default function MessageCard({
@@ -13,7 +13,10 @@ export default function MessageCard({
   isReply = false,
   onReply,
 }: MessageCardProps) {
-  const formatDate = (date: Date) => {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -29,6 +32,18 @@ export default function MessageCard({
     return date.toLocaleDateString();
   };
 
+  const getAvatarUrl = () => {
+    if (message.user.avatar_url) {
+      return `${API_URL}${message.user.avatar_url}`;
+    }
+    const name = message.user.display_name || message.user.email;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+  };
+
+  const getUserDisplayName = () => {
+    return message.user.display_name || message.user.email;
+  };
+
   return (
     <div
       className={`flex w-full flex-row items-start justify-start gap-4 ${isReply ? "pl-16" : ""}`}
@@ -36,18 +51,16 @@ export default function MessageCard({
       <div
         className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-11 shrink-0"
         style={{
-          backgroundImage: message.user.avatar
-            ? `url(${message.user.avatar})`
-            : `url(https://ui-avatars.com/api/?name=${encodeURIComponent(message.user.name || "User")})`,
+          backgroundImage: `url(${getAvatarUrl()})`,
         }}
       />
       <div className="flex h-full flex-1 flex-col items-start justify-start">
         <div className="flex w-full flex-row items-center justify-start gap-x-3">
           <p className="text-base font-bold text-text-primary dark:text-white">
-            {message.user.name || "Anonymous"}
+            {getUserDisplayName()}
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {formatDate(message.createdAt)}
+            {formatDate(message.created_at)}
           </p>
         </div>
         <p className="text-base text-text-primary dark:text-gray-300 mt-1">

@@ -56,9 +56,9 @@ async def reset_password(email: str, new_password: str):
 async def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Reset user password')
-    parser.add_argument('--email', required=True, help='User email')
-    parser.add_argument('--password', required=True, help='New password')
+    parser = argparse.ArgumentParser(description="Reset user password")
+    parser.add_argument("--email", required=True, help="User email")
+    parser.add_argument("--password", required=True, help="New password")
     args = parser.parse_args()
 
     await reset_password(args.email, args.password)

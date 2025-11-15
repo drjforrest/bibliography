@@ -43,7 +43,7 @@ def call_mcp_tool(name, input_data):
     elif name == "get_open_databases":
         return {{
             "text_result": [{{
-                "text": '''{{
+                "text": \'\'\'{{
                     "success": true,
                     "databases": [
                         {{
@@ -62,7 +62,7 @@ def call_mcp_tool(name, input_data):
                         }}
                     ],
                     "totalCount": 2
-                }}'''
+                }}\'\'\'
             }}]
         }}
     else:

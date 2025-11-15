@@ -94,10 +94,10 @@ async def get_tag_hierarchy(
             user_id=str(tag.user_id),
             created_at=tag.created_at,
             paper_count=paper_count,
-            children=[]
+            children=[],
         )
 
-        if hasattr(tag, 'children') and tag.children:
+        if hasattr(tag, "children") and tag.children:
             response.children = [build_tag_tree(child) for child in tag.children]
 
         return response
@@ -243,9 +243,17 @@ async def add_tag_to_paper(
     try:
         success = await tag_service.add_tag_to_paper(paper_id, tag_id, str(user.id))
         if not success:
-            return {"message": "Tag already applied to paper", "paper_id": paper_id, "tag_id": tag_id}
+            return {
+                "message": "Tag already applied to paper",
+                "paper_id": paper_id,
+                "tag_id": tag_id,
+            }
 
-        return {"message": "Tag added successfully", "paper_id": paper_id, "tag_id": tag_id}
+        return {
+            "message": "Tag added successfully",
+            "paper_id": paper_id,
+            "tag_id": tag_id,
+        }
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -265,7 +273,11 @@ async def remove_tag_from_paper(
     if not success:
         raise HTTPException(status_code=404, detail="Tag or paper not found")
 
-    return {"message": "Tag removed successfully", "paper_id": paper_id, "tag_id": tag_id}
+    return {
+        "message": "Tag removed successfully",
+        "paper_id": paper_id,
+        "tag_id": tag_id,
+    }
 
 
 @router.get("/papers/{paper_id}/tags", response_model=TagListResponse)
@@ -300,7 +312,9 @@ async def set_paper_tags(
     tag_service = TagService(session)
 
     try:
-        tags = await tag_service.set_paper_tags(paper_id, tags_update.tag_ids, str(user.id))
+        tags = await tag_service.set_paper_tags(
+            paper_id, tags_update.tag_ids, str(user.id)
+        )
 
         # Add paper counts
         tag_responses = []

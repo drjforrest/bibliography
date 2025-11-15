@@ -15,15 +15,17 @@ from pydantic import BaseModel
 from app.config import config
 from app.db import User, get_user_db
 
+
 class BearerResponse(BaseModel):
     access_token: str
     token_type: str
+
 
 SECRET = config.SECRET_KEY
 
 if config.AUTH_TYPE == "GOOGLE":
     from httpx_oauth.clients.google import GoogleOAuth2
-    
+
     google_oauth_client = GoogleOAuth2(
         config.GOOGLE_OAUTH_CLIENT_ID,
         config.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -45,16 +47,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        print(
-            f"Verification requested for user {user.id}. Verification token: {token}")
+        print(f"Verification requested for user {user.id}. Verification token: {token}")
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
     yield UserManager(user_db)
-    
-    
+
+
 def get_jwt_strategy() -> JWTStrategy[models.UP, models.ID]:
-    return JWTStrategy(secret=SECRET, lifetime_seconds=3600*24*30)  # 30 days
+    return JWTStrategy(secret=SECRET, lifetime_seconds=3600 * 24 * 30)  # 30 days
 
 
 # # COOKIE AUTH | Uncomment if you want to use cookie auth.
@@ -76,6 +77,7 @@ def get_jwt_strategy() -> JWTStrategy[models.UP, models.ID]:
 #     get_strategy=get_jwt_strategy,
 # )
 
+
 # BEARER AUTH CODE.
 class CustomBearerTransport(BearerTransport):
     async def get_login_response(self, token: str) -> Response:
@@ -85,6 +87,7 @@ class CustomBearerTransport(BearerTransport):
             return RedirectResponse(redirect_url, status_code=302)
         else:
             return JSONResponse(bearer_response.dict())
+
 
 bearer_transport = CustomBearerTransport(tokenUrl="auth/jwt/login")
 

@@ -11,6 +11,7 @@ from langchain_core.runnables import RunnableConfig
 
 class SubSectionType(Enum):
     """Enum defining the type of sub-section."""
+
     START = "START"
     MIDDLE = "MIDDLE"
     END = "END"
@@ -28,7 +29,6 @@ class Configuration:
     relevant_documents: List[Any]  # Documents provided directly to the agent
     user_id: str
     search_space_id: int
-
 
     @classmethod
     def from_runnable_config(

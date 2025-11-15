@@ -5,7 +5,7 @@ import MessageCard from './MessageCard';
 
 interface MessageThreadProps {
   messages: Message[];
-  onReply?: (messageId: string) => void;
+  onReply?: (messageId: number) => void;
 }
 
 export default function MessageThread({ messages, onReply }: MessageThreadProps) {

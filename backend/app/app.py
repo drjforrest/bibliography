@@ -16,12 +16,7 @@ from app.routes.automated_ingestion_routes import router as automated_ingestion_
 from app.routes.admin_routes import router as admin_router
 from app.config import config
 
-from app.users import (
-    SECRET,
-    auth_backend,
-    fastapi_users,
-    current_active_user
-)
+from app.users import SECRET, auth_backend, fastapi_users, current_active_user
 
 
 @asynccontextmanager
@@ -68,12 +63,10 @@ app.include_router(
 
 if config.AUTH_TYPE == "GOOGLE":
     from app.users import google_oauth_client
+
     app.include_router(
         fastapi_users.get_oauth_router(
-            google_oauth_client,
-            auth_backend,
-            SECRET,
-            is_verified_by_default=True
+            google_oauth_client, auth_backend, SECRET, is_verified_by_default=True
         ),
         prefix="/auth/google",
         tags=["auth"],
@@ -87,5 +80,8 @@ app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
 
 
 @app.get("/verify-token")
-async def authenticated_route(user: User = Depends(current_active_user), session: AsyncSession = Depends(get_async_session)):
+async def authenticated_route(
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
     return {"message": "Token is valid"}

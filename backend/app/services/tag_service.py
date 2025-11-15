@@ -25,7 +25,7 @@ class TagService:
             color=tag_data.color,
             icon=tag_data.icon,
             parent_id=tag_data.parent_id,
-            user_id=user_id
+            user_id=user_id,
         )
 
         self.session.add(tag)
@@ -35,9 +35,11 @@ class TagService:
 
     async def get_tag_by_id(self, tag_id: int, user_id: str) -> Optional[Tag]:
         """Get a tag by ID (only user's own tags)."""
-        stmt = select(Tag).where(
-            and_(Tag.id == tag_id, Tag.user_id == user_id)
-        ).options(selectinload(Tag.children))
+        stmt = (
+            select(Tag)
+            .where(and_(Tag.id == tag_id, Tag.user_id == user_id))
+            .options(selectinload(Tag.children))
+        )
 
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -46,7 +48,7 @@ class TagService:
         self,
         user_id: str,
         parent_id: Optional[int] = None,
-        include_children: bool = False
+        include_children: bool = False,
     ) -> List[Tag]:
         """Get all tags for a user, optionally filtered by parent."""
         stmt = select(Tag).where(Tag.user_id == user_id)
@@ -67,18 +69,19 @@ class TagService:
 
     async def get_all_user_tags(self, user_id: str) -> List[Tag]:
         """Get all tags for a user (flat list, including nested)."""
-        stmt = select(Tag).where(
-            Tag.user_id == user_id
-        ).order_by(Tag.name)
+        stmt = select(Tag).where(Tag.user_id == user_id).order_by(Tag.name)
 
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_tag_hierarchy(self, user_id: str) -> List[Tag]:
         """Get tags in hierarchical structure (only top-level tags with children loaded)."""
-        stmt = select(Tag).where(
-            and_(Tag.user_id == user_id, Tag.parent_id.is_(None))
-        ).options(selectinload(Tag.children)).order_by(Tag.name)
+        stmt = (
+            select(Tag)
+            .where(and_(Tag.user_id == user_id, Tag.parent_id.is_(None)))
+            .options(selectinload(Tag.children))
+            .order_by(Tag.name)
+        )
 
         result = await self.session.execute(stmt)
         tags = list(result.scalars().all())
@@ -91,16 +94,13 @@ class TagService:
 
     async def _load_tag_descendants(self, tag: Tag):
         """Recursively load all descendants of a tag."""
-        if hasattr(tag, 'children') and tag.children:
+        if hasattr(tag, "children") and tag.children:
             for child in tag.children:
-                await self.session.refresh(child, ['children'])
+                await self.session.refresh(child, ["children"])
                 await self._load_tag_descendants(child)
 
     async def update_tag(
-        self,
-        tag_id: int,
-        user_id: str,
-        update_data: TagUpdate
+        self, tag_id: int, user_id: str, update_data: TagUpdate
     ) -> Optional[Tag]:
         """Update a tag."""
         tag = await self.get_tag_by_id(tag_id, user_id)
@@ -129,7 +129,9 @@ class TagService:
         await self.session.refresh(tag)
         return tag
 
-    async def _is_descendant(self, ancestor_id: int, potential_descendant_id: int) -> bool:
+    async def _is_descendant(
+        self, ancestor_id: int, potential_descendant_id: int
+    ) -> bool:
         """Check if potential_descendant_id is a descendant of ancestor_id."""
         current_tag = await self.session.get(Tag, potential_descendant_id)
         while current_tag and current_tag.parent_id:
@@ -154,19 +156,16 @@ class TagService:
         if not tag:
             return 0
 
-        stmt = select(func.count()).select_from(paper_tags).where(
-            paper_tags.c.tag_id == tag_id
+        stmt = (
+            select(func.count())
+            .select_from(paper_tags)
+            .where(paper_tags.c.tag_id == tag_id)
         )
 
         result = await self.session.execute(stmt)
         return result.scalar() or 0
 
-    async def add_tag_to_paper(
-        self,
-        paper_id: int,
-        tag_id: int,
-        user_id: str
-    ) -> bool:
+    async def add_tag_to_paper(self, paper_id: int, tag_id: int, user_id: str) -> bool:
         """Add a tag to a paper."""
         # Verify tag belongs to user
         tag = await self.get_tag_by_id(tag_id, user_id)
@@ -180,10 +179,7 @@ class TagService:
 
         # Check if already tagged
         stmt = select(paper_tags).where(
-            and_(
-                paper_tags.c.paper_id == paper_id,
-                paper_tags.c.tag_id == tag_id
-            )
+            and_(paper_tags.c.paper_id == paper_id, paper_tags.c.tag_id == tag_id)
         )
         result = await self.session.execute(stmt)
         if result.first():
@@ -196,10 +192,7 @@ class TagService:
         return True
 
     async def remove_tag_from_paper(
-        self,
-        paper_id: int,
-        tag_id: int,
-        user_id: str
+        self, paper_id: int, tag_id: int, user_id: str
     ) -> bool:
         """Remove a tag from a paper."""
         # Verify tag belongs to user
@@ -209,10 +202,7 @@ class TagService:
 
         # Remove tag
         stmt = paper_tags.delete().where(
-            and_(
-                paper_tags.c.paper_id == paper_id,
-                paper_tags.c.tag_id == tag_id
-            )
+            and_(paper_tags.c.paper_id == paper_id, paper_tags.c.tag_id == tag_id)
         )
         result = await self.session.execute(stmt)
         await self.session.commit()
@@ -220,23 +210,18 @@ class TagService:
 
     async def get_paper_tags(self, paper_id: int, user_id: str) -> List[Tag]:
         """Get all tags for a specific paper."""
-        stmt = select(Tag).join(
-            paper_tags, Tag.id == paper_tags.c.tag_id
-        ).where(
-            and_(
-                paper_tags.c.paper_id == paper_id,
-                Tag.user_id == user_id
-            )
-        ).order_by(Tag.name)
+        stmt = (
+            select(Tag)
+            .join(paper_tags, Tag.id == paper_tags.c.tag_id)
+            .where(and_(paper_tags.c.paper_id == paper_id, Tag.user_id == user_id))
+            .order_by(Tag.name)
+        )
 
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def set_paper_tags(
-        self,
-        paper_id: int,
-        tag_ids: List[int],
-        user_id: str
+        self, paper_id: int, tag_ids: List[int], user_id: str
     ) -> List[Tag]:
         """Set tags for a paper (replaces existing tags)."""
         # Verify paper exists
@@ -246,9 +231,7 @@ class TagService:
 
         # Verify all tags belong to user
         if tag_ids:
-            stmt = select(Tag).where(
-                and_(Tag.id.in_(tag_ids), Tag.user_id == user_id)
-            )
+            stmt = select(Tag).where(and_(Tag.id.in_(tag_ids), Tag.user_id == user_id))
             result = await self.session.execute(stmt)
             found_tags = list(result.scalars().all())
             if len(found_tags) != len(tag_ids):
@@ -262,8 +245,7 @@ class TagService:
         if tag_ids:
             for tag_id in tag_ids:
                 insert_stmt = paper_tags.insert().values(
-                    paper_id=paper_id,
-                    tag_id=tag_id
+                    paper_id=paper_id, tag_id=tag_id
                 )
                 await self.session.execute(insert_stmt)
 
@@ -274,12 +256,12 @@ class TagService:
 
     async def search_tags(self, user_id: str, query: str, limit: int = 20) -> List[Tag]:
         """Search tags by name."""
-        stmt = select(Tag).where(
-            and_(
-                Tag.user_id == user_id,
-                Tag.name.ilike(f"%{query}%")
-            )
-        ).order_by(Tag.name).limit(limit)
+        stmt = (
+            select(Tag)
+            .where(and_(Tag.user_id == user_id, Tag.name.ilike(f"%{query}%")))
+            .order_by(Tag.name)
+            .limit(limit)
+        )
 
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

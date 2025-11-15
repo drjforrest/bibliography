@@ -7,6 +7,8 @@ interface AnnotationCardProps {
 }
 
 export default function AnnotationCard({ annotation }: AnnotationCardProps) {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   const getBorderColor = () => {
     switch (annotation.type) {
       case "highlight":
@@ -44,22 +46,34 @@ export default function AnnotationCard({ annotation }: AnnotationCardProps) {
     return date.toLocaleDateString();
   };
 
+  const getAvatarUrl = () => {
+    if (annotation.user?.avatar_url) {
+      return `${API_URL}${annotation.user.avatar_url}`;
+    }
+    if (annotation.user?.avatar) {
+      return annotation.user.avatar;
+    }
+    const name = annotation.user?.display_name || annotation.user?.name || "User";
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+  };
+
+  const getUserDisplayName = () => {
+    return annotation.user?.display_name || annotation.user?.name || "Anonymous";
+  };
+
   return (
     <div
       className={`flex items-start gap-4 p-4 rounded-lg bg-white dark:bg-gray-800 shadow-sm border-l-4 ${getBorderColor()}`}
     >
       <img
-        className="w-10 h-10 rounded-full mt-1"
-        src={
-          annotation.user?.avatar ||
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(annotation.user?.name || "User")}`
-        }
-        alt={`${annotation.user?.name || "User"} avatar`}
+        className="w-10 h-10 rounded-full mt-1 object-cover"
+        src={getAvatarUrl()}
+        alt={`${getUserDisplayName()} avatar`}
       />
       <div className="flex-1">
         <div className="flex items-center justify-between">
           <p className="font-semibold text-gray-800 dark:text-gray-200">
-            {annotation.user?.name || "Anonymous"}
+            {getUserDisplayName()}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {annotation.createdAt && formatDate(annotation.createdAt)}

@@ -89,16 +89,16 @@ async def test_setup():
             # Check if PDF exists
             pdf_full_path = file_storage.get_full_path(paper.file_path)
             if not pdf_full_path.exists():
-                print(f"  [{i}] Paper {paper.id}: PDF not found at {pdf_full_path} - SKIPPED")
+                print(
+                    f"  [{i}] Paper {paper.id}: PDF not found at {pdf_full_path} - SKIPPED"
+                )
                 fail_count += 1
                 continue
 
             # Generate thumbnail
             try:
                 thumbnail_path = thumbnail_gen.generate_thumbnail(
-                    paper.file_path,
-                    paper.id,
-                    force_regenerate=False
+                    paper.file_path, paper.id, force_regenerate=False
                 )
 
                 if thumbnail_path:
@@ -145,7 +145,9 @@ async def test_setup():
         print()
         print("Thumbnail Access:")
         print(f"  GET /api/v1/papers/{{paper_id}}/thumbnail")
-        print(f"  Example: http://localhost:8000/api/v1/papers/{papers[0].id}/thumbnail")
+        print(
+            f"  Example: http://localhost:8000/api/v1/papers/{papers[0].id}/thumbnail"
+        )
         print()
         print("Batch Thumbnail Generation:")
         print(f"  POST /api/v1/papers/thumbnails/generate-batch")
@@ -168,7 +170,9 @@ async def test_setup():
         print("   ✓ Clicking a paper opens the PDF viewer")
         print()
         print("5. To generate all thumbnails in batch:")
-        print("   curl -X POST http://localhost:8000/api/v1/papers/thumbnails/generate-batch \\")
+        print(
+            "   curl -X POST http://localhost:8000/api/v1/papers/thumbnails/generate-batch \\"
+        )
         print("        -H 'Authorization: Bearer YOUR_TOKEN' \\")
         print("        -F 'limit=100'")
         print()
@@ -182,5 +186,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Error: {str(e)}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

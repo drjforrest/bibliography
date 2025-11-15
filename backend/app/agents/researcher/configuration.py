@@ -8,8 +8,10 @@ from typing import Optional, List, Any
 
 from langchain_core.runnables import RunnableConfig
 
-class SearchMode(Enum): 
+
+class SearchMode(Enum):
     """Enum defining the type of search mode."""
+
     CHUNKS = "CHUNKS"
     DOCUMENTS = "DOCUMENTS"
 
@@ -25,7 +27,6 @@ class Configuration:
     user_id: str
     search_space_id: int
     search_mode: SearchMode
-
 
     @classmethod
     def from_runnable_config(

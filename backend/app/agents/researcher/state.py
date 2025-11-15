@@ -7,6 +7,7 @@ from typing import List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.streaming_service import StreamingService
 
+
 @dataclass
 class State:
     """Defines the dynamic state for the agent during execution.
@@ -15,19 +16,19 @@ class State:
     See: https://langchain-ai.github.io/langgraph/concepts/low_level/#state
     for more information.
     """
+
     # Runtime context (not part of actual graph state)
     db_session: AsyncSession
-    
+
     # Streaming service
     streaming_service: StreamingService
-    
+
     chat_history: Optional[List[Any]] = field(default_factory=list)
-    
+
     reformulated_query: Optional[str] = field(default=None)
     # Using field to explicitly mark as part of state
     answer_outline: Optional[Any] = field(default=None)
-    
+
     # OUTPUT: Populated by agent nodes
     # Using field to explicitly mark as part of state
     final_written_report: Optional[str] = field(default=None)
-

@@ -7,9 +7,10 @@ interface BookGridProps {
   papers: Paper[];
   view: ViewMode;
   onChatWithDocument?: (documentId: number) => void;
+  onFavoriteChange?: () => void;
 }
 
-export default function BookGrid({ papers, view, onChatWithDocument }: BookGridProps) {
+export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteChange }: BookGridProps) {
   if (papers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -80,6 +81,7 @@ export default function BookGrid({ papers, view, onChatWithDocument }: BookGridP
           key={paper.id}
           paper={paper}
           onChatWithDocument={onChatWithDocument}
+          onFavoriteChange={onFavoriteChange}
         />
       ))}
     </div>

@@ -1,6 +1,11 @@
 from .base import TimestampModel, IDModel
 from .users import UserRead, UserCreate, UserUpdate
-from .search_space import SearchSpaceBase, SearchSpaceCreate, SearchSpaceUpdate, SearchSpaceRead
+from .search_space import (
+    SearchSpaceBase,
+    SearchSpaceCreate,
+    SearchSpaceUpdate,
+    SearchSpaceRead,
+)
 from .documents import (
     ExtensionDocumentMetadata,
     ExtensionDocumentContent,

@@ -38,14 +38,21 @@ from app.services.embedding_service import EmbeddingService
 from app.services.enhanced_rag_service import EnhancedRAGService
 from app.config import config
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 class DEVONthinkCSVImporter:
     """Import papers from DEVONthink CSV export."""
 
-    def __init__(self, session_maker, user_id: UUID, default_literature_type: str = "PEER_REVIEWED"):
+    def __init__(
+        self,
+        session_maker,
+        user_id: UUID,
+        default_literature_type: str = "PEER_REVIEWED",
+    ):
         self.session_maker = session_maker
         self.user_id = user_id
         self.default_literature_type = default_literature_type
@@ -58,11 +65,12 @@ class DEVONthinkCSVImporter:
         self.error_count = 0
         self.errors = []
 
-    async def get_or_create_search_space(self, session: AsyncSession, name: str = "DEVONthink Import") -> SearchSpace:
+    async def get_or_create_search_space(
+        self, session: AsyncSession, name: str = "DEVONthink Import"
+    ) -> SearchSpace:
         """Get or create a search space for imported papers."""
         stmt = select(SearchSpace).where(
-            SearchSpace.name == name,
-            SearchSpace.user_id == self.user_id
+            SearchSpace.name == name, SearchSpace.user_id == self.user_id
         )
         result = await session.execute(stmt)
         search_space = result.scalar_one_or_none()
@@ -72,7 +80,7 @@ class DEVONthinkCSVImporter:
                 name=name,
                 description="Papers imported from DEVONthink via CSV export",
                 user_id=self.user_id,
-                is_active=True
+                is_active=True,
             )
             session.add(search_space)
             await session.commit()
@@ -80,7 +88,9 @@ class DEVONthinkCSVImporter:
 
         return search_space
 
-    async def import_from_csv(self, csv_path: str, search_space_id: Optional[int] = None):
+    async def import_from_csv(
+        self, csv_path: str, search_space_id: Optional[int] = None
+    ):
         """Import papers from CSV file."""
         logger.info(f"Starting import from {csv_path}")
 
@@ -96,7 +106,7 @@ class DEVONthinkCSVImporter:
                 search_space = await self.get_or_create_search_space(session)
 
         # Read CSV with encoding handling for special characters
-        with open(csv_path, 'r', encoding='utf-8', errors='replace') as f:
+        with open(csv_path, "r", encoding="utf-8", errors="replace") as f:
             reader = csv.DictReader(f)
 
             for row in reader:
@@ -107,7 +117,9 @@ class DEVONthinkCSVImporter:
                         self.imported_count += 1
                     except Exception as e:
                         self.error_count += 1
-                        error_msg = f"Error importing {row.get('Name', 'Unknown')}: {str(e)}"
+                        error_msg = (
+                            f"Error importing {row.get('Name', 'Unknown')}: {str(e)}"
+                        )
                         logger.error(error_msg)
                         self.errors.append(error_msg)
 
@@ -123,27 +135,32 @@ class DEVONthinkCSVImporter:
     def _determine_literature_type(self, label: str) -> LiteratureType:
         """Determine literature type from DEVONthink label or tags."""
         label_lower = label.lower() if label else ""
-        
+
         # Check for explicit type indicators in label
-        if any(term in label_lower for term in ['grey', 'gray', 'grey literature', 'gray literature']):
+        if any(
+            term in label_lower
+            for term in ["grey", "gray", "grey literature", "gray literature"]
+        ):
             return LiteratureType.GREY_LITERATURE
-        elif any(term in label_lower for term in ['news', 'media', 'press']):
+        elif any(term in label_lower for term in ["news", "media", "press"]):
             return LiteratureType.NEWS
-        elif any(term in label_lower for term in ['peer', 'journal', 'academic']):
+        elif any(term in label_lower for term in ["peer", "journal", "academic"]):
             return LiteratureType.PEER_REVIEWED
-        
+
         # Default to the import-level default
         return LiteratureType[self.default_literature_type]
 
-    async def import_record(self, session: AsyncSession, row: dict, search_space_id: int):
+    async def import_record(
+        self, session: AsyncSession, row: dict, search_space_id: int
+    ):
         """Import a single record from CSV row."""
-        dt_uuid = row['DEVONthink UUID']
-        name = row['Name']
-        description = row['Single Sentence Description']
-        label = row['RecordLabel']
-        finder_comment = row['Finder Comment']
-        pdf_path = row['PDF Path']
-        
+        dt_uuid = row["DEVONthink UUID"]
+        name = row["Name"]
+        description = row["Single Sentence Description"]
+        label = row["RecordLabel"]
+        finder_comment = row["Finder Comment"]
+        pdf_path = row["PDF Path"]
+
         # Determine literature type
         literature_type = self._determine_literature_type(label)
 
@@ -156,9 +173,7 @@ class DEVONthinkCSVImporter:
             return
 
         # Check if already imported (by DEVONthink UUID)
-        stmt = select(ScientificPaper).where(
-            ScientificPaper.dt_source_uuid == dt_uuid
-        )
+        stmt = select(ScientificPaper).where(ScientificPaper.dt_source_uuid == dt_uuid)
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
 
@@ -194,8 +209,8 @@ class DEVONthinkCSVImporter:
                 "devonthink_label": label,
                 "devonthink_finder_comment": finder_comment,
                 "import_source": "csv_export",
-                "import_timestamp": datetime.now(timezone.utc).isoformat()
-            }
+                "import_timestamp": datetime.now(timezone.utc).isoformat(),
+            },
         )
         session.add(document)
         await session.flush()
@@ -203,7 +218,7 @@ class DEVONthinkCSVImporter:
         # Step 4: Create ScientificPaper record
         # Use extracted title if available, otherwise use DEVONthink name
         paper_title = metadata.get("title") or name
-        if paper_title.lower().endswith('.pdf'):
+        if paper_title.lower().endswith(".pdf"):
             paper_title = paper_title[:-4]
 
         paper = ScientificPaper(
@@ -211,7 +226,8 @@ class DEVONthinkCSVImporter:
             title=paper_title,
             authors=metadata.get("authors", []),
             doi=metadata.get("doi"),
-            abstract=metadata.get("abstract") or description,  # Use DEVONthink description as fallback
+            abstract=metadata.get("abstract")
+            or description,  # Use DEVONthink description as fallback
             publication_date=self._parse_date(metadata.get("publication_date")),
             publication_year=metadata.get("publication_year"),
             file_path=relative_path,
@@ -226,8 +242,8 @@ class DEVONthinkCSVImporter:
                 "devonthink_description": description,
                 "finder_comment": finder_comment,
                 "literature_type": literature_type.value,
-                "extraction_timestamp": datetime.now(timezone.utc).isoformat()
-            }
+                "extraction_timestamp": datetime.now(timezone.utc).isoformat(),
+            },
         )
         session.add(paper)
         await session.flush()
@@ -238,9 +254,7 @@ class DEVONthinkCSVImporter:
         logger.info(f"Generating thumbnail...")
         try:
             thumbnail_path = self.thumbnail_gen.generate_thumbnail(
-                relative_path,
-                paper.id,
-                force_regenerate=False
+                relative_path, paper.id, force_regenerate=False
             )
             if thumbnail_path:
                 logger.info(f"Thumbnail generated: {thumbnail_path}")
@@ -263,6 +277,7 @@ class DEVONthinkCSVImporter:
             return None
         try:
             from dateutil import parser
+
             dt = parser.parse(date_str)
             return dt.date() if dt else None
         except Exception:
@@ -295,15 +310,17 @@ async def main():
     """Main entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Import papers from DEVONthink CSV export')
-    parser.add_argument('--csv', required=True, help='Path to CSV file')
-    parser.add_argument('--user-id', required=True, help='User UUID')
-    parser.add_argument('--search-space-id', type=int, help='Optional search space ID')
+    parser = argparse.ArgumentParser(
+        description="Import papers from DEVONthink CSV export"
+    )
+    parser.add_argument("--csv", required=True, help="Path to CSV file")
+    parser.add_argument("--user-id", required=True, help="User UUID")
+    parser.add_argument("--search-space-id", type=int, help="Optional search space ID")
     parser.add_argument(
-        '--literature-type',
-        choices=['PEER_REVIEWED', 'GREY_LITERATURE', 'NEWS'],
-        default='PEER_REVIEWED',
-        help='Default literature type for imported papers (can be overridden by DEVONthink labels)'
+        "--literature-type",
+        choices=["PEER_REVIEWED", "GREY_LITERATURE", "NEWS"],
+        default="PEER_REVIEWED",
+        help="Default literature type for imported papers (can be overridden by DEVONthink labels)",
     )
     args = parser.parse_args()
 
@@ -321,7 +338,9 @@ async def main():
 
     # Create async session maker
     engine = create_async_engine(config.DATABASE_URL)
-    async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session_maker = sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
 
     importer = DEVONthinkCSVImporter(async_session_maker, user_id, args.literature_type)
     await importer.import_from_csv(args.csv, args.search_space_id)
@@ -337,5 +356,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Import failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

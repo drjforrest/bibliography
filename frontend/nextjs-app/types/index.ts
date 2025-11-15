@@ -3,7 +3,10 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  display_name?: string;
+  bio?: string;
   avatar?: string;
+  avatar_url?: string;
   is_active?: boolean;
   is_verified?: boolean;
 }
@@ -78,7 +81,14 @@ export interface Annotation {
   paperId?: string;
   user_id?: string;
   userId?: string;
-  user?: User;
+  user?: {
+    id?: string;
+    name?: string;
+    display_name?: string;
+    email?: string;
+    avatar?: string;
+    avatar_url?: string;
+  };
   user_email?: string;
   created_at?: string;
   createdAt?: Date;
@@ -149,22 +159,30 @@ export interface Topic {
 
 // Message Board types
 export interface Message {
-  id: string;
-  topicId: string;
-  userId: string;
-  user: User;
+  id: number;
+  topic_id: number;
+  user_id: string;
+  user: {
+    id: string;
+    email: string;
+    display_name?: string;
+    avatar_url?: string;
+  };
   content: string;
-  createdAt: Date;
-  parentId?: string;
+  created_at: string;
+  parent_id?: number;
   replies?: Message[];
 }
 
 export interface MessageTopic {
-  id: string;
+  id: number;
   name: string;
   icon: string;
-  unreadCount?: number;
-  lastMessage?: Date;
+  description?: string;
+  user_id: string;
+  created_at: string;
+  unread_count?: number;
+  last_message?: string;
 }
 
 // View types

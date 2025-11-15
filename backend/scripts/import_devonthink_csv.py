@@ -4,6 +4,7 @@ Import DEVONthink CSV data into Bibliography database.
 This script reads the thumbnail_index.csv file and creates ScientificPaper records
 for each entry, linking to thumbnails and preserving DEVONthink metadata.
 """
+
 import asyncio
 import csv
 import sys
@@ -18,16 +19,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_async_session_context, ScientificPaper, Document, SearchSpace, User
+from app.db import (
+    get_async_session_context,
+    ScientificPaper,
+    Document,
+    SearchSpace,
+    User,
+)
 from app.db import DocumentType
 from app.config import config
 
 
-async def get_or_create_search_space(session: AsyncSession, user_id: str) -> SearchSpace:
+async def get_or_create_search_space(
+    session: AsyncSession, user_id: str
+) -> SearchSpace:
     """Get or create a search space for imported papers."""
     stmt = select(SearchSpace).where(
-        SearchSpace.user_id == user_id,
-        SearchSpace.name == "DEVONthink Import"
+        SearchSpace.user_id == user_id, SearchSpace.name == "DEVONthink Import"
     )
     result = await session.execute(stmt)
     search_space = result.scalar_one_or_none()
@@ -36,7 +44,7 @@ async def get_or_create_search_space(session: AsyncSession, user_id: str) -> Sea
         search_space = SearchSpace(
             name="DEVONthink Import",
             description="Papers imported from DEVONthink thumbnail index",
-            user_id=user_id
+            user_id=user_id,
         )
         session.add(search_space)
         await session.commit()
@@ -57,13 +65,13 @@ async def import_record(
     row: dict,
     search_space_id: int,
     thumbnail_base_path: Path,
-    dry_run: bool = False
+    dry_run: bool = False,
 ) -> Optional[ScientificPaper]:
     """Import a single record from the CSV."""
-    dt_uuid = row['DEVONthink UUID'].strip()
-    name = row['Name'].strip()
-    description = row['Single Sentence Description'].strip()
-    thumbnail_path = row.get('Thumbnail Path', '').strip()
+    dt_uuid = row["DEVONthink UUID"].strip()
+    name = row["Name"].strip()
+    description = row["Single Sentence Description"].strip()
+    thumbnail_path = row.get("Thumbnail Path", "").strip()
 
     # Skip if already exists
     if await paper_exists(session, dt_uuid):
@@ -91,10 +99,10 @@ async def import_record(
         document_metadata={
             "source": "devonthink_csv_import",
             "devonthink_uuid": dt_uuid,
-            "has_thumbnail": thumbnail_rel_path is not None
+            "has_thumbnail": thumbnail_rel_path is not None,
         },
         content=description if description else name,  # Use description as content
-        search_space_id=search_space_id
+        search_space_id=search_space_id,
     )
     session.add(document)
     await session.flush()  # Get document ID
@@ -109,7 +117,9 @@ async def import_record(
         dt_source_uuid=dt_uuid,
         dt_source_path=thumbnail_rel_path,  # Store thumbnail path here
         document_id=document.id,
-        confidence_score=0.9 if description else 0.5  # Higher confidence if we have description
+        confidence_score=(
+            0.9 if description else 0.5
+        ),  # Higher confidence if we have description
     )
 
     session.add(paper)
@@ -128,7 +138,9 @@ async def main():
 
     # Configuration
     csv_path = Path(__file__).parent.parent.parent / "data" / "thumbnail_index.csv"
-    thumbnail_base = Path(__file__).parent.parent.parent / "data" / "DEVONthink_Thumbnails"
+    thumbnail_base = (
+        Path(__file__).parent.parent.parent / "data" / "DEVONthink_Thumbnails"
+    )
 
     if not csv_path.exists():
         print(f"❌ CSV file not found: {csv_path}")
@@ -152,7 +164,7 @@ async def main():
     # Read CSV
     print(f"\n📄 Reading CSV: {csv_path}")
     records = []
-    with open(csv_path, 'r', encoding='latin-1') as f:
+    with open(csv_path, "r", encoding="latin-1") as f:
         reader = csv.DictReader(f)
         for row in reader:
             records.append(row)
@@ -170,7 +182,9 @@ async def main():
 
         if not user:
             print("❌ No users found in database. Please create a user first.")
-            print("   Run: cd backend && python -c 'from app.db import *; import asyncio; asyncio.run(create_db_and_tables())'")
+            print(
+                "   Run: cd backend && python -c 'from app.db import *; import asyncio; asyncio.run(create_db_and_tables())'"
+            )
             return
 
         print(f"   Using user: {user.email}")
@@ -190,11 +204,7 @@ async def main():
         for i, row in enumerate(records, 1):
             try:
                 result = await import_record(
-                    session,
-                    row,
-                    search_space.id,
-                    thumbnail_base,
-                    dry_run=dry_run
+                    session, row, search_space.id, thumbnail_base, dry_run=dry_run
                 )
                 if result:
                     imported_count += 1
@@ -210,6 +220,7 @@ async def main():
                 print(f"  ❌ Error importing record {i}: {e}")
                 if "--verbose" in sys.argv:
                     import traceback
+
                     traceback.print_exc()
 
         print("-" * 70)

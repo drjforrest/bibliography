@@ -5,16 +5,28 @@ from pydantic import BaseModel, Field
 
 class SemanticSearchRequest(BaseModel):
     """Request schema for semantic search."""
+
     query: str = Field(..., min_length=1, description="Search query")
-    search_space_id: Optional[int] = Field(None, description="Search space to filter by")
-    search_type: str = Field("hybrid", pattern="^(semantic|keyword|hybrid)$", description="Type of search to perform")
+    search_space_id: Optional[int] = Field(
+        None, description="Search space to filter by"
+    )
+    search_type: str = Field(
+        "hybrid",
+        pattern="^(semantic|keyword|hybrid)$",
+        description="Type of search to perform",
+    )
     limit: int = Field(10, ge=1, le=50, description="Maximum number of results")
-    min_confidence: float = Field(0.0, ge=0.0, le=1.0, description="Minimum extraction confidence score")
-    include_abstracts: bool = Field(True, description="Whether to include abstracts in results")
+    min_confidence: float = Field(
+        0.0, ge=0.0, le=1.0, description="Minimum extraction confidence score"
+    )
+    include_abstracts: bool = Field(
+        True, description="Whether to include abstracts in results"
+    )
 
 
 class SearchInsights(BaseModel):
     """Search insights and analytics."""
+
     total_papers: int
     avg_confidence: float
     avg_search_score: float
@@ -26,6 +38,7 @@ class SearchInsights(BaseModel):
 
 class PaperInfo(BaseModel):
     """Enhanced paper information."""
+
     id: int
     title: Optional[str]
     authors: List[str] = []
@@ -42,6 +55,7 @@ class PaperInfo(BaseModel):
 
 class SearchResult(BaseModel):
     """Enhanced search result with paper information."""
+
     document_id: int
     title: str
     content: Optional[str]
@@ -55,6 +69,7 @@ class SearchResult(BaseModel):
 
 class SemanticSearchResponse(BaseModel):
     """Response schema for semantic search."""
+
     query: str
     search_type: str
     total_results: int
@@ -65,6 +80,7 @@ class SemanticSearchResponse(BaseModel):
 
 class SimilarPapersResponse(BaseModel):
     """Response schema for similar papers search."""
+
     reference_paper_id: int
     similar_papers: List[SearchResult]
     total_found: int
@@ -72,6 +88,7 @@ class SimilarPapersResponse(BaseModel):
 
 class SearchSuggestionsResponse(BaseModel):
     """Response schema for search suggestions."""
+
     query: str
     suggestions: List[str]
     total_suggestions: int

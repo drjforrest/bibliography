@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 
 interface TopicListProps {
   topics: MessageTopic[];
-  onTopicSelect?: (topicId: string) => void;
+  onTopicSelect?: (topicId: number) => void;
 }
 
 export default function TopicList({ topics, onTopicSelect }: TopicListProps) {
@@ -51,7 +51,7 @@ export default function TopicList({ topics, onTopicSelect }: TopicListProps) {
           >
             {topic.name}
           </p>
-          {topic.unreadCount && topic.unreadCount > 0 && (
+          {topic.unread_count && topic.unread_count > 0 && (
             <span className="w-2 h-2 bg-accent rounded-full" />
           )}
         </Link>

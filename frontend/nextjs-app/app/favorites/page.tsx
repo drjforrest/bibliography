@@ -30,7 +30,7 @@ export default function FavoritesPage() {
       try {
         setIsLoading(true);
         const [papersData, tagsData] = await Promise.all([
-          api.getPapers({ limit: 100 }),
+          api.getFavorites({ limit: 100 }),
           api.getTagHierarchy(),
         ]);
         setPapers(papersData.papers || []);
@@ -58,10 +58,16 @@ export default function FavoritesPage() {
     setSearchQuery(query);
     try {
       if (query) {
-        const result = await api.searchPapers(query);
-        setPapers(result.papers || []);
+        // Search within favorites
+        const result = await api.getFavorites({ limit: 100 });
+        const filteredPapers = result.papers.filter((paper) =>
+          paper.title?.toLowerCase().includes(query.toLowerCase()) ||
+          paper.authors?.some((author) => author.toLowerCase().includes(query.toLowerCase()))
+        );
+        setPapers(filteredPapers);
       } else {
-        const result = await api.getPapers({ limit: 100 });
+        // Show all favorites
+        const result = await api.getFavorites({ limit: 100 });
         setPapers(result.papers || []);
       }
     } catch (error) {
@@ -167,11 +173,20 @@ export default function FavoritesPage() {
                     <p className="text-gray-500 dark:text-gray-400">Loading papers...</p>
                   </div>
                 ) : papers.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-gray-500 dark:text-gray-400">No papers found</p>
+                  <div className="flex items-center justify-center h-full flex-col gap-4">
+                    <span className="material-symbols-outlined text-6xl text-gray-400">star_outline</span>
+                    <p className="text-gray-500 dark:text-gray-400">No favorite papers yet</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                      Click the star icon on any paper to add it to your favorites
+                    </p>
                   </div>
                 ) : (
-                  <BookGrid papers={papers} view={viewMode} />
+                  <BookGrid papers={papers} view={viewMode} onFavoriteChange={() => {
+                    // Refresh favorites when a paper is unfavorited
+                    api.getFavorites({ limit: 100 }).then(result => {
+                      setPapers(result.papers || []);
+                    });
+                  }} />
                 )}
               </div>
             </div>

@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 export default function MessagesPage() {
   const [topics, setTopics] = useState<MessageTopic[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [currentTopicId, setCurrentTopicId] = useState<string>('');
+  const [currentTopicId, setCurrentTopicId] = useState<number | null>(null);
   const [isLoadingTopics, setIsLoadingTopics] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,10 +61,11 @@ export default function MessagesPage() {
   }, [currentTopicId]);
 
   const handleSendMessage = async (content: string) => {
+    if (!currentTopicId) return;
+    
     try {
       const newMessage = await api.createMessage({
-        topicId: currentTopicId,
-        userId: 'current-user', // This will be set by the backend from auth
+        topic_id: currentTopicId,
         content,
       });
 
@@ -76,7 +77,7 @@ export default function MessagesPage() {
     }
   };
 
-  const handleReply = (messageId: string) => {
+  const handleReply = (messageId: number) => {
     // In a real app, this would open a reply composer
     console.log('Reply to message:', messageId);
   };

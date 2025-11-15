@@ -10,9 +10,11 @@ class QueryService:
     """
 
     @staticmethod
-    async def reformulate_query_with_chat_history(user_query: str, chat_history_str: Optional[str] = None) -> str:
+    async def reformulate_query_with_chat_history(
+        user_query: str, chat_history_str: Optional[str] = None
+    ) -> str:
         """
-        Reformulate the user query using the STRATEGIC_LLM to make it more 
+        Reformulate the user query using the STRATEGIC_LLM to make it more
         effective for information retrieval and research purposes.
 
         Args:
@@ -80,14 +82,13 @@ class QueryService:
             print(f"Error reformulating query: {e}")
             return user_query
 
-
     @staticmethod
     async def langchain_chat_history_to_str(chat_history: List[Any]) -> str:
         """
         Convert a list of chat history messages to a string.
         """
         chat_history_str = "<chat_history>\n"
-        
+
         for chat_message in chat_history:
             if isinstance(chat_message, HumanMessage):
                 chat_history_str += f"<user>{chat_message.content}</user>\n"
@@ -95,6 +96,6 @@ class QueryService:
                 chat_history_str += f"<assistant>{chat_message.content}</assistant>\n"
             elif isinstance(chat_message, SystemMessage):
                 chat_history_str += f"<system>{chat_message.content}</system>\n"
-                
+
         chat_history_str += "</chat_history>"
         return chat_history_str

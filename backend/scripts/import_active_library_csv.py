@@ -12,7 +12,12 @@ from uuid import UUID
 import logging
 
 from sqlalchemy import select
-from app.db import get_async_session_context, ScientificPaper, DevonthinkSync, DevonthinkSyncStatus
+from app.db import (
+    get_async_session_context,
+    ScientificPaper,
+    DevonthinkSync,
+    DevonthinkSyncStatus,
+)
 from app.services.file_storage import FileStorageService
 from app.services.pdf_processor import PDFProcessor
 from app.services.semantic_search_service import SemanticSearchService
@@ -39,20 +44,22 @@ async def import_csv_records(csv_path: Path, user_id: UUID, search_space_id: int
         skipped = 0
         errors = 0
 
-        with open(csv_path, 'r', encoding='utf-8') as f:
+        with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
 
             for row in reader:
                 try:
-                    dt_uuid = row['DEVONthink UUID']
-                    name = row['Name']
-                    description = row['Single Sentence Description']
-                    label = row['RecordLabel']
-                    finder_comment = row['Finder Comment']
-                    pdf_path = row['PDF Path']
+                    dt_uuid = row["DEVONthink UUID"]
+                    name = row["Name"]
+                    description = row["Single Sentence Description"]
+                    label = row["RecordLabel"]
+                    finder_comment = row["Finder Comment"]
+                    pdf_path = row["PDF Path"]
 
                     # Check if already synced
-                    stmt = select(DevonthinkSync).where(DevonthinkSync.dt_source_uuid == dt_uuid)
+                    stmt = select(DevonthinkSync).where(
+                        DevonthinkSync.dt_source_uuid == dt_uuid
+                    )
                     result = await session.execute(stmt)
                     existing_sync = result.scalar_one_or_none()
 
@@ -78,11 +85,11 @@ async def import_csv_records(csv_path: Path, user_id: UUID, search_space_id: int
 
                     # Create paper record
                     paper = ScientificPaper(
-                        title=name or pdf_metadata.get('title', 'Untitled'),
-                        authors=pdf_metadata.get('authors'),
-                        abstract=description or pdf_metadata.get('abstract'),
-                        publication_year=pdf_metadata.get('year'),
-                        doi=pdf_metadata.get('doi'),
+                        title=name or pdf_metadata.get("title", "Untitled"),
+                        authors=pdf_metadata.get("authors"),
+                        abstract=description or pdf_metadata.get("abstract"),
+                        publication_year=pdf_metadata.get("year"),
+                        doi=pdf_metadata.get("doi"),
                         file_path=stored_path,
                         file_uuid=file_uuid,
                         dt_source_uuid=dt_uuid,
@@ -90,10 +97,10 @@ async def import_csv_records(csv_path: Path, user_id: UUID, search_space_id: int
                         user_id=user_id,
                         search_space_id=search_space_id,
                         metadata_={
-                            'devonthink_label': label,
-                            'finder_comment': finder_comment,
-                            'original_name': name
-                        }
+                            "devonthink_label": label,
+                            "finder_comment": finder_comment,
+                            "original_name": name,
+                        },
                     )
 
                     session.add(paper)
@@ -105,7 +112,7 @@ async def import_csv_records(csv_path: Path, user_id: UUID, search_space_id: int
                         dt_source_path=finder_comment,
                         local_paper_id=paper.id,
                         user_id=user_id,
-                        sync_status=DevonthinkSyncStatus.SYNCED
+                        sync_status=DevonthinkSyncStatus.SYNCED,
                     )
                     session.add(sync_record)
 
@@ -121,7 +128,9 @@ async def import_csv_records(csv_path: Path, user_id: UUID, search_space_id: int
                     logger.info(f"✓ Imported: {name}")
 
                 except Exception as e:
-                    logger.error(f"Error processing record {row.get('Name', 'unknown')}: {e}")
+                    logger.error(
+                        f"Error processing record {row.get('Name', 'unknown')}: {e}"
+                    )
                     errors += 1
                     await session.rollback()
                     continue
@@ -136,14 +145,23 @@ async def main():
     """Main entry point"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Import active_library.csv from DEVONthink')
-    parser.add_argument('csv_path', nargs='?',
-                       default='../data/incoming/active_library.csv',
-                       help='Path to active_library.csv')
-    parser.add_argument('--user-id', default='960bc239-c12e-4559-bb86-a5072df1f4a6',
-                       help='User UUID for ownership')
-    parser.add_argument('--search-space-id', type=int, default=1,
-                       help='Search space ID')
+    parser = argparse.ArgumentParser(
+        description="Import active_library.csv from DEVONthink"
+    )
+    parser.add_argument(
+        "csv_path",
+        nargs="?",
+        default="../data/incoming/active_library.csv",
+        help="Path to active_library.csv",
+    )
+    parser.add_argument(
+        "--user-id",
+        default="960bc239-c12e-4559-bb86-a5072df1f4a6",
+        help="User UUID for ownership",
+    )
+    parser.add_argument(
+        "--search-space-id", type=int, default=1, help="Search space ID"
+    )
 
     args = parser.parse_args()
 
@@ -153,5 +171,5 @@ async def main():
     await import_csv_records(csv_path, user_id, args.search_space_id)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

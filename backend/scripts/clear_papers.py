@@ -31,7 +31,9 @@ from app.services.file_storage import FileStorageService
 from app.services.thumbnail_generator import ThumbnailGenerator
 from app.config import config
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -58,12 +60,16 @@ async def clear_papers(user_id: UUID, delete_files: bool = False):
             return
 
         search_space_ids = [s.id for s in search_spaces]
-        logger.info(f"Found {len(search_spaces)} search spaces: {[s.name for s in search_spaces]}")
+        logger.info(
+            f"Found {len(search_spaces)} search spaces: {[s.name for s in search_spaces]}"
+        )
 
         # Step 2: Count papers to be deleted
-        stmt = select(ScientificPaper).join(
-            Document, Document.id == ScientificPaper.document_id
-        ).where(Document.search_space_id.in_(search_space_ids))
+        stmt = (
+            select(ScientificPaper)
+            .join(Document, Document.id == ScientificPaper.document_id)
+            .where(Document.search_space_id.in_(search_space_ids))
+        )
         result = await session.execute(stmt)
         papers = result.scalars().all()
 
@@ -76,8 +82,10 @@ async def clear_papers(user_id: UUID, delete_files: bool = False):
 
         # Confirm deletion
         print()
-        response = input(f"Are you sure you want to delete {len(papers)} papers? (yes/no): ")
-        if response.lower() != 'yes':
+        response = input(
+            f"Are you sure you want to delete {len(papers)} papers? (yes/no): "
+        )
+        if response.lower() != "yes":
             logger.info("Deletion cancelled")
             await engine.dispose()
             return
@@ -94,9 +102,7 @@ async def clear_papers(user_id: UUID, delete_files: bool = False):
         logger.info(f"Deleted {result.rowcount} ScientificPaper records")
 
         # Delete Document records
-        stmt = delete(Document).where(
-            Document.id.in_(document_ids)
-        )
+        stmt = delete(Document).where(Document.id.in_(document_ids))
         result = await session.execute(stmt)
         logger.info(f"Deleted {result.rowcount} Document records")
 
@@ -120,13 +126,19 @@ async def clear_papers(user_id: UUID, delete_files: bool = False):
             pdf_stats = file_storage.get_storage_stats()
             thumb_stats = thumbnail_gen.get_thumbnail_stats()
 
-            logger.info(f"Current storage: {pdf_stats['total_files']} PDFs ({pdf_stats['total_size_mb']} MB)")
-            logger.info(f"Current storage: {thumb_stats['total_thumbnails']} thumbnails ({thumb_stats['total_size_mb']} MB)")
+            logger.info(
+                f"Current storage: {pdf_stats['total_files']} PDFs ({pdf_stats['total_size_mb']} MB)"
+            )
+            logger.info(
+                f"Current storage: {thumb_stats['total_thumbnails']} thumbnails ({thumb_stats['total_size_mb']} MB)"
+            )
 
             # Confirm file deletion
             print()
-            response = input("Are you sure you want to delete all PDF and thumbnail files? (yes/no): ")
-            if response.lower() == 'yes':
+            response = input(
+                "Are you sure you want to delete all PDF and thumbnail files? (yes/no): "
+            )
+            if response.lower() == "yes":
                 # Delete PDFs
                 if file_storage.storage_root.exists():
                     shutil.rmtree(file_storage.storage_root)
@@ -139,7 +151,9 @@ async def clear_papers(user_id: UUID, delete_files: bool = False):
                     thumbnail_gen.thumbnail_root.mkdir(parents=True, exist_ok=True)
                     logger.info("Deleted all thumbnail files")
             else:
-                logger.info("File deletion cancelled - database cleared but files remain")
+                logger.info(
+                    "File deletion cancelled - database cleared but files remain"
+                )
 
     await engine.dispose()
 
@@ -159,10 +173,13 @@ async def main():
     """Main entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Clear all papers from database')
-    parser.add_argument('--user-id', required=True, help='User UUID')
-    parser.add_argument('--delete-files', action='store_true',
-                       help='Also delete PDF and thumbnail files from disk')
+    parser = argparse.ArgumentParser(description="Clear all papers from database")
+    parser.add_argument("--user-id", required=True, help="User UUID")
+    parser.add_argument(
+        "--delete-files",
+        action="store_true",
+        help="Also delete PDF and thumbnail files from disk",
+    )
     args = parser.parse_args()
 
     # Parse user ID
@@ -183,5 +200,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

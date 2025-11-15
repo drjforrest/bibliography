@@ -24,7 +24,9 @@ class PDFWatchHandler(FileSystemEventHandler):
 
     def __init__(self, processor_callback: Callable[[str], bool]):
         self.processor_callback = processor_callback
-        self.processing_files = set()  # type: Set[str]  # Track files currently being processed
+        self.processing_files = (
+            set()
+        )  # type: Set[str]  # Track files currently being processed
         super().__init__()
 
     def _should_process_file(self, file_path: str) -> bool:
@@ -304,7 +306,12 @@ class WatchFolderService:
 
     def process_existing_files(self) -> Dict[str, Any]:
         """Process any existing PDF files in the watch directory."""
-        results = {"processed": 0, "failed": 0, "skipped": 0, "files": []}  # type: Dict[str, Any]
+        results = {
+            "processed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "files": [],
+        }  # type: Dict[str, Any]
 
         try:
             watch_path = Path(config.WATCH_DIR)

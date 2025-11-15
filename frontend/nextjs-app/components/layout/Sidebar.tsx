@@ -28,6 +28,10 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
     { icon: 'forum', label: 'Message Board', href: '/messages' },
   ];
 
+  const settingsItems = [
+    { icon: 'person', label: 'Profile', href: '/profile' },
+  ];
+
   return (
     <aside className="w-64 bg-[#f6f7f8] dark:bg-[#101922] p-4 flex flex-col justify-between border-r border-gray-200 dark:border-gray-800">
       <div>
@@ -60,23 +64,26 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
           {/* User Menu Dropdown */}
           {showUserMenu && (
             <div className="absolute top-full left-0 right-0 mb-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+              <Link
+                href="/profile"
+                onClick={() => setShowUserMenu(false)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg transition-colors"
+              >
+                <span className="material-symbols-outlined">person</span>
+                <span className="text-sm font-medium">Profile Settings</span>
+              </Link>
               <button
                 onClick={() => {
                   logout();
                   setShowUserMenu(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg transition-colors"
               >
                 <span className="material-symbols-outlined">logout</span>
                 <span className="text-sm font-medium">Sign out</span>
               </button>
             </div>
           )}
-        </div>
-
-        {/* API Key Settings */}
-        <div className="mb-6">
-          <APIKeySettings />
         </div>
 
         {/* Navigation */}

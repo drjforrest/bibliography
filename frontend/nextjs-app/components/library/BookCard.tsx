@@ -3,16 +3,57 @@
 import type { Paper } from '@/types';
 import { LITERATURE_TYPE_LABELS, LITERATURE_TYPE_COLORS } from '@/types';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 
 interface BookCardProps {
   paper: Paper;
   onChatWithDocument?: (documentId: number) => void;
+  onFavoriteChange?: () => void;
 }
 
-export default function BookCard({ paper, onChatWithDocument }: BookCardProps) {
+export default function BookCard({ paper, onChatWithDocument, onFavoriteChange }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  // Check if paper is favorited on mount
+  useEffect(() => {
+    const checkFavorited = async () => {
+      try {
+        const result = await api.isFavorited(paper.id);
+        setIsFavorited(result.is_favorited);
+      } catch (error) {
+        console.error('Failed to check favorite status:', error);
+      }
+    };
+    checkFavorited();
+  }, [paper.id]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isTogglingFavorite) return;
+
+    setIsTogglingFavorite(true);
+    try {
+      if (isFavorited) {
+        await api.removeFavorite(paper.id);
+        setIsFavorited(false);
+      } else {
+        await api.addFavorite(paper.id);
+        setIsFavorited(true);
+      }
+      // Notify parent component of change
+      onFavoriteChange?.();
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  };
 
   // Generate thumbnail URL if paper has an ID
   const thumbnailUrl = paper.id
@@ -79,6 +120,22 @@ export default function BookCard({ paper, onChatWithDocument }: BookCardProps) {
           )}
         </div>
       </Link>
+
+      {/* Favorite button overlay */}
+      <button
+        onClick={handleToggleFavorite}
+        disabled={isTogglingFavorite}
+        className={`absolute bottom-2 left-2 ${
+          isFavorited
+            ? 'bg-yellow-500 hover:bg-yellow-600'
+            : 'bg-gray-700/80 hover:bg-gray-600'
+        } text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50`}
+        title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+      >
+        <span className="material-symbols-outlined text-sm">
+          {isFavorited ? 'star' : 'star_outline'}
+        </span>
+      </button>
 
       {/* Chat button overlay */}
       {onChatWithDocument && (

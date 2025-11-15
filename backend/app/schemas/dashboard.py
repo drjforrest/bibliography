@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class BasicStats(BaseModel):
     """Basic user statistics."""
+
     total_papers: int
     total_search_spaces: int
     total_annotations: int
@@ -14,6 +15,7 @@ class BasicStats(BaseModel):
 
 class ActivityItem(BaseModel):
     """Single activity item."""
+
     id: int
     type: str
     title: str
@@ -23,6 +25,7 @@ class ActivityItem(BaseModel):
 
 class PaperAnalytics(BaseModel):
     """Paper analytics data."""
+
     year_distribution: List[Dict[str, Any]]
     top_journals: List[Dict[str, Any]]
     processing_status: List[Dict[str, Any]]
@@ -31,6 +34,7 @@ class PaperAnalytics(BaseModel):
 
 class SearchSpaceInfo(BaseModel):
     """Search space information."""
+
     id: int
     name: str
     description: Optional[str]
@@ -40,6 +44,7 @@ class SearchSpaceInfo(BaseModel):
 
 class AnnotationStats(BaseModel):
     """Annotation statistics."""
+
     total_annotations: int
     annotations_by_type: List[Dict[str, Any]]
     privacy_breakdown: Dict[str, int]
@@ -47,6 +52,7 @@ class AnnotationStats(BaseModel):
 
 class QualityMetrics(BaseModel):
     """Quality metrics for papers."""
+
     avg_confidence_score: float
     papers_with_doi: int
     total_papers: int
@@ -55,6 +61,7 @@ class QualityMetrics(BaseModel):
 
 class UserDashboardResponse(BaseModel):
     """Complete user dashboard response."""
+
     user_id: str
     generated_at: str
     basic_stats: BasicStats
@@ -67,6 +74,7 @@ class UserDashboardResponse(BaseModel):
 
 class SystemStats(BaseModel):
     """System-wide statistics."""
+
     total_users: int
     total_papers: int
     total_search_spaces: int
@@ -76,22 +84,26 @@ class SystemStats(BaseModel):
 
 class UserActivity(BaseModel):
     """Global user activity metrics."""
+
     active_users_7d: int
 
 
 class ContentAnalytics(BaseModel):
     """Global content analytics."""
+
     popular_journals: List[Dict[str, Any]]
 
 
 class ProcessingStats(BaseModel):
     """Processing statistics."""
+
     processing_status_distribution: List[Dict[str, Any]]
     global_avg_confidence: float
 
 
 class StorageMetrics(BaseModel):
     """Storage metrics."""
+
     total_size_bytes: int
     total_size_mb: float
     total_size_gb: float
@@ -100,6 +112,7 @@ class StorageMetrics(BaseModel):
 
 class GlobalDashboardResponse(BaseModel):
     """Global dashboard response."""
+
     generated_at: str
     system_stats: SystemStats
     user_activity: UserActivity
@@ -110,18 +123,20 @@ class GlobalDashboardResponse(BaseModel):
 
 class RecentPaperResponse(BaseModel):
     """Minimal paper info for recent papers list"""
+
     id: int
     title: str
     authors: Optional[List[str]] = None
     created_at: datetime
     literature_type: str
-    
+
     class Config:
         from_attributes = True
 
 
 class LiteratureTypeStats(BaseModel):
     """Statistics for a specific literature type"""
+
     literature_type: str
     count: int
     label: str  # Display name (e.g., "Peer-Reviewed")
@@ -129,6 +144,7 @@ class LiteratureTypeStats(BaseModel):
 
 class DashboardStatsResponse(BaseModel):
     """Dashboard statistics response with literature type breakdown"""
+
     total_papers: int
     by_literature_type: List[LiteratureTypeStats]
     new_since_last_login: List[RecentPaperResponse]

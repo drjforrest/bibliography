@@ -12,9 +12,14 @@ from app.services.citation_formatter import CitationFormatter
 from app.services.thumbnail_generator import ThumbnailGenerator
 from app.users import current_active_user
 from app.schemas.papers import (
-    PaperResponse, PaperListResponse, PaperSearchRequest,
-    PaperUploadResponse, CitationRequest, CitationResponse,
-    StorageStatsResponse, WatcherStatusResponse
+    PaperResponse,
+    PaperListResponse,
+    PaperSearchRequest,
+    PaperUploadResponse,
+    CitationRequest,
+    CitationResponse,
+    StorageStatsResponse,
+    WatcherStatusResponse,
 )
 
 router = APIRouter(prefix="/papers", tags=["papers"])
@@ -27,23 +32,27 @@ async def upload_pdf(
     literature_type: str = Form("PEER_REVIEWED"),
     move_file: bool = Form(True),
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Upload and process a PDF file.
     """
-    if not file.filename.lower().endswith('.pdf'):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must be a PDF")
 
     # Validate literature_type
     from app.db import LiteratureType
+
     try:
         lit_type = LiteratureType(literature_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid literature_type. Must be one of: {[t.value for t in LiteratureType]}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid literature_type. Must be one of: {[t.value for t in LiteratureType]}",
+        )
 
     # Save uploaded file to temporary location
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
         content = await file.read()
         temp_file.write(content)
         temp_path = temp_file.name
@@ -55,7 +64,7 @@ async def upload_pdf(
             user_id=str(user.id),
             search_space_id=search_space_id,
             literature_type=literature_type,
-            move_file=move_file
+            move_file=move_file,
         )
 
         return PaperUploadResponse(**result)
@@ -72,7 +81,7 @@ async def upload_pdf(
 async def search_papers(
     search_request: PaperSearchRequest,
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Search papers by query string.
@@ -81,25 +90,28 @@ async def search_papers(
     papers = await paper_manager.search_papers(
         query=search_request.query,
         search_space_id=search_request.search_space_id,
-        limit=search_request.limit
+        limit=search_request.limit,
     )
 
     return PaperListResponse(
         papers=[PaperResponse.from_orm(paper) for paper in papers],
         total=len(papers),
         limit=search_request.limit,
-        offset=0
+        offset=0,
     )
 
 
 @router.get("/", response_model=PaperListResponse)
 async def get_papers(
     search_space_id: Optional[int] = Query(None),
-    literature_type: Optional[str] = Query(None, description="Filter by literature type: PEER_REVIEWED, GREY_LITERATURE, NEWS"),
+    literature_type: Optional[str] = Query(
+        None,
+        description="Filter by literature type: PEER_REVIEWED, GREY_LITERATURE, NEWS",
+    ),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get paginated list of papers for the current user.
@@ -111,14 +123,14 @@ async def get_papers(
         search_space_id=search_space_id,
         literature_type=literature_type,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
     return PaperListResponse(
         papers=[PaperResponse.from_orm(paper) for paper in papers],
         total=len(papers),
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
 
@@ -126,7 +138,7 @@ async def get_papers(
 async def get_paper(
     paper_id: int,
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get a specific paper by ID.
@@ -144,7 +156,7 @@ async def get_paper(
 async def search_papers(
     search_request: PaperSearchRequest,
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Search papers by query string.
@@ -153,14 +165,14 @@ async def search_papers(
     papers = await paper_manager.search_papers(
         query=search_request.query,
         search_space_id=search_request.search_space_id,
-        limit=search_request.limit
+        limit=search_request.limit,
     )
-    
+
     return PaperListResponse(
         papers=[PaperResponse.from_orm(paper) for paper in papers],
         total=len(papers),
         limit=search_request.limit,
-        offset=0
+        offset=0,
     )
 
 
@@ -168,7 +180,7 @@ async def search_papers(
 async def get_papers_by_folder(
     folder_path: str = Query(...),
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get papers in a specific DEVONthink folder path.
@@ -176,9 +188,11 @@ async def get_papers_by_folder(
     from sqlalchemy import select
     from app.db import ScientificPaper
 
-    stmt = select(ScientificPaper).where(
-        ScientificPaper.dt_source_path.like(f"{folder_path}%")
-    ).limit(100)
+    stmt = (
+        select(ScientificPaper)
+        .where(ScientificPaper.dt_source_path.like(f"{folder_path}%"))
+        .limit(100)
+    )
 
     result = await session.execute(stmt)
     papers = result.scalars().all()
@@ -186,14 +200,13 @@ async def get_papers_by_folder(
     return {
         "papers": [PaperResponse.from_orm(paper) for paper in papers],
         "folder_path": folder_path,
-        "total": len(papers)
+        "total": len(papers),
     }
 
 
 @router.get("/{paper_id}/pdf")
 async def get_paper_pdf(
-    paper_id: int,
-    session: AsyncSession = Depends(get_async_session)
+    paper_id: int, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Get PDF file for viewing (not download).
@@ -212,13 +225,13 @@ async def get_paper_pdf(
         raise HTTPException(status_code=404, detail="PDF file not found on disk")
 
     # Return file for inline viewing
-    with open(full_path, 'rb') as f:
+    with open(full_path, "rb") as f:
         pdf_bytes = f.read()
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
-        media_type='application/pdf',
-        headers={"Content-Disposition": "inline"}
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
     )
 
 
@@ -226,7 +239,7 @@ async def get_paper_pdf(
 async def download_paper(
     paper_id: int,
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Download the PDF file for a paper.
@@ -246,12 +259,12 @@ async def download_paper(
     # Generate a nice filename
     filename = f"{paper.title[:50]}.pdf" if paper.title else f"paper_{paper_id}.pdf"
     # Clean filename for download
-    filename = "".join(c for c in filename if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+    filename = "".join(
+        c for c in filename if c.isalnum() or c in (" ", "-", "_", ".")
+    ).strip()
 
     return FileResponse(
-        path=str(full_path),
-        filename=filename,
-        media_type='application/pdf'
+        path=str(full_path), filename=filename, media_type="application/pdf"
     )
 
 
@@ -259,7 +272,7 @@ async def download_paper(
 async def get_paper_thumbnail(
     paper_id: int,
     regenerate: bool = Query(False, description="Force regenerate thumbnail"),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get thumbnail image for a paper. Generates it if it doesn't exist.
@@ -279,9 +292,7 @@ async def get_paper_thumbnail(
 
     # Generate thumbnail (will use cached version if exists and regenerate=False)
     thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
-        paper.file_path,
-        paper_id,
-        force_regenerate=regenerate
+        paper.file_path, paper_id, force_regenerate=regenerate
     )
 
     if not thumbnail_relative_path:
@@ -296,11 +307,11 @@ async def get_paper_thumbnail(
     # Return thumbnail image
     return FileResponse(
         path=str(thumbnail_full_path),
-        media_type='image/jpeg',
+        media_type="image/jpeg",
         headers={
             "Cache-Control": "public, max-age=86400",  # Cache for 1 day
-            "Content-Disposition": "inline"
-        }
+            "Content-Disposition": "inline",
+        },
     )
 
 
@@ -309,27 +320,25 @@ async def get_citation(
     paper_id: int,
     citation_request: CitationRequest,
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get formatted citation for a paper.
     """
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)
-    
+
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
-    
+
     try:
         if citation_request.style.lower() == "bibtex":
             citation = CitationFormatter.format_bibtex(paper)
         else:
             citation = CitationFormatter.format_citation(paper, citation_request.style)
-        
+
         return CitationResponse(
-            citation=citation,
-            style=citation_request.style,
-            paper_id=paper_id
+            citation=citation, style=citation_request.style, paper_id=paper_id
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -347,29 +356,29 @@ async def get_citation_styles():
 async def delete_paper(
     paper_id: int,
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Delete a paper and its associated file.
     """
     paper_manager = PaperManagerService(session)
-    
+
     # Verify paper exists and user has access (through search space ownership)
     paper = await paper_manager.get_paper_by_id(paper_id)
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
-    
+
     success = await paper_manager.delete_paper(paper_id)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to delete paper")
-    
+
     return {"message": "Paper deleted successfully", "paper_id": paper_id}
 
 
 @router.get("/stats/storage", response_model=StorageStatsResponse)
 async def get_storage_stats(
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get storage statistics.
@@ -383,38 +392,37 @@ async def get_storage_stats(
 async def start_watcher(
     search_space_id: int = Form(...),
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Start the folder watcher for automatic PDF processing.
     """
     paper_manager = PaperManagerService(session)
     paper_manager.start_folder_watcher(
-        user_id=str(user.id),
-        search_space_id=search_space_id
+        user_id=str(user.id), search_space_id=search_space_id
     )
-    
+
     return {"message": "Folder watcher started", "search_space_id": search_space_id}
 
 
 @router.post("/watcher/stop")
 async def stop_watcher(
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Stop the folder watcher.
     """
     paper_manager = PaperManagerService(session)
     paper_manager.stop_folder_watcher()
-    
+
     return {"message": "Folder watcher stopped"}
 
 
 @router.get("/watcher/status", response_model=WatcherStatusResponse)
 async def get_watcher_status(
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get folder watcher status.
@@ -427,7 +435,7 @@ async def get_watcher_status(
             is_running=False,
             watched_folder="Not initialized",
             folder_exists=False,
-            pdf_count=0
+            pdf_count=0,
         )
 
     return WatcherStatusResponse(**status)
@@ -436,7 +444,7 @@ async def get_watcher_status(
 @router.get("/stats/by-room")
 async def get_papers_by_room(
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get paper counts by literature type (room).
@@ -445,17 +453,15 @@ async def get_papers_by_room(
     from app.db import ScientificPaper, Document, SearchSpace
 
     # Count papers by literature type for user's search spaces
-    stmt = select(
-        ScientificPaper.literature_type,
-        func.count(ScientificPaper.id).label('count')
-    ).join(
-        Document, Document.id == ScientificPaper.document_id
-    ).join(
-        SearchSpace, SearchSpace.id == Document.search_space_id
-    ).where(
-        SearchSpace.user_id == user.id
-    ).group_by(
-        ScientificPaper.literature_type
+    stmt = (
+        select(
+            ScientificPaper.literature_type,
+            func.count(ScientificPaper.id).label("count"),
+        )
+        .join(Document, Document.id == ScientificPaper.document_id)
+        .join(SearchSpace, SearchSpace.id == Document.search_space_id)
+        .where(SearchSpace.user_id == user.id)
+        .group_by(ScientificPaper.literature_type)
     )
 
     result = await session.execute(stmt)
@@ -466,7 +472,7 @@ async def get_papers_by_room(
         "PEER_REVIEWED": room_stats.get("PEER_REVIEWED", 0),
         "GREY_LITERATURE": room_stats.get("GREY_LITERATURE", 0),
         "NEWS": room_stats.get("NEWS", 0),
-        "total": sum(room_stats.values())
+        "total": sum(room_stats.values()),
     }
 
 
@@ -476,7 +482,7 @@ async def generate_thumbnails_batch(
     force_regenerate: bool = Form(False),
     limit: int = Form(100, le=500),
     user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Generate thumbnails for multiple papers in batch.
@@ -486,12 +492,11 @@ async def generate_thumbnails_batch(
     from app.db import ScientificPaper, Document, SearchSpace
 
     # Build query to get papers
-    stmt = select(ScientificPaper).join(
-        Document, Document.id == ScientificPaper.document_id
-    ).join(
-        SearchSpace, SearchSpace.id == Document.search_space_id
-    ).where(
-        SearchSpace.user_id == user.id
+    stmt = (
+        select(ScientificPaper)
+        .join(Document, Document.id == ScientificPaper.document_id)
+        .join(SearchSpace, SearchSpace.id == Document.search_space_id)
+        .where(SearchSpace.user_id == user.id)
     )
 
     if search_space_id:
@@ -507,19 +512,140 @@ async def generate_thumbnails_batch(
             "message": "No papers found",
             "success_count": 0,
             "failure_count": 0,
-            "total": 0
+            "total": 0,
         }
 
     # Generate thumbnails
     thumbnail_gen = ThumbnailGenerator()
     success_count, failure_count = thumbnail_gen.batch_generate_thumbnails(
-        papers,
-        force_regenerate=force_regenerate
+        papers, force_regenerate=force_regenerate
     )
 
     return {
         "message": f"Generated thumbnails for {success_count} papers",
         "success_count": success_count,
         "failure_count": failure_count,
-        "total": len(papers)
+        "total": len(papers),
     }
+
+
+@router.post("/{paper_id}/favorite")
+async def add_favorite(
+    paper_id: int,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Add a paper to the user's favorites.
+    """
+    from sqlalchemy import select, insert
+    from app.db import ScientificPaper, user_favorites
+
+    # Check if paper exists
+    paper_stmt = select(ScientificPaper).where(ScientificPaper.id == paper_id)
+    paper_result = await session.execute(paper_stmt)
+    paper = paper_result.scalar_one_or_none()
+
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    # Check if already favorited
+    check_stmt = select(user_favorites).where(
+        user_favorites.c.user_id == user.id,
+        user_favorites.c.paper_id == paper_id,
+    )
+    check_result = await session.execute(check_stmt)
+    if check_result.first():
+        return {"message": "Paper already in favorites", "is_favorited": True}
+
+    # Add to favorites
+    insert_stmt = insert(user_favorites).values(
+        user_id=user.id,
+        paper_id=paper_id,
+    )
+    await session.execute(insert_stmt)
+    await session.commit()
+
+    return {"message": "Paper added to favorites", "is_favorited": True}
+
+
+@router.delete("/{paper_id}/favorite")
+async def remove_favorite(
+    paper_id: int,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Remove a paper from the user's favorites.
+    """
+    from sqlalchemy import delete
+    from app.db import user_favorites
+
+    # Remove from favorites
+    delete_stmt = delete(user_favorites).where(
+        user_favorites.c.user_id == user.id,
+        user_favorites.c.paper_id == paper_id,
+    )
+    result = await session.execute(delete_stmt)
+    await session.commit()
+
+    if result.rowcount == 0:
+        return {"message": "Paper was not in favorites", "is_favorited": False}
+
+    return {"message": "Paper removed from favorites", "is_favorited": False}
+
+
+@router.get("/{paper_id}/is-favorited")
+async def is_favorited(
+    paper_id: int,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Check if a paper is in the user's favorites.
+    """
+    from sqlalchemy import select
+    from app.db import user_favorites
+
+    check_stmt = select(user_favorites).where(
+        user_favorites.c.user_id == user.id,
+        user_favorites.c.paper_id == paper_id,
+    )
+    check_result = await session.execute(check_stmt)
+    is_fav = check_result.first() is not None
+
+    return {"is_favorited": is_fav, "paper_id": paper_id}
+
+
+@router.get("/favorites/list", response_model=PaperListResponse)
+async def get_favorites(
+    limit: int = Query(50, le=100),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Get all papers in the user's favorites.
+    """
+    from sqlalchemy import select
+    from app.db import ScientificPaper, user_favorites
+
+    # Get favorited papers
+    stmt = (
+        select(ScientificPaper)
+        .join(user_favorites, user_favorites.c.paper_id == ScientificPaper.id)
+        .where(user_favorites.c.user_id == user.id)
+        .order_by(user_favorites.c.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
+    result = await session.execute(stmt)
+    papers = result.scalars().all()
+
+    return PaperListResponse(
+        papers=[PaperResponse.from_orm(paper) for paper in papers],
+        total=len(papers),
+        limit=limit,
+        offset=offset,
+    )

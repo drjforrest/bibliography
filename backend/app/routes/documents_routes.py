@@ -7,15 +7,24 @@ from app.db import get_async_session, User, SearchSpace, Document, DocumentType
 from app.schemas import DocumentsCreate, DocumentUpdate, DocumentRead
 from app.users import current_active_user
 from app.utils.check_ownership import check_ownership
-from app.tasks.background_tasks import add_received_markdown_file_document, add_extension_received_document, add_received_file_document, add_crawled_url_document, add_youtube_video_document
+from app.tasks.background_tasks import (
+    add_received_markdown_file_document,
+    add_extension_received_document,
+    add_received_file_document,
+    add_crawled_url_document,
+    add_youtube_video_document,
+)
 from app.config import config as app_config
+
 # Force asyncio to use standard event loop before unstructured imports
 import asyncio
+
 try:
     asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 except RuntimeError:
     pass
 import os
+
 os.environ["UNSTRUCTURED_HAS_PATCHED_LOOP"] = "1"
 
 
@@ -27,7 +36,7 @@ async def create_documents(
     request: DocumentsCreate,
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
-    fastapi_background_tasks: BackgroundTasks = BackgroundTasks()
+    fastapi_background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     try:
         # Check if the user owns the search space
@@ -38,27 +47,20 @@ async def create_documents(
                 fastapi_background_tasks.add_task(
                     process_extension_document_with_new_session,
                     individual_document,
-                    request.search_space_id
+                    request.search_space_id,
                 )
         elif request.document_type == DocumentType.CRAWLED_URL:
             for url in request.content:
                 fastapi_background_tasks.add_task(
-                    process_crawled_url_with_new_session,
-                    url,
-                    request.search_space_id
+                    process_crawled_url_with_new_session, url, request.search_space_id
                 )
         elif request.document_type == DocumentType.YOUTUBE_VIDEO:
             for url in request.content:
                 fastapi_background_tasks.add_task(
-                    process_youtube_video_with_new_session,
-                    url,
-                    request.search_space_id
+                    process_youtube_video_with_new_session, url, request.search_space_id
                 )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid document type"
-            )
+            raise HTTPException(status_code=400, detail="Invalid document type")
 
         await session.commit()
         return {"message": "Documents processed successfully"}
@@ -67,8 +69,7 @@ async def create_documents(
     except Exception as e:
         await session.rollback()
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to process documents: {str(e)}"
+            status_code=500, detail=f"Failed to process documents: {str(e)}"
         )
 
 
@@ -78,7 +79,7 @@ async def create_documents(
     search_space_id: int = Form(...),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
-    fastapi_background_tasks: BackgroundTasks = BackgroundTasks()
+    fastapi_background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     try:
         await check_ownership(session, SearchSpace, search_space_id, user)
@@ -94,7 +95,9 @@ async def create_documents(
                 import os
 
                 # Create temp file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=os.path.splitext(file.filename)[1]
+                ) as temp_file:
                     temp_path = temp_file.name
 
                 # Write uploaded file to temp file
@@ -107,12 +110,12 @@ async def create_documents(
                     process_file_in_background_with_new_session,
                     temp_path,
                     file.filename,
-                    search_space_id
+                    search_space_id,
                 )
             except Exception as e:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Failed to process file {file.filename}: {str(e)}"
+                    detail=f"Failed to process file {file.filename}: {str(e)}",
                 )
 
         await session.commit()
@@ -121,27 +124,22 @@ async def create_documents(
         raise
     except Exception as e:
         await session.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to upload files: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to upload files: {str(e)}")
 
 
 async def process_file_in_background(
-    file_path: str,
-    filename: str,
-    search_space_id: int,
-    session: AsyncSession
+    file_path: str, filename: str, search_space_id: int, session: AsyncSession
 ):
     try:
         # Check if the file is a markdown file
-        if filename.lower().endswith(('.md', '.markdown')):
+        if filename.lower().endswith((".md", ".markdown")):
             # For markdown files, read the content directly
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 markdown_content = f.read()
 
             # Clean up the temp file
             import os
+
             try:
                 os.unlink(file_path)
             except:
@@ -149,13 +147,12 @@ async def process_file_in_background(
 
             # Process markdown directly through specialized function
             await add_received_markdown_file_document(
-                session,
-                filename,
-                markdown_content,
-                search_space_id
+                session, filename, markdown_content, search_space_id
             )
         # Check if the file is an audio file
-        elif filename.lower().endswith(('.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.wav', '.webm')):
+        elif filename.lower().endswith(
+            (".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm")
+        ):
             # Open the audio file for transcription
             with open(file_path, "rb") as audio_file:
                 # Use LiteLLM for audio transcription
@@ -163,19 +160,20 @@ async def process_file_in_background(
                     transcription_response = await atranscription(
                         model=app_config.STT_SERVICE,
                         file=audio_file,
-                        api_base=app_config.STT_SERVICE_API_BASE
+                        api_base=app_config.STT_SERVICE_API_BASE,
                     )
                 else:
                     transcription_response = await atranscription(
-                        model=app_config.STT_SERVICE,
-                        file=audio_file
+                        model=app_config.STT_SERVICE, file=audio_file
                     )
 
                 # Extract the transcribed text
                 transcribed_text = transcription_response.get("text", "")
 
                 # Add metadata about the transcription
-                transcribed_text = f"# Transcription of {filename}\n\n{transcribed_text}"
+                transcribed_text = (
+                    f"# Transcription of {filename}\n\n{transcribed_text}"
+                )
 
             # Clean up the temp file
             try:
@@ -185,10 +183,7 @@ async def process_file_in_background(
 
             # Process transcription as markdown document
             await add_received_markdown_file_document(
-                session,
-                filename,
-                transcribed_text,
-                search_space_id
+                session, filename, transcribed_text, search_space_id
             )
         else:
             # Use synchronous unstructured API to avoid event loop issues
@@ -209,20 +204,17 @@ async def process_file_in_background(
 
             # Clean up the temp file
             import os
+
             try:
                 os.unlink(file_path)
             except:
                 pass
 
             # Pass the documents to the existing background task
-            await add_received_file_document(
-                session,
-                filename,
-                docs,
-                search_space_id
-            )
+            await add_received_file_document(session, filename, docs, search_space_id)
     except Exception as e:
         import logging
+
         logging.error(f"Error processing file in background: {str(e)}")
 
 
@@ -232,39 +224,39 @@ async def read_documents(
     limit: int = 300,
     search_space_id: int = None,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user)
+    user: User = Depends(current_active_user),
 ):
     try:
-        query = select(Document).join(SearchSpace).filter(
-            SearchSpace.user_id == user.id)
+        query = (
+            select(Document).join(SearchSpace).filter(SearchSpace.user_id == user.id)
+        )
 
         # Filter by search_space_id if provided
         if search_space_id is not None:
             query = query.filter(Document.search_space_id == search_space_id)
 
-        result = await session.execute(
-            query.offset(skip).limit(limit)
-        )
+        result = await session.execute(query.offset(skip).limit(limit))
         db_documents = result.scalars().all()
 
         # Convert database objects to API-friendly format
         api_documents = []
         for doc in db_documents:
-            api_documents.append(DocumentRead(
-                id=doc.id,
-                title=doc.title,
-                document_type=doc.document_type,
-                document_metadata=doc.document_metadata,
-                content=doc.content,
-                created_at=doc.created_at,
-                search_space_id=doc.search_space_id
-            ))
+            api_documents.append(
+                DocumentRead(
+                    id=doc.id,
+                    title=doc.title,
+                    document_type=doc.document_type,
+                    document_metadata=doc.document_metadata,
+                    content=doc.content,
+                    created_at=doc.created_at,
+                    search_space_id=doc.search_space_id,
+                )
+            )
 
         return api_documents
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch documents: {str(e)}"
+            status_code=500, detail=f"Failed to fetch documents: {str(e)}"
         )
 
 
@@ -272,7 +264,7 @@ async def read_documents(
 async def read_document(
     document_id: int,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user)
+    user: User = Depends(current_active_user),
 ):
     try:
         result = await session.execute(
@@ -284,8 +276,7 @@ async def read_document(
 
         if not document:
             raise HTTPException(
-                status_code=404,
-                detail=f"Document with id {document_id} not found"
+                status_code=404, detail=f"Document with id {document_id} not found"
             )
 
         # Convert database object to API-friendly format
@@ -296,12 +287,11 @@ async def read_document(
             document_metadata=document.document_metadata,
             content=document.content,
             created_at=document.created_at,
-            search_space_id=document.search_space_id
+            search_space_id=document.search_space_id,
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch document: {str(e)}"
+            status_code=500, detail=f"Failed to fetch document: {str(e)}"
         )
 
 
@@ -310,7 +300,7 @@ async def update_document(
     document_id: int,
     document_update: DocumentUpdate,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user)
+    user: User = Depends(current_active_user),
 ):
     try:
         # Query the document directly instead of using read_document function
@@ -323,8 +313,7 @@ async def update_document(
 
         if not db_document:
             raise HTTPException(
-                status_code=404,
-                detail=f"Document with id {document_id} not found"
+                status_code=404, detail=f"Document with id {document_id} not found"
             )
 
         update_data = document_update.model_dump(exclude_unset=True)
@@ -341,15 +330,14 @@ async def update_document(
             document_metadata=db_document.document_metadata,
             content=db_document.content,
             created_at=db_document.created_at,
-            search_space_id=db_document.search_space_id
+            search_space_id=db_document.search_space_id,
         )
     except HTTPException:
         raise
     except Exception as e:
         await session.rollback()
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update document: {str(e)}"
+            status_code=500, detail=f"Failed to update document: {str(e)}"
         )
 
 
@@ -357,7 +345,7 @@ async def update_document(
 async def delete_document(
     document_id: int,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user)
+    user: User = Depends(current_active_user),
 ):
     try:
         # Query the document directly instead of using read_document function
@@ -370,8 +358,7 @@ async def delete_document(
 
         if not document:
             raise HTTPException(
-                status_code=404,
-                detail=f"Document with id {document_id} not found"
+                status_code=404, detail=f"Document with id {document_id} not found"
             )
 
         await session.delete(document)
@@ -382,30 +369,28 @@ async def delete_document(
     except Exception as e:
         await session.rollback()
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete document: {str(e)}"
+            status_code=500, detail=f"Failed to delete document: {str(e)}"
         )
 
 
 async def process_extension_document_with_new_session(
-    individual_document,
-    search_space_id: int
+    individual_document, search_space_id: int
 ):
     """Create a new session and process extension document."""
     from app.db import async_session_maker
 
     async with async_session_maker() as session:
         try:
-            await add_extension_received_document(session, individual_document, search_space_id)
+            await add_extension_received_document(
+                session, individual_document, search_space_id
+            )
         except Exception as e:
             import logging
+
             logging.error(f"Error processing extension document: {str(e)}")
 
 
-async def process_crawled_url_with_new_session(
-    url: str,
-    search_space_id: int
-):
+async def process_crawled_url_with_new_session(url: str, search_space_id: int):
     """Create a new session and process crawled URL."""
     from app.db import async_session_maker
 
@@ -414,13 +399,12 @@ async def process_crawled_url_with_new_session(
             await add_crawled_url_document(session, url, search_space_id)
         except Exception as e:
             import logging
+
             logging.error(f"Error processing crawled URL: {str(e)}")
 
 
 async def process_file_in_background_with_new_session(
-    file_path: str,
-    filename: str,
-    search_space_id: int
+    file_path: str, filename: str, search_space_id: int
 ):
     """Create a new session and process file."""
     from app.db import async_session_maker
@@ -429,10 +413,7 @@ async def process_file_in_background_with_new_session(
         await process_file_in_background(file_path, filename, search_space_id, session)
 
 
-async def process_youtube_video_with_new_session(
-    url: str,
-    search_space_id: int
-):
+async def process_youtube_video_with_new_session(url: str, search_space_id: int):
     """Create a new session and process YouTube video."""
     from app.db import async_session_maker
 
@@ -441,4 +422,5 @@ async def process_youtube_video_with_new_session(
             await add_youtube_video_document(session, url, search_space_id)
         except Exception as e:
             import logging
+
             logging.error(f"Error processing YouTube video: {str(e)}")

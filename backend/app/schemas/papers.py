@@ -6,6 +6,7 @@ from enum import Enum
 
 class LiteratureType(str, Enum):
     """Literature type for room classification."""
+
     PEER_REVIEWED = "PEER_REVIEWED"
     GREY_LITERATURE = "GREY_LITERATURE"
     NEWS = "NEWS"
@@ -13,6 +14,7 @@ class LiteratureType(str, Enum):
 
 class PaperResponse(BaseModel):
     """Response schema for scientific paper data."""
+
     id: int
     literature_type: str = "PEER_REVIEWED"  # Room classification
     title: Optional[str]
@@ -36,30 +38,31 @@ class PaperResponse(BaseModel):
     processing_status: str
     file_size: Optional[int]
     created_at: datetime
-    
-    @field_validator('keywords', 'subject_areas', 'tags', mode='before')
+
+    @field_validator("keywords", "subject_areas", "tags", mode="before")
     @classmethod
     def convert_none_to_list(cls, v):
         """Convert None values to empty lists for list fields."""
         return v if v is not None else []
-    
+
     def __init__(self, **data):
         """Extract summary from extraction_metadata if available."""
         # Check if we have extraction_metadata from the ORM object
-        if 'extraction_metadata' in data:
-            metadata = data.get('extraction_metadata', {})
+        if "extraction_metadata" in data:
+            metadata = data.get("extraction_metadata", {})
             if metadata and isinstance(metadata, dict):
                 # Extract finder_comment as summary
-                if not data.get('summary') and 'finder_comment' in metadata:
-                    data['summary'] = metadata['finder_comment']
+                if not data.get("summary") and "finder_comment" in metadata:
+                    data["summary"] = metadata["finder_comment"]
         super().__init__(**data)
-    
+
     class Config:
         from_attributes = True
 
 
 class PaperListResponse(BaseModel):
     """Response schema for paginated paper lists."""
+
     papers: List[PaperResponse]
     total: int
     limit: int
@@ -68,6 +71,7 @@ class PaperListResponse(BaseModel):
 
 class PaperSearchRequest(BaseModel):
     """Request schema for paper search."""
+
     query: str
     search_space_id: Optional[int] = None
     limit: int = 20
@@ -75,6 +79,7 @@ class PaperSearchRequest(BaseModel):
 
 class PaperUploadResponse(BaseModel):
     """Response schema for paper upload."""
+
     status: str
     paper_id: Optional[int] = None
     title: Optional[str] = None
@@ -87,11 +92,13 @@ class PaperUploadResponse(BaseModel):
 
 class CitationRequest(BaseModel):
     """Request schema for citation formatting."""
+
     style: str = "apa"  # apa, mla, chicago, ieee, harvard, bibtex
 
 
 class CitationResponse(BaseModel):
     """Response schema for formatted citations."""
+
     citation: str
     style: str
     paper_id: int
@@ -99,6 +106,7 @@ class CitationResponse(BaseModel):
 
 class StorageStatsResponse(BaseModel):
     """Response schema for storage statistics."""
+
     total_files: int
     total_size_bytes: int
     total_size_mb: float
@@ -109,6 +117,7 @@ class StorageStatsResponse(BaseModel):
 
 class WatcherStatusResponse(BaseModel):
     """Response schema for folder watcher status."""
+
     is_running: bool
     watched_folder: str
     folder_exists: bool
@@ -118,6 +127,7 @@ class WatcherStatusResponse(BaseModel):
 # Annotation schemas
 class AnnotationCreate(BaseModel):
     """Schema for creating a new annotation."""
+
     content: str
     annotation_type: str = "note"  # note, highlight, bookmark
     page_number: Optional[int] = None
@@ -131,6 +141,7 @@ class AnnotationCreate(BaseModel):
 
 class AnnotationUpdate(BaseModel):
     """Schema for updating an annotation."""
+
     content: Optional[str] = None
     annotation_type: Optional[str] = None
     page_number: Optional[int] = None
@@ -144,6 +155,7 @@ class AnnotationUpdate(BaseModel):
 
 class AnnotationResponse(BaseModel):
     """Response schema for annotation data."""
+
     id: int
     content: str
     annotation_type: str
@@ -157,22 +169,24 @@ class AnnotationResponse(BaseModel):
     paper_id: int
     user_id: str
     created_at: datetime
-    
+
     # User information for team context
     user_email: Optional[str] = None  # Can be populated via join
-    
+
     class Config:
         from_attributes = True
 
 
 class AnnotationListResponse(BaseModel):
     """Response schema for annotation lists."""
+
     annotations: List[AnnotationResponse]
     total: int
 
 
 class PaperWithAnnotationsResponse(BaseModel):
     """Response schema for paper with its annotations."""
+
     paper: PaperResponse
     annotations: List[AnnotationResponse]
     user_can_annotate: bool = True

@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 class ThumbnailGenerator:
     """Service for generating and managing PDF thumbnails."""
 
-    def __init__(self, storage_root: Optional[str] = None, thumbnail_root: Optional[str] = None):
+    def __init__(
+        self, storage_root: Optional[str] = None, thumbnail_root: Optional[str] = None
+    ):
         """
         Initialize the thumbnail generator.
 
@@ -21,16 +23,22 @@ class ThumbnailGenerator:
             storage_root: Root directory for PDF storage. If None, uses config value.
             thumbnail_root: Root directory for thumbnail storage. If None, uses storage_root/thumbnails.
         """
-        self.storage_root = Path(storage_root or getattr(config, 'PDF_STORAGE_ROOT', './data/pdfs'))
-        self.thumbnail_root = Path(thumbnail_root or (self.storage_root.parent / 'thumbnails'))
+        self.storage_root = Path(
+            storage_root or getattr(config, "PDF_STORAGE_ROOT", "./data/pdfs")
+        )
+        self.thumbnail_root = Path(
+            thumbnail_root or (self.storage_root.parent / "thumbnails")
+        )
         self.thumbnail_root.mkdir(parents=True, exist_ok=True)
 
         # Default thumbnail settings
         self.thumbnail_size = (300, 400)  # Width x Height for book-like aspect ratio
         self.thumbnail_quality = 85
-        self.thumbnail_format = 'JPEG'
+        self.thumbnail_format = "JPEG"
 
-    def generate_thumbnail(self, pdf_path: str, paper_id: int, force_regenerate: bool = False) -> Optional[str]:
+    def generate_thumbnail(
+        self, pdf_path: str, paper_id: int, force_regenerate: bool = False
+    ) -> Optional[str]:
         """
         Generate a thumbnail from the first page of a PDF.
 
@@ -65,6 +73,7 @@ class ThumbnailGenerator:
             else:
                 # Fallback to year/month based on current date
                 from datetime import datetime
+
                 now = datetime.now()
                 year_dir = self.thumbnail_root / str(now.year)
                 month_dir = year_dir / f"{now.month:02d}"
@@ -100,11 +109,13 @@ class ThumbnailGenerator:
             img.thumbnail(self.thumbnail_size, Image.Resampling.LANCZOS)
 
             # Create a canvas with exact thumbnail dimensions (for consistent sizing)
-            canvas = Image.new('RGB', self.thumbnail_size, (255, 255, 255))
+            canvas = Image.new("RGB", self.thumbnail_size, (255, 255, 255))
 
             # Paste the resized image centered on the canvas
-            offset = ((self.thumbnail_size[0] - img.width) // 2,
-                     (self.thumbnail_size[1] - img.height) // 2)
+            offset = (
+                (self.thumbnail_size[0] - img.width) // 2,
+                (self.thumbnail_size[1] - img.height) // 2,
+            )
             canvas.paste(img, offset)
 
             # Save thumbnail
@@ -112,7 +123,7 @@ class ThumbnailGenerator:
                 thumbnail_path,
                 self.thumbnail_format,
                 quality=self.thumbnail_quality,
-                optimize=True
+                optimize=True,
             )
 
             doc.close()
@@ -174,10 +185,12 @@ class ThumbnailGenerator:
             "total_thumbnails": total_files,
             "total_size_bytes": total_size,
             "total_size_mb": round(total_size / (1024 * 1024), 2),
-            "thumbnail_root": str(self.thumbnail_root)
+            "thumbnail_root": str(self.thumbnail_root),
         }
 
-    def batch_generate_thumbnails(self, papers: list, force_regenerate: bool = False) -> Tuple[int, int]:
+    def batch_generate_thumbnails(
+        self, papers: list, force_regenerate: bool = False
+    ) -> Tuple[int, int]:
         """
         Generate thumbnails for multiple papers.
 
@@ -193,15 +206,21 @@ class ThumbnailGenerator:
 
         for paper in papers:
             if not paper.file_path:
-                logger.warning(f"Paper {paper.id} has no file_path, skipping thumbnail generation")
+                logger.warning(
+                    f"Paper {paper.id} has no file_path, skipping thumbnail generation"
+                )
                 failure_count += 1
                 continue
 
-            result = self.generate_thumbnail(paper.file_path, paper.id, force_regenerate)
+            result = self.generate_thumbnail(
+                paper.file_path, paper.id, force_regenerate
+            )
             if result:
                 success_count += 1
             else:
                 failure_count += 1
 
-        logger.info(f"Batch thumbnail generation: {success_count} succeeded, {failure_count} failed")
+        logger.info(
+            f"Batch thumbnail generation: {success_count} succeeded, {failure_count} failed"
+        )
         return success_count, failure_count

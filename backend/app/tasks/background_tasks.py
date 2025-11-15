@@ -94,9 +94,11 @@ async def add_crawled_url_document(
         # Create and store document
         document = Document(
             search_space_id=search_space_id,
-            title=url_crawled[0].metadata["title"]
-            if type(crawl_loader) == FireCrawlLoader
-            else url_crawled[0].metadata["source"],
+            title=(
+                url_crawled[0].metadata["title"]
+                if type(crawl_loader) == FireCrawlLoader
+                else url_crawled[0].metadata["source"]
+            ),
             document_type=DocumentType.CRAWLED_URL,
             document_metadata=url_crawled[0].metadata,
             content=summary_content,
