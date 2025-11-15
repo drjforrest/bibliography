@@ -28,7 +28,7 @@ export default function PDFViewer({ paperId, pdfUrl, title = 'Document', content
   // If we have a PDF URL, show the PDF viewer
   if (effectivePdfUrl && !loadError) {
     return (
-      <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 relative">
+      <div className="w-full h-full flex flex-col bg-gray-100 dark:bg-gray-900 relative">
         {/* Zoom Controls */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           <button

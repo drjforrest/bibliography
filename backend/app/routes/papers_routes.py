@@ -193,11 +193,11 @@ async def get_papers_by_folder(
 @router.get("/{paper_id}/pdf")
 async def get_paper_pdf(
     paper_id: int,
-    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
     Get PDF file for viewing (not download).
+    Public endpoint - no authentication required for PDF viewing.
     """
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)
@@ -259,11 +259,11 @@ async def download_paper(
 async def get_paper_thumbnail(
     paper_id: int,
     regenerate: bool = Query(False, description="Force regenerate thumbnail"),
-    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
     """
     Get thumbnail image for a paper. Generates it if it doesn't exist.
+    Public endpoint - no authentication required for thumbnail access.
     """
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)

@@ -54,7 +54,7 @@ async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db
     
     
 def get_jwt_strategy() -> JWTStrategy[models.UP, models.ID]:
-    return JWTStrategy(secret=SECRET, lifetime_seconds=3600*24)
+    return JWTStrategy(secret=SECRET, lifetime_seconds=3600*24*30)  # 30 days
 
 
 # # COOKIE AUTH | Uncomment if you want to use cookie auth.
