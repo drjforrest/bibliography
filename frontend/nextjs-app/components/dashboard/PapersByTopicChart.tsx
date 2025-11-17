@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type LiteratureTypeTab = 'PEER_REVIEWED' | 'GREY_LITERATURE' | 'NEWS';
 
@@ -36,14 +36,14 @@ export default function PapersByTopicChart() {
 
   const tabs: { key: LiteratureTypeTab; label: string; color: string }[] = [
     { key: 'PEER_REVIEWED', label: 'Peer-Reviewed', color: 'bg-[#4e989e]' }, // Trust Green
-    { key: 'GREY_LITERATURE', label: 'Grey Literature', color: 'bg-[#e86530]' }, // Deep Orange
+    { key: 'GREY_LITERATURE', label: 'Grey Literature', color: 'bg-[#4e989e]' }, // Trust Green
     { key: 'NEWS', label: 'News', color: 'bg-[#cc9900]' }, // College Gold
   ];
 
   const getBarColor = () => {
     switch (activeTab) {
       case 'PEER_REVIEWED': return '#4e989e'; // Trust Green
-      case 'GREY_LITERATURE': return '#e86530'; // Deep Orange
+      case 'GREY_LITERATURE': return '#4e989e'; // Trust Green
       case 'NEWS': return '#cc9900'; // College Gold
     }
   };

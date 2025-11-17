@@ -4,12 +4,12 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/layout/Sidebar";
 import BookGrid from "@/components/library/BookGrid";
 import ChatPanel from "@/components/library/ChatPanel";
+import LiteratureTypeFilter from "@/components/library/LiteratureTypeFilter";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
-import LiteratureTypeFilter from "@/components/library/LiteratureTypeFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import type { Paper, SortOption, Tag, Topic, ViewMode, LiteratureType } from "@/types";
+import type { LiteratureType, Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
@@ -19,7 +19,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLiteratureType, setSelectedLiteratureType] = useState<LiteratureType | null>(null);
+  const [selectedLiteratureType, setSelectedLiteratureType] = useState<LiteratureType | 'ALL'>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
@@ -36,9 +36,9 @@ export default function HomePage() {
       try {
         setIsLoading(true);
         const [papersData, tagsData] = await Promise.all([
-          api.getPapers({ 
+          api.getPapers({
             limit: 100,
-            literature_type: selectedLiteratureType || undefined,
+            literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
           }),
           api.getTagHierarchy(),
         ]);
@@ -70,9 +70,9 @@ export default function HomePage() {
         const result = await api.searchPapers(query);
         setPapers(result.papers || []);
       } else {
-        const result = await api.getPapers({ 
+        const result = await api.getPapers({
           limit: 100,
-          literature_type: selectedLiteratureType || undefined,
+          literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
         });
         setPapers(result.papers || []);
       }
@@ -86,7 +86,7 @@ export default function HomePage() {
     try {
       const result = await api.getPapers({
         limit: 100,
-        literature_type: selectedLiteratureType || undefined,
+        literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
       });
       setPapers(result.papers || []);
     } catch (error) {

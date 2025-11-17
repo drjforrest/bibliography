@@ -3,12 +3,18 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AnnotationSidebar from '@/components/annotations/AnnotationSidebar';
 import AnnotationToolbar from '@/components/annotations/AnnotationToolbar';
-import InteractivePDFViewer from '@/components/annotations/InteractivePDFViewer';
 import Header from '@/components/layout/Header';
 import { api } from '@/lib/api';
 import type { Annotation, AnnotationType, Paper } from '@/types';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+// Dynamically import InteractivePDFViewer to prevent SSR issues with PDF.js
+const InteractivePDFViewer = dynamic(
+  () => import('@/components/annotations/InteractivePDFViewer'),
+  { ssr: false }
+);
 
 export default function PaperAnnotationPage() {
   const params = useParams();
@@ -47,15 +53,9 @@ export default function PaperAnnotationPage() {
     }
   }, [paperId]);
 
-  const handleToolSelect = (tool: AnnotationType | 'zoom_in' | 'zoom_out') => {
-    if (tool === 'zoom_in' || tool === 'zoom_out') {
-      // Zoom is handled by the PDF viewer itself
-      return;
-    }
+  const handleToolSelect = (tool: AnnotationType) => {
     // Set active tool for interactive PDF viewer
-    if (tool === 'highlight' || tool === 'underline' || tool === 'comment') {
-      setActiveTool(tool);
-    }
+    setActiveTool(tool);
   };
 
   const handleAnnotationCreate = async (annotation: any) => {

@@ -1,6 +1,7 @@
 'use client';
 
 import ProtectedRoute from '@/components/ProtectedRoute';
+import Header from '@/components/layout/Header';
 import MessageComposer from '@/components/messages/MessageComposer';
 import MessageThread from '@/components/messages/MessageThread';
 import TopicList from '@/components/messages/TopicList';
@@ -126,9 +127,11 @@ export default function MessagesPage() {
 
   return (
     <ProtectedRoute>
-      <div className="flex h-screen bg-background-light dark:bg-background-dark text-text-primary">
-        {/* Left Column: Navigation Panel */}
-        <aside className="w-1/4 bg-white dark:bg-gray-800 p-6 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700">
+      <div className="flex flex-col h-screen bg-background-light dark:bg-background-dark text-text-primary">
+        <Header />
+        <div className="flex flex-1">
+          {/* Left Column: Navigation Panel */}
+          <aside className="w-1/4 bg-white dark:bg-gray-800 p-6 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700">
           {isLoadingTopics ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-gray-500 dark:text-gray-400">Loading topics...</p>
@@ -184,7 +187,7 @@ export default function MessagesPage() {
 
               <button
                 onClick={handleCreateTopic}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-[#e86530] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#d15424] transition-colors"
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-[#4e989e] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#3d7a7f] transition-colors"
               >
                 <span className="material-symbols-outlined">add</span>
                 <span className="truncate">Add New Topic</span>
@@ -193,8 +196,8 @@ export default function MessagesPage() {
           )}
         </aside>
 
-      {/* Right Column: Message Thread */}
-    <main className="w-3/4 flex flex-col h-screen">
+          {/* Right Column: Message Thread */}
+          <main className="flex-1 flex flex-col">
       <header className="flex-shrink-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap justify-between items-center gap-3">
           <h2 className="text-3xl font-extrabold tracking-tight text-primary dark:text-white">
@@ -219,6 +222,7 @@ export default function MessagesPage() {
 
       <MessageComposer onSend={handleSendMessage} />
     </main>
+        </div>
       </div>
     </ProtectedRoute>
   );

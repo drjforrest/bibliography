@@ -47,6 +47,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
               width={40}
               height={40}
               className="rounded-full"
+              style={{ height: 'auto' }}
             />
             <div className="flex flex-col flex-1 text-left">
               <h1 className="text-base font-medium leading-normal text-gray-900 dark:text-white">

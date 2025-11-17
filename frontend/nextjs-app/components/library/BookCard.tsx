@@ -1,24 +1,27 @@
 'use client';
 
-import type { Paper } from '@/types';
-import { LITERATURE_TYPE_LABELS, LITERATURE_TYPE_COLORS } from '@/types';
-import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import TagDialog from '@/components/library/TagDialog';
 import ContextMenu, { ContextMenuItem } from '@/components/shared/ContextMenu';
+import { api } from '@/lib/api';
+import type { Paper } from '@/types';
+import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS } from '@/types';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 interface BookCardProps {
   paper: Paper;
   onChatWithDocument?: (documentId: number) => void;
   onFavoriteChange?: () => void;
+  onTagChange?: () => void;
   onDelete?: () => void;
 }
 
-export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, onDelete }: BookCardProps) {
+export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, onTagChange, onDelete }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showTagDialog, setShowTagDialog] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   // Check if paper is favorited on mount
@@ -80,6 +83,16 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
 
   const contextMenuItems: ContextMenuItem[] = [
     {
+      label: 'Chat with PDF',
+      icon: 'chat',
+      onClick: () => onChatWithDocument?.(paper.id),
+    },
+    {
+      label: 'Manage Tags',
+      icon: 'tag',
+      onClick: () => setShowTagDialog(true),
+    },
+    {
       label: isFavorited ? 'Remove from Favorites' : 'Add to Favorites',
       icon: isFavorited ? 'star' : 'star_outline',
       onClick: (e?: any) => handleToggleFavorite(e || {} as React.MouseEvent),
@@ -118,7 +131,7 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
           style={{
             backgroundImage: getBackgroundImage(),
           }}
-          title={paper.title}
+          title={`${paper.title}\n\n${paper.summary || 'No summary available'}`}
         >
           {/* Literature Type Badge */}
           {paper.literature_type && paper.literature_type !== 'PEER_REVIEWED' && (
@@ -158,51 +171,6 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
         </div>
       </Link>
 
-      {/* Favorite button overlay */}
-      <button
-        onClick={handleToggleFavorite}
-        disabled={isTogglingFavorite}
-        className={`absolute bottom-2 left-2 ${
-          isFavorited
-            ? 'bg-yellow-500 hover:bg-yellow-600'
-            : 'bg-gray-700/80 hover:bg-gray-600'
-        } text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50`}
-        title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-      >
-        <span className="material-symbols-outlined text-sm">
-          {isFavorited ? 'star' : 'star_outline'}
-        </span>
-      </button>
-
-      {/* Chat button overlay */}
-      {onChatWithDocument && (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onChatWithDocument(paper.id);
-          }}
-          className="absolute top-2 right-2 bg-[#4e989e] hover:bg-[#3d7a7f] text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Chat with this document"
-        >
-          <span className="material-symbols-outlined text-sm">chat</span>
-        </button>
-      )}
-
-      {/* Delete button overlay */}
-      {onDelete && (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleDelete();
-          }}
-          className="absolute bottom-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Delete paper"
-        >
-          <span className="material-symbols-outlined text-sm">delete</span>
-        </button>
-      )}
 
       {/* Context Menu */}
       {contextMenu && (
@@ -213,6 +181,17 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
           onClose={() => setContextMenu(null)}
         />
       )}
+
+      {/* Tag Dialog */}
+      <TagDialog
+        isOpen={showTagDialog}
+        onClose={() => setShowTagDialog(false)}
+        paper={paper}
+        onTagChange={() => {
+          onTagChange?.();
+          setShowTagDialog(false);
+        }}
+      />
     </div>
   );
 }

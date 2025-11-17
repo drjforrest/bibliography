@@ -150,9 +150,33 @@ check_prerequisites() {
     # Check backend venv
     if [ ! -d "backend/venv" ]; then
         print_warning "Backend virtual environment not found"
-        print_info "Run: cd backend && python3 -m venv venv && source venv/bin/activate && pip install -e ."
+        print_info "Run: cd backend && python3 -m venv venv && venv/bin/pip install -e ."
+        all_good=false
+    elif [ ! -f "backend/venv/bin/python" ]; then
+        print_error "Backend virtual environment is broken"
+        print_info "Remove and recreate: rm -rf backend/venv && cd backend && python3 -m venv venv && venv/bin/pip install -e ."
+        all_good=false
     else
-        print_success "Backend virtual environment exists"
+        # Test if venv python works
+        if backend/venv/bin/python --version &> /dev/null; then
+            print_success "Backend virtual environment exists"
+            
+            # Check scipy for known import issue
+            if ! backend/venv/bin/python -c "import scipy.special._support_alternative_backends" &> /dev/null; then
+                print_warning "scipy has import issues, upgrading..."
+                backend/venv/bin/python -m pip install --upgrade scipy &> /dev/null
+                if backend/venv/bin/python -c "import scipy.special._support_alternative_backends" &> /dev/null; then
+                    print_success "scipy upgraded successfully"
+                else
+                    print_error "scipy upgrade failed"
+                    all_good=false
+                fi
+            fi
+        else
+            print_error "Backend virtual environment is broken (old path references)"
+            print_info "Remove and recreate: rm -rf backend/venv && cd backend && python3 -m venv venv && venv/bin/pip install -e ."
+            all_good=false
+        fi
     fi
 
     # Check frontend .env.local
@@ -192,12 +216,16 @@ check_prerequisites() {
 start_backend() {
     print_header "🚀 Starting Backend (FastAPI)"
 
-    cd backend
+    # Kill any existing process on port 8000
+    EXISTING_PID=$(lsof -ti:8000 2>/dev/null)
+    if [ -n "$EXISTING_PID" ]; then
+        print_warning "Killing existing process on port 8000 (PID: $EXISTING_PID)"
+        kill -9 $EXISTING_PID 2>/dev/null || true
+        sleep 1
+    fi
 
-    # Activate virtual environment
-    if [ -f "venv/bin/activate" ]; then
-        source venv/bin/activate
-    else
+    # Check for virtual environment
+    if [ ! -f "backend/venv/bin/python" ]; then
         print_error "Virtual environment not found"
         exit 1
     fi
@@ -206,20 +234,23 @@ start_backend() {
     print_info "API docs available at http://localhost:8000/docs"
     echo ""
 
-    # Start backend in background
-    python main.py --reload > ../logs/backend.log 2>&1 &
+    # Start backend in background from the backend directory
+    cd backend
+    venv/bin/python main.py --reload &
     BACKEND_PID=$!
+    cd ..
 
     # Wait a moment to check if it started
-    sleep 2
+    sleep 4
     if kill -0 $BACKEND_PID 2>/dev/null; then
         print_success "Backend started (PID: $BACKEND_PID)"
     else
         print_error "Backend failed to start. Check logs/backend.log"
+        if [ -f logs/backend.log ]; then
+            tail -20 logs/backend.log
+        fi
         exit 1
     fi
-
-    cd ..
 }
 
 # ================================================================================
@@ -229,13 +260,21 @@ start_backend() {
 start_frontend() {
     print_header "🎨 Starting Frontend (Next.js)"
 
+    # Kill any existing process on port 3000
+    EXISTING_PID=$(lsof -ti:3000 2>/dev/null)
+    if [ -n "$EXISTING_PID" ]; then
+        print_warning "Killing existing process on port 3000 (PID: $EXISTING_PID)"
+        kill -9 $EXISTING_PID 2>/dev/null || true
+        sleep 1
+    fi
+
     cd frontend/nextjs-app
 
     print_info "Frontend will start on http://localhost:3000"
     echo ""
 
     # Start frontend in background
-    npm run dev > ../../logs/frontend.log 2>&1 &
+    npm run dev &
     FRONTEND_PID=$!
 
     # Wait a moment to check if it started

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link';
+import { useState } from 'react';
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
@@ -11,10 +12,10 @@ export default function Header() {
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6">
-      <div className="flex items-center gap-4">
-        <span className="material-symbols-outlined text-[#4e989e] text-2xl">menu_book</span>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Digital Library</h1>
-      </div>
+      <Link href="/" className="flex items-center gap-4 hover:opacity-80 transition-opacity">
+        <img src="/HERO-Lab-logo-no-words.png" alt="HERO Lab Logo" className="h-8 w-auto" />
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">HERO Evidence Library</h1>
+      </Link>
 
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">

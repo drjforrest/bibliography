@@ -259,7 +259,7 @@ export default function DashboardPage() {
                             Notifications
                           </h2>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            Where you've been mentioned
+                            Where you&apos;ve been mentioned
                           </p>
                         </div>
                         {unreadCount > 0 && (

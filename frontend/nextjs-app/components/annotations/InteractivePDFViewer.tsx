@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import type { AnnotationType } from '@/types';
 
-// Import CSS for react-pdf
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+}
 
 interface Annotation {
   id: string;
@@ -42,8 +43,12 @@ export default function InteractivePDFViewer({
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [currentRect, setCurrentRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>(existingAnnotations);
+  const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setAnnotations(existingAnnotations);
@@ -130,60 +135,112 @@ export default function InteractivePDFViewer({
     }
   };
 
+  // Handle dragging the toolbar
+  const handleToolbarMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (toolbarRef.current) {
+      const rect = toolbarRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setIsDragging(true);
+    }
+  };
+
   useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && containerRef.current) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const newX = Math.max(0, Math.min(e.clientX - containerRect.left - dragOffset.x, containerRect.width - (toolbarRef.current?.offsetWidth || 0)));
+        const newY = Math.max(0, Math.min(e.clientY - containerRect.top - dragOffset.y, containerRect.height - (toolbarRef.current?.offsetHeight || 0)));
+        setToolbarPosition({ x: newX, y: newY });
+      }
+    };
+
     const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+      }
       if (activeTool === 'highlight' || activeTool === 'underline') {
         setTimeout(() => handleTextSelection(), 10);
       }
     };
 
+    document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
-  }, [activeTool, handleTextSelection]);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [activeTool, handleTextSelection, isDragging, dragOffset]);
 
   return (
     <div ref={containerRef} className="w-full h-full flex flex-col bg-gray-100 dark:bg-gray-900 relative">
-      {/* Controls */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex gap-2">
-          <button
-            onClick={() => handleZoom('out')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Zoom out"
-          >
-            <span className="material-symbols-outlined">zoom_out</span>
-          </button>
-          <span className="px-3 py-2 text-sm font-medium">{Math.round(scale * 100)}%</span>
-          <button
-            onClick={() => handleZoom('in')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Zoom in"
-          >
-            <span className="material-symbols-outlined">zoom_in</span>
-          </button>
+      {/* Unified Draggable Controls */}
+      <div
+        ref={toolbarRef}
+        className="absolute z-20 bg-white dark:bg-gray-800 rounded-lg shadow-lg"
+        style={{
+          left: `${toolbarPosition.x}px`,
+          top: `${toolbarPosition.y}px`,
+          cursor: isDragging ? 'grabbing' : 'grab',
+        }}
+      >
+        {/* Drag Handle */}
+        <div
+          className="flex items-center gap-2 px-2 py-1 border-b border-gray-200 dark:border-gray-700"
+          onMouseDown={handleToolbarMouseDown}
+        >
+          <span className="material-symbols-outlined text-sm text-gray-400">drag_indicator</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 select-none">Drag to move</span>
         </div>
+        
+        {/* Controls Container */}
+        <div className="p-2 flex flex-col gap-2">
+          {/* Zoom Controls */}
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => handleZoom('out')}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              title="Zoom out"
+            >
+              <span className="material-symbols-outlined">zoom_out</span>
+            </button>
+            <span className="px-3 py-2 text-sm font-medium min-w-[60px] text-center">{Math.round(scale * 100)}%</span>
+            <button
+              onClick={() => handleZoom('in')}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              title="Zoom in"
+            >
+              <span className="material-symbols-outlined">zoom_in</span>
+            </button>
+          </div>
 
-        {/* Page Navigation */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex gap-2 items-center">
-          <button
-            onClick={() => setPageNumber((prev) => Math.max(prev - 1, 1))}
-            disabled={pageNumber <= 1}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50"
-            title="Previous page"
-          >
-            <span className="material-symbols-outlined">chevron_left</span>
-          </button>
-          <span className="px-2 text-sm font-medium">
-            {pageNumber} / {numPages}
-          </span>
-          <button
-            onClick={() => setPageNumber((prev) => Math.min(prev + 1, numPages))}
-            disabled={pageNumber >= numPages}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50"
-            title="Next page"
-          >
-            <span className="material-symbols-outlined">chevron_right</span>
-          </button>
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+
+          {/* Page Navigation */}
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setPageNumber((prev) => Math.max(prev - 1, 1))}
+              disabled={pageNumber <= 1}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50"
+              title="Previous page"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span className="px-2 text-sm font-medium min-w-[60px] text-center">
+              {pageNumber} / {numPages}
+            </span>
+            <button
+              onClick={() => setPageNumber((prev) => Math.min(prev + 1, numPages))}
+              disabled={pageNumber >= numPages}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50"
+              title="Next page"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
         </div>
       </div>
 

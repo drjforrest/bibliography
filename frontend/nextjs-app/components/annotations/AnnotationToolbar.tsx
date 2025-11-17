@@ -4,13 +4,13 @@ import { useState } from 'react';
 import type { AnnotationType } from '@/types';
 
 interface AnnotationToolbarProps {
-  onToolSelect: (tool: AnnotationType | 'zoom_in' | 'zoom_out') => void;
+  onToolSelect: (tool: AnnotationType) => void;
 }
 
 export default function AnnotationToolbar({ onToolSelect }: AnnotationToolbarProps) {
   const [activeTool, setActiveTool] = useState<string | null>(null);
 
-  const handleToolClick = (tool: AnnotationType | 'zoom_in' | 'zoom_out') => {
+  const handleToolClick = (tool: AnnotationType) => {
     setActiveTool(tool);
     onToolSelect(tool);
   };
@@ -21,13 +21,8 @@ export default function AnnotationToolbar({ onToolSelect }: AnnotationToolbarPro
     { id: 'comment', icon: 'add_comment', label: 'Add Comment' },
   ];
 
-  const zoomTools = [
-    { id: 'zoom_in', icon: 'zoom_in', label: 'Zoom In' },
-    { id: 'zoom_out', icon: 'zoom_out', label: 'Zoom Out' },
-  ];
-
   return (
-    <div className="sticky top-4 z-10 mx-auto mb-8 flex w-fit justify-center gap-2 rounded-lg bg-white dark:bg-gray-800 p-2 shadow-md border border-gray-200 dark:border-gray-700">
+    <div className="flex gap-2 p-2">
       {tools.map((tool) => (
         <button
           key={tool.id}
@@ -37,19 +32,6 @@ export default function AnnotationToolbar({ onToolSelect }: AnnotationToolbarPro
               ? 'bg-primary/20 text-primary dark:bg-primary/30'
               : 'text-gray-700 dark:text-gray-300'
           }`}
-          title={tool.label}
-        >
-          <span className="material-symbols-outlined">{tool.icon}</span>
-        </button>
-      ))}
-
-      <div className="border-l border-gray-300 dark:border-gray-600 mx-2" />
-
-      {zoomTools.map((tool) => (
-        <button
-          key={tool.id}
-          onClick={() => handleToolClick(tool.id as 'zoom_in' | 'zoom_out')}
-          className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
           title={tool.label}
         >
           <span className="material-symbols-outlined">{tool.icon}</span>
