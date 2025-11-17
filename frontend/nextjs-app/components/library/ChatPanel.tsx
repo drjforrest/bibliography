@@ -83,13 +83,14 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
       };
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/chats/chat`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/chat`,
         requestData,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          responseType: 'stream'
         }
       );
 
@@ -157,7 +158,7 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
     return (
       <button
         onClick={onToggle}
-        className="fixed right-4 bottom-4 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-colors"
+        className="fixed right-4 bottom-4 z-50 bg-[#4e989e] hover:bg-[#3d7a7f] text-white rounded-full p-3 shadow-lg transition-colors"
         title="Open AI Chat"
       >
         <span className="material-symbols-outlined">chat</span>
@@ -198,7 +199,7 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
             <div
               className={`max-w-[80%] rounded-lg px-3 py-2 ${
                 message.role === 'user'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#4e989e] text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
               }`}
             >
@@ -234,13 +235,13 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={`Ask about ${selectedDocumentId ? 'this document' : 'your library'}...`}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4e989e] focus:border-transparent"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={!inputValue.trim() || isLoading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+            className="px-4 py-2 bg-[#4e989e] hover:bg-[#3d7a7f] disabled:bg-gray-400 text-white rounded-lg transition-colors"
           >
             <span className="material-symbols-outlined">send</span>
           </button>

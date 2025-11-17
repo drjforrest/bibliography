@@ -104,7 +104,7 @@ export default function FavoritesPage() {
             <div className="flex flex-col h-full">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white">
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   Favorites
                 </h1>
               </div>
@@ -123,7 +123,7 @@ export default function FavoritesPage() {
                   onClick={() => handleSort("date")}
                   className={`flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-lg pl-4 pr-2 ${
                     sortBy === "date"
-                      ? "bg-primary text-white"
+                      ? "bg-[#4e989e] text-white"
                       : "bg-gray-200 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -138,7 +138,7 @@ export default function FavoritesPage() {
                   onClick={() => handleSort("title")}
                   className={`flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-lg pl-4 pr-2 ${
                     sortBy === "title"
-                      ? "bg-primary text-white"
+                      ? "bg-[#4e989e] text-white"
                       : "bg-gray-200 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -153,7 +153,7 @@ export default function FavoritesPage() {
                   onClick={() => handleSort("author")}
                   className={`flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-lg pl-4 pr-2 ${
                     sortBy === "author"
-                      ? "bg-primary text-white"
+                      ? "bg-[#4e989e] text-white"
                       : "bg-gray-200 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -181,12 +181,22 @@ export default function FavoritesPage() {
                     </p>
                   </div>
                 ) : (
-                  <BookGrid papers={papers} view={viewMode} onFavoriteChange={() => {
-                    // Refresh favorites when a paper is unfavorited
-                    api.getFavorites({ limit: 100 }).then(result => {
-                      setPapers(result.papers || []);
-                    });
-                  }} />
+                  <BookGrid
+                    papers={papers}
+                    view={viewMode}
+                    onFavoriteChange={() => {
+                      // Refresh favorites when a paper is unfavorited
+                      api.getFavorites({ limit: 100 }).then(result => {
+                        setPapers(result.papers || []);
+                      });
+                    }}
+                    onDelete={() => {
+                      // Refresh favorites when a paper is deleted
+                      api.getFavorites({ limit: 100 }).then(result => {
+                        setPapers(result.papers || []);
+                      });
+                    }}
+                  />
                 )}
               </div>
             </div>

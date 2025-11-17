@@ -12,7 +12,7 @@ export default function Header() {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6">
       <div className="flex items-center gap-4">
-        <span className="material-symbols-outlined text-primary text-2xl">menu_book</span>
+        <span className="material-symbols-outlined text-[#4e989e] text-2xl">menu_book</span>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">Digital Library</h1>
       </div>
 
@@ -40,7 +40,7 @@ export default function Header() {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 cursor-pointer hover:ring-2 hover:ring-[#4e989e] transition-all"
             style={{
               backgroundImage: user?.avatar
                 ? `url(${user.avatar})`

@@ -18,6 +18,23 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+
+  /* Brand Color Palette */
+  --yankee-blue: #22263c;
+  --trust-green: #4e989e;
+  --soft-green: #94d2bd;
+  --smokey-grey: #474a52;
+  --deep-orange: #e86530;
+  --pure-white: #ffffff;
+  --college-gold: #cc9900;
+
+  /* Semantic Color Mapping */
+  --primary: var(--trust-green);
+  --secondary: var(--soft-green);
+  --accent: var(--deep-orange);
+  --background-dark: var(--yankee-blue);
+  --text-primary: var(--smokey-grey);
+  --highlight: var(--college-gold);
 }
 
 @media (prefers-color-scheme: dark) {

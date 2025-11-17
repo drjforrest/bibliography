@@ -17,6 +17,7 @@ import asyncio
 import csv
 import logging
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -52,10 +53,12 @@ class DEVONthinkCSVImporter:
         session_maker,
         user_id: UUID,
         default_literature_type: str = "PEER_REVIEWED",
+        cleanup_processed: bool = True,
     ):
         self.session_maker = session_maker
         self.user_id = user_id
         self.default_literature_type = default_literature_type
+        self.cleanup_processed = cleanup_processed
         self.file_storage = FileStorageService()
         self.thumbnail_gen = ThumbnailGenerator()
 
@@ -64,6 +67,40 @@ class DEVONthinkCSVImporter:
         self.skipped_count = 0
         self.error_count = 0
         self.errors = []
+
+        # Processed files tracking
+        self.processed_folder = None
+
+    def setup_processed_folder(self, csv_path: str) -> Path:
+        """Create processed folder for cleanup using today's date."""
+        csv_dir = Path(csv_path).parent
+        today = datetime.now().strftime("%Y-%m-%d")
+        processed_folder = csv_dir / "processed" / today
+        processed_folder.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Processed files will be moved to: {processed_folder}")
+        return processed_folder
+
+    def move_to_processed(self, pdf_path: str, status: str):
+        """Move PDF to processed folder after import/skip."""
+        if not self.cleanup_processed or not self.processed_folder:
+            return
+
+        try:
+            pdf_file = Path(pdf_path)
+            if not pdf_file.exists():
+                return
+
+            # Create status subfolder (imported, skipped, error)
+            status_folder = self.processed_folder / status
+            status_folder.mkdir(exist_ok=True)
+
+            # Move file
+            dest = status_folder / pdf_file.name
+            shutil.move(str(pdf_file), str(dest))
+            logger.debug(f"Moved {pdf_file.name} to {status}/")
+
+        except Exception as e:
+            logger.warning(f"Failed to move {pdf_path} to processed folder: {e}")
 
     async def get_or_create_search_space(
         self, session: AsyncSession, name: str = "DEVONthink Import"
@@ -94,6 +131,10 @@ class DEVONthinkCSVImporter:
         """Import papers from CSV file."""
         logger.info(f"Starting import from {csv_path}")
 
+        # Setup processed folder for cleanup
+        if self.cleanup_processed:
+            self.processed_folder = self.setup_processed_folder(csv_path)
+
         # Get or create search space using a fresh session
         async with self.session_maker() as session:
             if search_space_id:
@@ -113,8 +154,11 @@ class DEVONthinkCSVImporter:
                 # Each record gets its own fresh session to avoid greenlet errors
                 async with self.session_maker() as session:
                     try:
-                        await self.import_record(session, row, search_space.id)
-                        self.imported_count += 1
+                        status = await self.import_record(session, row, search_space.id)
+                        if status == "imported":
+                            self.imported_count += 1
+                        elif status == "skipped":
+                            self.skipped_count += 1
                     except Exception as e:
                         self.error_count += 1
                         error_msg = (
@@ -122,6 +166,10 @@ class DEVONthinkCSVImporter:
                         )
                         logger.error(error_msg)
                         self.errors.append(error_msg)
+                        # Move errored PDF to processed/error folder
+                        pdf_path = row.get("PDF Path")
+                        if pdf_path:
+                            self.move_to_processed(pdf_path, "error")
 
         # Note: Vectorization should be done separately via API endpoints or dedicated script
         # to avoid session/async issues during batch imports
@@ -129,14 +177,41 @@ class DEVONthinkCSVImporter:
             logger.info(f"Successfully imported {self.imported_count} papers")
             logger.info("Run vectorization separately via API or dedicated script")
 
+        # Archive the CSV file
+        if self.cleanup_processed and self.processed_folder:
+            try:
+                csv_file = Path(csv_path)
+                csv_dest = self.processed_folder / csv_file.name
+                shutil.copy2(str(csv_file), str(csv_dest))
+                logger.info(f"Archived CSV to: {csv_dest}")
+            except Exception as e:
+                logger.warning(f"Failed to archive CSV file: {e}")
+
         # Print summary
         self.print_summary()
 
-    def _determine_literature_type(self, label: str) -> LiteratureType:
-        """Determine literature type from DEVONthink label or tags."""
-        label_lower = label.lower() if label else ""
+    def _determine_literature_type(self, label: str, finder_comment: str = "") -> LiteratureType:
+        """Determine literature type from DEVONthink Finder Comment or label.
 
-        # Check for explicit type indicators in label
+        Looks for hashtags in Finder Comment first:
+        - #peer-review, #peer, #journal → PEER_REVIEWED
+        - #grey-lit, #grey, #gray-lit → GREY_LITERATURE
+        - #news, #media, #press → NEWS
+
+        Falls back to label checking, then default.
+        """
+        # Check Finder Comment first (most explicit)
+        comment_lower = finder_comment.lower() if finder_comment else ""
+
+        if any(tag in comment_lower for tag in ["#peer-review", "#peer", "#journal", "#academic"]):
+            return LiteratureType.PEER_REVIEWED
+        elif any(tag in comment_lower for tag in ["#grey-lit", "#grey", "#gray-lit", "#gray"]):
+            return LiteratureType.GREY_LITERATURE
+        elif any(tag in comment_lower for tag in ["#news", "#media", "#press"]):
+            return LiteratureType.NEWS
+
+        # Fallback: Check label for keywords
+        label_lower = label.lower() if label else ""
         if any(
             term in label_lower
             for term in ["grey", "gray", "grey literature", "gray literature"]
@@ -152,8 +227,8 @@ class DEVONthinkCSVImporter:
 
     async def import_record(
         self, session: AsyncSession, row: dict, search_space_id: int
-    ):
-        """Import a single record from CSV row."""
+    ) -> str:
+        """Import a single record from CSV row. Returns status: 'imported' or 'skipped'."""
         dt_uuid = row["DEVONthink UUID"]
         name = row["Name"]
         description = row["Single Sentence Description"]
@@ -161,16 +236,16 @@ class DEVONthinkCSVImporter:
         finder_comment = row["Finder Comment"]
         pdf_path = row["PDF Path"]
 
-        # Determine literature type
-        literature_type = self._determine_literature_type(label)
+        # Determine literature type from Finder Comment tags or label
+        literature_type = self._determine_literature_type(label, finder_comment)
 
         logger.info(f"Importing: {name}")
 
         # Check if PDF file exists
         if not pdf_path or not os.path.exists(pdf_path):
             logger.warning(f"PDF file not found: {pdf_path}, skipping")
-            self.skipped_count += 1
-            return
+            self.move_to_processed(pdf_path, "skipped")
+            return "skipped"
 
         # Check if already imported (by DEVONthink UUID)
         stmt = select(ScientificPaper).where(ScientificPaper.dt_source_uuid == dt_uuid)
@@ -179,8 +254,8 @@ class DEVONthinkCSVImporter:
 
         if existing:
             logger.info(f"Paper already imported: {name}, skipping")
-            self.skipped_count += 1
-            return
+            self.move_to_processed(pdf_path, "skipped")
+            return "skipped"
 
         # Generate local UUID for the paper
         local_uuid = uuid4()
@@ -271,6 +346,10 @@ class DEVONthinkCSVImporter:
         await session.commit()
         logger.info(f"Successfully imported: {name}")
 
+        # Move PDF to processed/imported folder
+        self.move_to_processed(pdf_path, "imported")
+        return "imported"
+
     def _parse_date(self, date_str: Optional[str]):
         """Parse date string."""
         if not date_str:
@@ -322,6 +401,11 @@ async def main():
         default="PEER_REVIEWED",
         help="Default literature type for imported papers (can be overridden by DEVONthink labels)",
     )
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Keep processed PDFs in original location (don't move to processed/ folder)",
+    )
     args = parser.parse_args()
 
     # Validate CSV file
@@ -342,7 +426,12 @@ async def main():
         engine, class_=AsyncSession, expire_on_commit=False
     )
 
-    importer = DEVONthinkCSVImporter(async_session_maker, user_id, args.literature_type)
+    importer = DEVONthinkCSVImporter(
+        async_session_maker,
+        user_id,
+        args.literature_type,
+        cleanup_processed=not args.no_cleanup
+    )
     await importer.import_from_csv(args.csv, args.search_space_id)
 
     await engine.dispose()

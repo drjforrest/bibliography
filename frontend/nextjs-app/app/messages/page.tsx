@@ -82,6 +82,48 @@ export default function MessagesPage() {
     console.log('Reply to message:', messageId);
   };
 
+  const handleCreateTopic = async () => {
+    const name = window.prompt('Enter topic name:');
+    if (!name || !name.trim()) return;
+
+    try {
+      const newTopic = await api.createTopic({
+        name: name.trim(),
+        icon: 'chat_bubble',
+      });
+      setTopics([...topics, newTopic]);
+      setCurrentTopicId(newTopic.id);
+    } catch (error) {
+      console.error('Failed to create topic:', error);
+      setError('Failed to create topic');
+    }
+  };
+
+  const handleRenameTopic = async (topicId: number, newName: string) => {
+    try {
+      const updatedTopic = await api.updateTopic(topicId, { name: newName });
+      setTopics(topics.map(t => t.id === topicId ? updatedTopic : t));
+    } catch (error) {
+      console.error('Failed to rename topic:', error);
+      setError('Failed to rename topic');
+    }
+  };
+
+  const handleDeleteTopic = async (topicId: number) => {
+    try {
+      await api.deleteTopic(topicId);
+      setTopics(topics.filter(t => t.id !== topicId));
+      // If we deleted the current topic, select the first remaining one
+      if (currentTopicId === topicId) {
+        const remainingTopics = topics.filter(t => t.id !== topicId);
+        setCurrentTopicId(remainingTopics.length > 0 ? remainingTopics[0].id : null);
+      }
+    } catch (error) {
+      console.error('Failed to delete topic:', error);
+      setError('Failed to delete topic');
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="flex h-screen bg-background-light dark:bg-background-dark text-text-primary">
@@ -96,7 +138,7 @@ export default function MessagesPage() {
               <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600"
+                className="px-4 py-2 bg-[#4e989e] text-white rounded-lg hover:bg-[#3d7a7f]"
               >
                 Retry
               </button>
@@ -131,10 +173,19 @@ export default function MessagesPage() {
             </label>
           </div>
 
-          <TopicList topics={topics} onTopicSelect={setCurrentTopicId} />
+          <TopicList
+            topics={topics}
+            currentTopicId={currentTopicId}
+            onTopicSelect={setCurrentTopicId}
+            onRenameTopic={handleRenameTopic}
+            onDeleteTopic={handleDeleteTopic}
+          />
         </div>
 
-              <button className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-accent text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-green-600 transition-colors">
+              <button
+                onClick={handleCreateTopic}
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg h-11 px-4 bg-[#e86530] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#d15424] transition-colors"
+              >
                 <span className="material-symbols-outlined">add</span>
                 <span className="truncate">Add New Topic</span>
               </button>

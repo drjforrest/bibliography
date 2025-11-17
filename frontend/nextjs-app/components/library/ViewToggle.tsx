@@ -13,7 +13,7 @@ export default function ViewToggle({ view, onViewChange }: ViewToggleProps) {
       <label
         className={`flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-lg px-3 ${
           view === 'grid'
-            ? 'bg-white dark:bg-gray-900/80 shadow-sm text-primary dark:text-white'
+            ? 'bg-white dark:bg-gray-900/80 shadow-sm text-[#4e989e] dark:text-white'
             : 'text-gray-500 dark:text-gray-400'
         } text-sm font-medium leading-normal`}
       >
@@ -31,7 +31,7 @@ export default function ViewToggle({ view, onViewChange }: ViewToggleProps) {
       <label
         className={`flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-lg px-3 ${
           view === 'list'
-            ? 'bg-white dark:bg-gray-900/80 shadow-sm text-primary dark:text-white'
+            ? 'bg-white dark:bg-gray-900/80 shadow-sm text-[#4e989e] dark:text-white'
             : 'text-gray-500 dark:text-gray-400'
         } text-sm font-medium leading-normal`}
       >

@@ -243,3 +243,111 @@ async def get_activity_feed(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Activity feed failed: {str(e)}")
+
+
+@router.get("/papers-by-topic")
+async def get_papers_by_topic(
+    literature_type: str = Query(None, description="Filter by literature type: PEER_REVIEWED, GREY_LITERATURE, NEWS"),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Get count of papers grouped by topic/tag, optionally filtered by literature type.
+    Returns data suitable for bar/pie charts.
+    """
+    from sqlalchemy import select, func
+    from app.db import ScientificPaper, Tag, paper_tags
+
+    try:
+        # Build query to count papers per tag
+        query = (
+            select(
+                Tag.name,
+                func.count(ScientificPaper.id).label('count')
+            )
+            .join(paper_tags, Tag.id == paper_tags.c.tag_id)
+            .join(ScientificPaper, ScientificPaper.id == paper_tags.c.paper_id)
+        )
+
+        # Filter by literature type if specified
+        if literature_type:
+            query = query.where(ScientificPaper.literature_type == literature_type)
+
+        # Group by tag name and order by count descending
+        query = query.group_by(Tag.name).order_by(func.count(ScientificPaper.id).desc()).limit(10)
+
+        result = await session.execute(query)
+        data = [{"name": row[0], "value": row[1]} for row in result.all()]
+
+        return {
+            "literature_type": literature_type or "ALL",
+            "data": data,
+            "total": sum(item["value"] for item in data)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Papers by topic failed: {str(e)}")
+
+
+@router.get("/growth-over-time")
+async def get_growth_over_time(
+    days: int = Query(90, le=365, description="Number of days to look back"),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Get cumulative growth of papers over time.
+    Returns data suitable for line/area charts.
+    """
+    from sqlalchemy import select, func
+    from app.db import ScientificPaper
+    from datetime import datetime, timedelta
+    import pytz
+
+    try:
+        # Get all papers ordered by creation date
+        query = (
+            select(
+                func.date(ScientificPaper.created_at).label('date'),
+                func.count(ScientificPaper.id).label('count')
+            )
+            .where(
+                ScientificPaper.created_at >= datetime.now(pytz.UTC) - timedelta(days=days)
+            )
+            .group_by(func.date(ScientificPaper.created_at))
+            .order_by(func.date(ScientificPaper.created_at))
+        )
+
+        result = await session.execute(query)
+        daily_counts = result.all()
+
+        # Calculate cumulative counts
+        cumulative_data = []
+        total = 0
+        for date, count in daily_counts:
+            total += count
+            cumulative_data.append({
+                "date": date.isoformat() if hasattr(date, 'isoformat') else str(date),
+                "count": total
+            })
+
+        # If no data for recent days, get the total count
+        if not cumulative_data:
+            total_query = select(func.count(ScientificPaper.id))
+            total_result = await session.execute(total_query)
+            total_count = total_result.scalar() or 0
+
+            # Return single data point for today
+            cumulative_data = [{
+                "date": datetime.now(pytz.UTC).date().isoformat(),
+                "count": total_count
+            }]
+
+        return {
+            "days": days,
+            "data": cumulative_data,
+            "total": cumulative_data[-1]["count"] if cumulative_data else 0
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Growth over time failed: {str(e)}")

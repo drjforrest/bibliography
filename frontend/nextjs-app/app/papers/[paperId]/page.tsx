@@ -99,9 +99,9 @@ export default function PaperAnnotationPage() {
                 {/* Article Summary Section - Collapsible */}
                 {paper?.summary && (
                   <div className="flex-shrink-0 mx-4 mt-4 mb-2">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-lg">
-                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base">summarize</span>
+                    <div className="p-4 bg-[#4e989e]/10 dark:bg-[#4e989e]/20 border-l-4 border-[#4e989e] rounded-r-lg">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-base text-[#4e989e]">summarize</span>
                         Article Summary
                       </h3>
                       <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap mt-2">

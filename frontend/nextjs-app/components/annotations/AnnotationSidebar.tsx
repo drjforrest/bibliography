@@ -24,7 +24,7 @@ export default function AnnotationSidebar({ annotations, paperTitle }: Annotatio
             onClick={() => setFilter('all')}
             className={`flex h-8 items-center justify-center gap-x-2 rounded-lg px-3 ${
               filter === 'all'
-                ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-blue-300 font-semibold'
+                ? 'bg-[#4e989e]/10 dark:bg-[#4e989e]/20 text-[#4e989e] dark:text-[#94d2bd] font-semibold'
                 : 'bg-gray-200 dark:bg-gray-700'
             }`}
           >
@@ -34,7 +34,7 @@ export default function AnnotationSidebar({ annotations, paperTitle }: Annotatio
             onClick={() => setFilter('page')}
             className={`flex h-8 items-center justify-center gap-x-2 rounded-lg pl-3 pr-2 ${
               filter === 'page'
-                ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-blue-300 font-semibold'
+                ? 'bg-[#4e989e]/10 dark:bg-[#4e989e]/20 text-[#4e989e] dark:text-[#94d2bd] font-semibold'
                 : 'bg-gray-200 dark:bg-gray-700'
             }`}
           >
@@ -45,7 +45,7 @@ export default function AnnotationSidebar({ annotations, paperTitle }: Annotatio
             onClick={() => setFilter('date')}
             className={`flex h-8 items-center justify-center gap-x-2 rounded-lg pl-3 pr-2 ${
               filter === 'date'
-                ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-blue-300 font-semibold'
+                ? 'bg-[#4e989e]/10 dark:bg-[#4e989e]/20 text-[#4e989e] dark:text-[#94d2bd] font-semibold'
                 : 'bg-gray-200 dark:bg-gray-700'
             }`}
           >

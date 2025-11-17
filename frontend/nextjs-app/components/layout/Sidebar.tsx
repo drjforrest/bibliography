@@ -94,7 +94,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg ${
                 isActive(item.href)
-                  ? 'bg-primary/20 dark:bg-primary/30 text-primary dark:text-white'
+                  ? 'bg-[#4e989e]/20 dark:bg-[#4e989e]/30 text-[#4e989e] dark:text-white'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800'
               }`}
             >

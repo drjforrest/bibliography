@@ -8,9 +8,12 @@ interface BookGridProps {
   view: ViewMode;
   onChatWithDocument?: (documentId: number) => void;
   onFavoriteChange?: () => void;
+  onDelete?: () => void;
 }
 
-export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteChange }: BookGridProps) {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteChange, onDelete }: BookGridProps) {
   if (papers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -30,19 +33,34 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
   if (view === "list") {
     return (
       <div className="space-y-4">
-        {papers.map((paper) => (
+        {papers.map((paper) => {
+          // Generate thumbnail URL
+          const thumbnailUrl = paper.id
+            ? `${API_URL}/api/v1/papers/${paper.id}/thumbnail`
+            : null;
+
+          return (
           <div
             key={paper.id}
             className="flex gap-4 p-4 bg-white dark:bg-gray-800/50 rounded-lg shadow hover:shadow-md transition-shadow"
           >
-            <div
-              className="w-24 h-32 bg-center bg-no-repeat bg-cover rounded flex-shrink-0"
-              style={{
-                backgroundImage: paper.coverImage
-                  ? `url(${paper.coverImage})`
-                  : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              }}
-            />
+            <div className="w-24 h-32 flex-shrink-0 rounded overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600">
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt={paper.title}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // On error, hide image and show gradient background
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="material-symbols-outlined text-4xl text-gray-400">description</span>
+                </div>
+              )}
+            </div>
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
                 {paper.title}
@@ -60,7 +78,7 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
                   {paper.tags.map((tag, index) => (
                     <span
                       key={index}
-                      className="text-xs px-2 py-1 bg-primary/10 text-primary dark:bg-primary/20 dark:text-blue-300 rounded"
+                      className="text-xs px-2 py-1 bg-[#4e989e]/10 text-[#4e989e] dark:bg-[#4e989e]/20 dark:text-[#94d2bd] rounded"
                     >
                       {tag}
                     </span>
@@ -69,7 +87,8 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
               )}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     );
   }
@@ -82,6 +101,7 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
           paper={paper}
           onChatWithDocument={onChatWithDocument}
           onFavoriteChange={onFavoriteChange}
+          onDelete={onDelete}
         />
       ))}
     </div>

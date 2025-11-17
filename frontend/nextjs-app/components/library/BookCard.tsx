@@ -5,17 +5,20 @@ import { LITERATURE_TYPE_LABELS, LITERATURE_TYPE_COLORS } from '@/types';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import ContextMenu, { ContextMenuItem } from '@/components/shared/ContextMenu';
 
 interface BookCardProps {
   paper: Paper;
   onChatWithDocument?: (documentId: number) => void;
   onFavoriteChange?: () => void;
+  onDelete?: () => void;
 }
 
-export default function BookCard({ paper, onChatWithDocument, onFavoriteChange }: BookCardProps) {
+export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, onDelete }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   // Check if paper is favorited on mount
@@ -55,6 +58,40 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange }
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Are you sure you want to delete "${paper.title}"?`)) return;
+
+    try {
+      await api.deletePaper(paper.id);
+      onDelete?.();
+    } catch (error) {
+      console.error('Failed to delete paper:', error);
+      alert('Failed to delete paper. Please try again.');
+    }
+  };
+
+  const contextMenuItems: ContextMenuItem[] = [
+    {
+      label: isFavorited ? 'Remove from Favorites' : 'Add to Favorites',
+      icon: isFavorited ? 'star' : 'star_outline',
+      onClick: (e?: any) => handleToggleFavorite(e || {} as React.MouseEvent),
+    },
+    {
+      label: 'Delete',
+      icon: 'delete',
+      onClick: handleDelete,
+      danger: true,
+    },
+  ];
+
   // Generate thumbnail URL if paper has an ID
   const thumbnailUrl = paper.id
     ? `${API_URL}/api/v1/papers/${paper.id}/thumbnail`
@@ -74,7 +111,7 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange }
   const showFallbackText = !paper.coverImage && (!thumbnailUrl || imageError);
 
   return (
-    <div className="group relative">
+    <div className="group relative" onContextMenu={handleContextMenu}>
       <Link href={`/papers/${paper.id}`} className="flex flex-col gap-3">
         <div
           className="w-full bg-center bg-no-repeat aspect-[3/4] bg-cover rounded-lg shadow-md group-hover:shadow-xl transition-shadow cursor-pointer relative"
@@ -145,11 +182,36 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange }
             e.stopPropagation();
             onChatWithDocument(paper.id);
           }}
-          className="absolute top-2 right-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 bg-[#4e989e] hover:bg-[#3d7a7f] text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
           title="Chat with this document"
         >
           <span className="material-symbols-outlined text-sm">chat</span>
         </button>
+      )}
+
+      {/* Delete button overlay */}
+      {onDelete && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleDelete();
+          }}
+          className="absolute bottom-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Delete paper"
+        >
+          <span className="material-symbols-outlined text-sm">delete</span>
+        </button>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </div>
   );

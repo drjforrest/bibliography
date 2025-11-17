@@ -101,7 +101,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-[#4e989e] hover:bg-[#3d7a7f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4e989e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading ? (
                   <span className="flex items-center">
@@ -133,7 +133,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <Link
                 href="/auth/register"
-                className="font-medium text-primary hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                className="font-medium text-[#4e989e] hover:text-[#3d7a7f] dark:text-[#94d2bd] dark:hover:text-[#4e989e]"
               >
                 Create an account
               </Link>

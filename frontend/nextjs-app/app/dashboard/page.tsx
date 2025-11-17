@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/layout/Sidebar";
+import PapersByTopicChart from "@/components/dashboard/PapersByTopicChart";
+import LibraryGrowthChart from "@/components/dashboard/LibraryGrowthChart";
 import { api } from "@/lib/api";
 import type { DashboardStats, Topic, LiteratureTypeStats } from "@/types";
 import { LITERATURE_TYPE_LABELS, LITERATURE_TYPE_COLORS, LiteratureType } from "@/types";
@@ -153,7 +155,7 @@ export default function DashboardPage() {
                           {stats.total_papers}
                         </p>
                       </div>
-                      <span className="material-symbols-outlined text-4xl text-blue-600">
+                      <span className="material-symbols-outlined text-4xl text-[#4e989e]">
                         description
                       </span>
                     </div>
@@ -180,6 +182,12 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  <PapersByTopicChart />
+                  <LibraryGrowthChart />
                 </div>
 
                 {/* Activity Feed and Notifications Row */}
@@ -255,7 +263,7 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         {unreadCount > 0 && (
-                          <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                          <span className="bg-[#4e989e] text-white px-3 py-1 rounded-full text-sm font-semibold">
                             {unreadCount}
                           </span>
                         )}
@@ -277,7 +285,7 @@ export default function DashboardPage() {
                             <div
                               key={notification.id}
                               className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors ${
-                                !notification.is_read ? 'bg-blue-50 dark:bg-blue-900/10' : ''
+                                !notification.is_read ? 'bg-[#4e989e]/10 dark:bg-[#4e989e]/20' : ''
                               }`}
                               onClick={() => handleMarkNotificationAsRead(notification.id)}
                             >
@@ -300,7 +308,7 @@ export default function DashboardPage() {
                                       {formatTimeAgo(notification.created_at)}
                                     </span>
                                     {!notification.is_read && (
-                                      <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                                      <span className="w-2 h-2 bg-[#4e989e] rounded-full"></span>
                                     )}
                                   </div>
                                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -339,7 +347,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       {stats.new_since_last_login_count > 0 && (
-                        <span className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-semibold">
+                        <span className="bg-[#4e989e]/20 text-[#4e989e] dark:bg-[#4e989e]/30 dark:text-[#94d2bd] px-3 py-1 rounded-full text-sm font-semibold">
                           {stats.new_since_last_login_count} new
                         </span>
                       )}
@@ -364,7 +372,7 @@ export default function DashboardPage() {
                           onClick={() => router.push(`/papers/${paper.id}`)}
                         >
                           <div className="flex items-start gap-4">
-                            <span className="material-symbols-outlined text-blue-600 mt-1">
+                            <span className="material-symbols-outlined text-[#4e989e] mt-1">
                               description
                             </span>
                             <div className="flex-1 min-w-0">

@@ -39,7 +39,7 @@ export default function MessageComposer({ onSend, placeholder = 'Write a message
             <button
               type="submit"
               disabled={!content.trim()}
-              className="flex items-center justify-center gap-2 rounded-lg h-10 px-5 bg-accent text-white text-sm font-bold leading-normal hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 rounded-lg h-10 px-5 bg-[#e86530] text-white text-sm font-bold leading-normal hover:bg-[#d15424] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>Send</span>
               <span className="material-symbols-outlined">send</span>

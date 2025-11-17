@@ -222,7 +222,7 @@ export default function ProfilePage() {
               <div className="flex gap-3">
                 <label
                   htmlFor="avatar-upload"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors"
+                  className="px-4 py-2 bg-[#4e989e] hover:bg-[#3d7a7f] text-white rounded-lg cursor-pointer transition-colors"
                 >
                   Choose Image
                 </label>
@@ -269,7 +269,7 @@ export default function ProfilePage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Your name"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
             </div>
 
@@ -282,7 +282,7 @@ export default function ProfilePage() {
                 onChange={(e) => setBio(e.target.value)}
                 placeholder="Tell us about yourself..."
                 rows={4}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
             </div>
           </div>
@@ -314,35 +314,35 @@ export default function ProfilePage() {
                 value={openrouterKey}
                 onChange={(e) => setOpenrouterKey(e.target.value)}
                 placeholder="sk-or-v1-..."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="bg-[#4e989e]/10 dark:bg-[#4e989e]/20 border border-[#4e989e]/30 dark:border-[#4e989e]/40 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 mt-0.5">
+                <span className="material-symbols-outlined text-[#4e989e] dark:text-[#94d2bd] mt-0.5">
                   info
                 </span>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
                     Why OpenRouter?
                   </h3>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                  <p className="text-sm text-gray-800 dark:text-gray-200 mb-2">
                     OpenRouter gives you access to 100+ AI models through a single API key, including:
                   </p>
-                  <ul className="text-sm text-blue-800 dark:text-blue-200 list-disc list-inside space-y-1">
+                  <ul className="text-sm text-gray-800 dark:text-gray-200 list-disc list-inside space-y-1">
                     <li>GPT-4, GPT-4 Turbo, GPT-3.5 (OpenAI)</li>
                     <li>Claude 3 Opus, Sonnet, Haiku (Anthropic)</li>
                     <li>Gemini Pro (Google)</li>
                     <li>Llama 3, Mixtral, and many more open-source models</li>
                   </ul>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 mt-3">
+                  <p className="text-sm text-gray-800 dark:text-gray-200 mt-3">
                     Get your API key at{" "}
                     <a
                       href="https://openrouter.ai"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline font-medium hover:text-blue-600 dark:hover:text-blue-300"
+                      className="underline font-medium hover:text-[#3d7a7f] dark:hover:text-[#94d2bd]"
                     >
                       openrouter.ai
                     </a>
@@ -363,7 +363,7 @@ export default function ProfilePage() {
           <button
             onClick={handleSaveProfile}
             disabled={isSaving}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+            className="px-6 py-3 bg-[#4e989e] hover:bg-[#3d7a7f] disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
           >
             {isSaving ? "Saving..." : "Save Changes"}
           </button>

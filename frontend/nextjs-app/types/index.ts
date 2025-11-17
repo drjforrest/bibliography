@@ -21,9 +21,9 @@ export const LITERATURE_TYPE_LABELS: Record<LiteratureType, string> = {
 };
 
 export const LITERATURE_TYPE_COLORS: Record<LiteratureType, string> = {
-  PEER_REVIEWED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  GREY_LITERATURE: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-  NEWS: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+  PEER_REVIEWED: 'bg-[#4e989e]/20 text-[#4e989e] dark:bg-[#4e989e]/30 dark:text-[#94d2bd]',
+  GREY_LITERATURE: 'bg-[#e86530]/20 text-[#e86530] dark:bg-[#e86530]/30 dark:text-[#e86530]',
+  NEWS: 'bg-[#cc9900]/20 text-[#cc9900] dark:bg-[#cc9900]/30 dark:text-[#cc9900]'
 };
 
 // Paper/Book types

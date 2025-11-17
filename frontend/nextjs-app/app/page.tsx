@@ -81,6 +81,19 @@ export default function HomePage() {
     }
   };
 
+  const handleDelete = async () => {
+    // Refetch papers after deletion
+    try {
+      const result = await api.getPapers({
+        limit: 100,
+        literature_type: selectedLiteratureType || undefined,
+      });
+      setPapers(result.papers || []);
+    } catch (error) {
+      console.error('Failed to reload papers after deletion:', error);
+    }
+  };
+
   const handleSort = (option: SortOption) => {
     setSortBy(option);
     const sorted = [...papers].sort((a, b) => {
@@ -121,7 +134,7 @@ export default function HomePage() {
                       setChatMessages([]); // Clear messages for general library chat
                       setIsChatOpen(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#4e989e] hover:bg-[#3d7a7f] text-white rounded-lg transition-colors"
                   >
                     <span className="material-symbols-outlined text-base">chat</span>
                     <span className="hidden sm:inline">AI Chat</span>
@@ -143,7 +156,7 @@ export default function HomePage() {
                   onClick={() => handleSort("date")}
                   className={`flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-lg pl-4 pr-2 ${
                     sortBy === "date"
-                      ? "bg-primary text-white"
+                      ? "bg-[#4e989e] text-white"
                       : "bg-gray-200 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -158,7 +171,7 @@ export default function HomePage() {
                   onClick={() => handleSort("title")}
                   className={`flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-lg pl-4 pr-2 ${
                     sortBy === "title"
-                      ? "bg-primary text-white"
+                      ? "bg-[#4e989e] text-white"
                       : "bg-gray-200 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -173,7 +186,7 @@ export default function HomePage() {
                   onClick={() => handleSort("author")}
                   className={`flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-lg pl-4 pr-2 ${
                     sortBy === "author"
-                      ? "bg-primary text-white"
+                      ? "bg-[#4e989e] text-white"
                       : "bg-gray-200 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -205,6 +218,7 @@ export default function HomePage() {
                       setChatMessages([]); // Clear messages for new document chat
                       setIsChatOpen(true);
                     }}
+                    onDelete={handleDelete}
                   />
                 )}
               </div>

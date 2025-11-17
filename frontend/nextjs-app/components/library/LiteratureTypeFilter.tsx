@@ -20,7 +20,7 @@ export default function LiteratureTypeFilter({ selectedType, onTypeChange }: Lit
     const isSelected = selectedType === type;
     
     if (isSelected) {
-      return `${baseClasses} bg-blue-600 text-white`;
+      return `${baseClasses} bg-[#4e989e] text-white`;
     }
     return `${baseClasses} bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600`;
   };
