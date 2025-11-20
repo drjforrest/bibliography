@@ -183,7 +183,13 @@ class PaperManagerService:
 
     async def get_paper_by_id(self, paper_id: int) -> Optional[ScientificPaper]:
         """Get a scientific paper by ID."""
-        stmt = select(ScientificPaper).where(ScientificPaper.id == paper_id)
+        from sqlalchemy.orm import selectinload
+        
+        stmt = (
+            select(ScientificPaper)
+            .options(selectinload(ScientificPaper.document))
+            .where(ScientificPaper.id == paper_id)
+        )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -196,7 +202,13 @@ class PaperManagerService:
         offset: int = 0,
     ) -> List[ScientificPaper]:
         """Get papers for a user, optionally filtered by search space and literature type."""
-        stmt = select(ScientificPaper).join(Document)
+        from sqlalchemy.orm import selectinload
+        
+        stmt = (
+            select(ScientificPaper)
+            .options(selectinload(ScientificPaper.document))
+            .join(Document)
+        )
 
         if search_space_id:
             stmt = stmt.where(Document.search_space_id == search_space_id)
@@ -216,8 +228,13 @@ class PaperManagerService:
     ) -> List[ScientificPaper]:
         """Search papers by title, authors, or abstract."""
         from sqlalchemy import or_, func
+        from sqlalchemy.orm import selectinload
 
-        stmt = select(ScientificPaper).join(Document)
+        stmt = (
+            select(ScientificPaper)
+            .options(selectinload(ScientificPaper.document))
+            .join(Document)
+        )
 
         # Search in title, authors (as text), and abstract
         search_conditions = or_(

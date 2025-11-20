@@ -45,16 +45,38 @@ class PaperResponse(BaseModel):
         """Convert None values to empty lists for list fields."""
         return v if v is not None else []
 
-    def __init__(self, **data):
-        """Extract summary from extraction_metadata if available."""
-        # Check if we have extraction_metadata from the ORM object
-        if "extraction_metadata" in data:
-            metadata = data.get("extraction_metadata", {})
-            if metadata and isinstance(metadata, dict):
-                # Extract finder_comment as summary
-                if not data.get("summary") and "finder_comment" in metadata:
-                    data["summary"] = metadata["finder_comment"]
-        super().__init__(**data)
+    @classmethod
+    def from_orm(cls, obj):
+        """Custom from_orm to extract summary and title from document relationship."""
+        # Get base data from the ORM object
+        data = {}
+        for field in cls.model_fields:
+            if hasattr(obj, field):
+                data[field] = getattr(obj, field)
+        
+        # Fix title for DEVONthink imports
+        if hasattr(obj, 'document') and obj.document:
+            document = obj.document
+            # Use document title if paper title looks incorrect (e.g., all caps journal name)
+            if hasattr(document, 'title') and document.title:
+                current_title = data.get('title', '')
+                if current_title and current_title.isupper() and len(current_title) > 20:
+                    data['title'] = document.title
+            
+            # Extract summary from document_metadata
+            if not data.get('summary'):
+                if hasattr(document, 'document_metadata') and document.document_metadata:
+                    doc_metadata = document.document_metadata
+                    if isinstance(doc_metadata, dict) and 'devonthink_description' in doc_metadata:
+                        data['summary'] = doc_metadata['devonthink_description']
+        
+        # Also check extraction_metadata.finder_comment as fallback
+        if not data.get('summary') and 'extraction_metadata' in data:
+            metadata = data.get('extraction_metadata', {})
+            if isinstance(metadata, dict) and 'finder_comment' in metadata:
+                data['summary'] = metadata['finder_comment']
+        
+        return cls(**data)
 
     class Config:
         from_attributes = True
@@ -175,6 +197,14 @@ class AnnotationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def convert_uuid_to_string(cls, v):
+        """Convert UUID objects to string representation."""
+        if hasattr(v, '__str__'):
+            return str(v)
+        return v
 
 
 class AnnotationListResponse(BaseModel):

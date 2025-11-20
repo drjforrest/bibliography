@@ -2,8 +2,8 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import axios from "axios";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface UserProfile {
   id: string;
@@ -17,6 +17,7 @@ interface UserProfile {
 export default function ProfilePage() {
   const { token, user } = useAuth();
   const router = useRouter();
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -36,6 +37,13 @@ export default function ProfilePage() {
     }
     fetchProfile();
   }, [token]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    const originalDisplayName = profile?.display_name || "";
+    const originalBio = profile?.bio || "";
+    setHasUnsavedChanges(displayName !== originalDisplayName || bio !== originalBio || !!avatarFile || !!openrouterKey.trim());
+  }, [displayName, bio, avatarFile, openrouterKey, profile]);
 
   const fetchProfile = async () => {
     if (!token) return;
@@ -156,6 +164,8 @@ export default function ProfilePage() {
       }
 
       showMessage("success", "Profile updated successfully");
+      // Navigate back after successful save
+      setTimeout(() => router.back(), 1500);
     } catch (error) {
       console.error("Failed to save profile:", error);
       showMessage("error", "Failed to save profile");
@@ -178,13 +188,29 @@ export default function ProfilePage() {
     );
   }
 
+  const handleCancel = () => {
+    if (hasUnsavedChanges && !confirm("You have unsaved changes. Are you sure you want to leave?")) {
+      return;
+    }
+    router.back();
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Profile Settings</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Manage your profile information, avatar, and API keys
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Profile Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage your profile information, avatar, and API keys
+          </p>
+        </div>
+        <button
+          onClick={handleCancel}
+          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title="Close"
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
       </div>
 
       {message && (
@@ -358,8 +384,15 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+        {/* Save/Cancel Buttons */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={handleCancel}
+            disabled={isSaving}
+            className="px-6 py-3 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 disabled:text-gray-500 rounded-lg transition-colors font-medium"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleSaveProfile}
             disabled={isSaving}

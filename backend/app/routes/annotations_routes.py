@@ -19,8 +19,8 @@ router = APIRouter(prefix="/annotations", tags=["annotations"])
 
 @router.post("/", response_model=AnnotationResponse)
 async def create_annotation(
-    paper_id: int,
     annotation_data: AnnotationCreate,
+    paper_id: int = Query(...),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):

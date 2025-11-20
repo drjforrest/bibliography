@@ -1,10 +1,12 @@
 'use client';
 
+import type { AnnotationType } from '@/types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import type { AnnotationType } from '@/types';
 
+// @ts-ignore
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+// @ts-ignore
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // Configure PDF.js worker
@@ -25,6 +27,7 @@ interface Annotation {
 interface InteractivePDFViewerProps {
   pdfUrl: string;
   activeTool: AnnotationType | null;
+  onToolSelect: (tool: AnnotationType) => void;
   onAnnotationCreate: (annotation: Omit<Annotation, 'id' | 'timestamp'>) => void;
   existingAnnotations?: Annotation[];
 }
@@ -32,12 +35,13 @@ interface InteractivePDFViewerProps {
 export default function InteractivePDFViewer({
   pdfUrl,
   activeTool,
+  onToolSelect,
   onAnnotationCreate,
   existingAnnotations = [],
 }: InteractivePDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.5);
+  const [scale, setScale] = useState<number>(0.9);
   const [selection, setSelection] = useState<any>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
@@ -46,6 +50,7 @@ export default function InteractivePDFViewer({
   const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number }>({ x: 16, y: 16 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [activeToolLocal, setActiveToolLocal] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -63,6 +68,11 @@ export default function InteractivePDFViewer({
       if (direction === 'in') return Math.min(prev + 0.2, 3);
       return Math.max(prev - 0.2, 0.5);
     });
+  };
+
+  const handleToolClick = (tool: AnnotationType) => {
+    setActiveToolLocal(tool);
+    onToolSelect(tool);
   };
 
   // Handle text selection for highlight/underline
@@ -197,6 +207,46 @@ export default function InteractivePDFViewer({
         
         {/* Controls Container */}
         <div className="p-2 flex flex-col gap-2">
+          {/* Annotation Tools */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleToolClick('highlight')}
+              className={`p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                activeToolLocal === 'highlight'
+                  ? 'bg-primary/20 text-primary dark:bg-primary/30'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              title="Highlight"
+            >
+              <span className="material-symbols-outlined">format_ink_highlighter</span>
+            </button>
+            <button
+              onClick={() => handleToolClick('underline')}
+              className={`p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                activeToolLocal === 'underline'
+                  ? 'bg-primary/20 text-primary dark:bg-primary/30'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              title="Underline"
+            >
+              <span className="material-symbols-outlined">format_underlined</span>
+            </button>
+            <button
+              onClick={() => handleToolClick('comment')}
+              className={`p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                activeToolLocal === 'comment'
+                  ? 'bg-primary/20 text-primary dark:bg-primary/30'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              title="Add Comment"
+            >
+              <span className="material-symbols-outlined">add_comment</span>
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+
           {/* Zoom Controls */}
           <div className="flex gap-2 items-center">
             <button

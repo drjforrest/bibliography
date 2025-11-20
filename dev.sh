@@ -234,9 +234,9 @@ start_backend() {
     print_info "API docs available at http://localhost:8000/docs"
     echo ""
 
-    # Start backend in background from the backend directory
+    # Start backend in background from the backend directory with logging
     cd backend
-    venv/bin/python main.py --reload &
+    venv/bin/python main.py --reload > ../logs/backend.log 2>&1 &
     BACKEND_PID=$!
     cd ..
 
@@ -273,20 +273,24 @@ start_frontend() {
     print_info "Frontend will start on http://localhost:3000"
     echo ""
 
-    # Start frontend in background
-    npm run dev &
+    # Start frontend in background with logging
+    echo "Starting frontend in background..."
+    cd frontend/nextjs-app
+    npm run dev > ../../logs/frontend.log 2>&1 &
     FRONTEND_PID=$!
+    cd ../..
 
     # Wait a moment to check if it started
-    sleep 2
+    sleep 10
     if kill -0 $FRONTEND_PID 2>/dev/null; then
         print_success "Frontend started (PID: $FRONTEND_PID)"
     else
         print_error "Frontend failed to start. Check logs/frontend.log"
+        if [ -f logs/frontend.log ]; then
+            tail -20 logs/frontend.log
+        fi
         exit 1
     fi
-
-    cd ../..
 }
 
 # ================================================================================

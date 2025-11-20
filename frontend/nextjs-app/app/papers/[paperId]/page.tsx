@@ -2,7 +2,6 @@
 
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AnnotationSidebar from '@/components/annotations/AnnotationSidebar';
-import AnnotationToolbar from '@/components/annotations/AnnotationToolbar';
 import Header from '@/components/layout/Header';
 import { api } from '@/lib/api';
 import type { Annotation, AnnotationType, Paper } from '@/types';
@@ -95,39 +94,13 @@ export default function PaperAnnotationPage() {
                 <p className="text-red-500 dark:text-red-400">{error}</p>
               </div>
             ) : (
-              <>
-                {/* Article Summary Section - Collapsible */}
-                {paper?.summary && (
-                  <div className="flex-shrink-0 mx-4 mt-4 mb-2">
-                    <div className="p-4 bg-[#4e989e]/10 dark:bg-[#4e989e]/20 border-l-4 border-[#4e989e] rounded-r-lg">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base text-[#4e989e]">summarize</span>
-                        Article Summary
-                      </h3>
-                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap mt-2">
-                        {paper.summary}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* PDF Viewer with Floating Toolbar */}
-                <div className="flex-1 min-h-0 flex relative">
-                  {/* Floating Toolbar */}
-                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-                      <AnnotationToolbar onToolSelect={handleToolSelect} />
-                    </div>
-                  </div>
-                  
-                  <InteractivePDFViewer
-                    pdfUrl={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/papers/${paperId}/pdf`}
-                    activeTool={activeTool}
-                    onAnnotationCreate={handleAnnotationCreate}
-                    existingAnnotations={[]}
-                  />
-                </div>
-              </>
+              <InteractivePDFViewer
+                pdfUrl={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/papers/${paperId}/pdf`}
+                activeTool={activeTool}
+                onToolSelect={handleToolSelect}
+                onAnnotationCreate={handleAnnotationCreate}
+                existingAnnotations={[]}
+              />
             )}
           </div>
 
@@ -137,6 +110,7 @@ export default function PaperAnnotationPage() {
               <AnnotationSidebar
                 annotations={annotations}
                 paperTitle={paper?.title || 'Document'}
+                paperSummary={paper?.summary}
               />
             )}
             
