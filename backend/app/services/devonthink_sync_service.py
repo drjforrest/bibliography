@@ -29,7 +29,9 @@ from app.services.devonthink_mcp_client import DevonthinkMCPClient
 from app.services.pdf_processor import PDFProcessor
 from app.services.file_storage import FileStorageService
 from app.services.semantic_search_service import SemanticSearchService
-from app.services.enhanced_rag_service import EnhancedRAGService
+# TODO: EnhancedRAGService temporarily disabled due to deprecated langchain.chains.RetrievalQA
+# Need to refactor to use modern langchain without RetrievalQA (deprecated in langchain 1.2.0)
+# from app.services.enhanced_rag_service import EnhancedRAGService
 from app.services.embedding_service import EmbeddingService
 from app.config import config
 
@@ -45,7 +47,8 @@ class DevonthinkSyncService:
         self.pdf_processor = PDFProcessor(session)
         self.file_storage = FileStorageService()
         self.semantic_search = SemanticSearchService(session)
-        self.enhanced_rag = EnhancedRAGService(session)
+        # TODO: EnhancedRAGService temporarily disabled - see import comment above
+        # self.enhanced_rag = EnhancedRAGService(session)
         self.embedding_service = EmbeddingService(session)
 
     async def sync_database(
@@ -112,28 +115,31 @@ class DevonthinkSyncService:
             response.skipped_count = sync_stats["skipped"]
             response.details.extend(sync_stats["details"])
 
-            # Step 3: Rebuild FAISS vector store if we synced papers successfully
-            if sync_stats["synced"] > 0:
-                logger.info("Step 3: Rebuilding Enhanced RAG vector store")
-                try:
-                    rebuilt_success = (
-                        await self.enhanced_rag.build_vector_store_from_papers(
-                            user_id=str(user_id), search_space_id=search_space.id
-                        )
-                    )
-                    if rebuilt_success:
-                        stats = self.enhanced_rag.get_stats()
-                        response.details.append(
-                            f"Rebuilt FAISS vector store with {stats.get('documents_indexed', 0)} documents"
-                        )
-                        logger.info("Successfully rebuilt Enhanced RAG vector store")
-                    else:
-                        response.details.append(
-                            "Warning: Failed to rebuild FAISS vector store"
-                        )
-                except Exception as e:
-                    logger.error(f"Error rebuilding FAISS vector store: {str(e)}")
-                    response.details.append(f"Warning: FAISS rebuild failed: {str(e)}")
+            # TODO: Step 3 temporarily disabled - EnhancedRAGService uses deprecated RetrievalQA
+            # The pgvector embeddings in PostgreSQL are still being created in _process_for_search
+            # Once EnhancedRAGService is refactored, uncomment this section
+            # # Step 3: Rebuild FAISS vector store if we synced papers successfully
+            # if sync_stats["synced"] > 0:
+            #     logger.info("Step 3: Rebuilding Enhanced RAG vector store")
+            #     try:
+            #         rebuilt_success = (
+            #             await self.enhanced_rag.build_vector_store_from_papers(
+            #                 user_id=str(user_id), search_space_id=search_space.id
+            #             )
+            #         )
+            #         if rebuilt_success:
+            #             stats = self.enhanced_rag.get_stats()
+            #             response.details.append(
+            #                 f"Rebuilt FAISS vector store with {stats.get('documents_indexed', 0)} documents"
+            #             )
+            #             logger.info("Successfully rebuilt Enhanced RAG vector store")
+            #         else:
+            #             response.details.append(
+            #                 "Warning: Failed to rebuild FAISS vector store"
+            #             )
+            #     except Exception as e:
+            #         logger.error(f"Error rebuilding FAISS vector store: {str(e)}")
+            #         response.details.append(f"Warning: FAISS rebuild failed: {str(e)}")
 
             if sync_stats["errors"] > 0:
                 response.message = f"Sync completed with {sync_stats['errors']} errors"
@@ -589,17 +595,20 @@ class DevonthinkSyncService:
                     f"Successfully created and embedded chunks for document {paper.document_id}"
                 )
 
-            # Step 2: Also add to Enhanced RAG FAISS store for compatibility
-            try:
-                await self.enhanced_rag.add_paper_to_vector_store(paper)
-                logger.info(
-                    f"Successfully added paper {paper.id} to Enhanced RAG FAISS vector store"
-                )
-            except Exception as rag_error:
-                logger.warning(
-                    f"Enhanced RAG indexing failed for paper {paper.id}: {str(rag_error)}"
-                )
-                # Don't fail the whole process if just FAISS fails
+            # TODO: Step 2 temporarily disabled - EnhancedRAGService uses deprecated RetrievalQA
+            # pgvector embeddings are still being created above, which is the primary search backend
+            # Once EnhancedRAGService is refactored, uncomment this section
+            # # Step 2: Also add to Enhanced RAG FAISS store for compatibility
+            # try:
+            #     await self.enhanced_rag.add_paper_to_vector_store(paper)
+            #     logger.info(
+            #         f"Successfully added paper {paper.id} to Enhanced RAG FAISS vector store"
+            #     )
+            # except Exception as rag_error:
+            #     logger.warning(
+            #         f"Enhanced RAG indexing failed for paper {paper.id}: {str(rag_error)}"
+            #     )
+            #     # Don't fail the whole process if just FAISS fails
 
         except Exception as e:
             logger.error(f"Error processing paper {paper.id} for search: {str(e)}")

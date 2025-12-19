@@ -151,24 +151,46 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
         echo '✓ Port ${FRONTEND_PORT} is available'
     fi
 
-    # Ensure Python 3.12 is available
-    echo 'Checking Python version...'
-    if command -v python3.12 &> /dev/null; then
-        PYTHON_CMD='python3.12'
-        echo \"✓ Using Python 3.12\"
-    elif python3 --version | grep -q '3.12'; then
-        PYTHON_CMD='python3'
-        echo \"✓ Using Python 3.12 via python3\"
+    # Ensure Python 3.12 is available via pyenv
+    echo 'Setting up Python 3.12 via pyenv...'
+    export PYENV_ROOT=\$HOME/.pyenv
+    export PATH=\"\$PYENV_ROOT/shims:\$PATH\"
+
+    if command -v pyenv &> /dev/null; then
+        # Try to use pyenv's Python 3.12
+        if pyenv versions | grep -q '3.12'; then
+            PYTHON_CMD=\$(pyenv which python3)
+            echo \"✓ Using pyenv Python: \$PYTHON_CMD\"
+        else
+            echo '⚠ Python 3.12 not found in pyenv, using system python3'
+            PYTHON_CMD='python3'
+        fi
     else
-        echo '⚠ Python 3.12 not found, using system python3'
-        PYTHON_CMD='python3'
+        # Fallback to direct pyenv shim path
+        if [ -f \"\$PYENV_ROOT/shims/python3\" ]; then
+            PYTHON_CMD=\"\$PYENV_ROOT/shims/python3\"
+            echo \"✓ Using pyenv shim: \$PYTHON_CMD\"
+        else
+            echo '⚠ pyenv not found, using system python3'
+            PYTHON_CMD='python3'
+        fi
     fi
 
     # Install/update backend dependencies
     echo 'Setting up backend environment...'
     cd backend
-    \$PYTHON_CMD -m venv venv 2>/dev/null || true
+
+    # Recreate venv to ensure correct Python version
+    if [ -d venv ]; then
+        echo 'Removing old venv...'
+        rm -rf venv
+    fi
+    echo \"Creating new venv with \$PYTHON_CMD...\"
+    \$PYTHON_CMD -m venv venv
     source venv/bin/activate
+
+    # Verify Python version in venv
+    python --version
 
     echo 'Installing backend dependencies...'
     pip install --upgrade pip
@@ -181,7 +203,8 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
 
     # Start backend service
     echo 'Starting hero-evidence-library backend on port ${BACKEND_PORT}...'
-    nohup python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} > ../hero_evidence_library_backend.log 2>&1 &
+    BACKEND_DIR=\$(pwd)
+    nohup env PYTHONPATH=\$BACKEND_DIR ./venv/bin/python -m uvicorn app.app:app --host 0.0.0.0 --port ${BACKEND_PORT} > ../hero_evidence_library_backend.log 2>&1 &
     
     # Setup and start frontend
     echo 'Setting up frontend environment...'

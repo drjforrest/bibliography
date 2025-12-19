@@ -1,5 +1,5 @@
 import datetime
-from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from app.config import config
 from typing import Any, List, Optional
 

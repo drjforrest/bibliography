@@ -13,7 +13,7 @@ class DevonthinkMCPClientRealV2:
 
     def __init__(
         self,
-        mcp_server_path: str = "/Users/drjforrest/dev/repos/mcp-server-devonthink/dist/index.js",
+        mcp_server_path: str = "/Users/jforrest/mcp-server-devonthink/dist/index.js",
     ):
         self.mcp_server_path = mcp_server_path
         self.process = None
@@ -29,8 +29,10 @@ class DevonthinkMCPClientRealV2:
         """Context manager for MCP server connection"""
         try:
             # Start the MCP server as a subprocess
+            # Use full path to node since it's not in PATH on mac-mini (installed via nvm)
+            node_path = "/Users/jforrest/.nvm/versions/node/v22.21.1/bin/node"
             self.process = await asyncio.create_subprocess_exec(
-                "node",
+                node_path,
                 self.mcp_server_path,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,

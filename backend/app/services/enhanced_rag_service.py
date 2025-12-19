@@ -14,7 +14,7 @@ from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
 from langchain_community.llms import Ollama
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.schema import Document as LangChainDocument
+from langchain_core.documents import Document as LangChainDocument
 
 from app.db import ScientificPaper, Document, SearchSpace, Chunk
 from app.config import config
