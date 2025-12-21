@@ -29,19 +29,16 @@ print_warning() {
 
 # Configuration
 DEV_USER="drjforrest"
-DEV_HOST="drjforrest-laptop.local"  # Update if needed
-DEV_PDF_PATH="/Users/drjforrest/dev/hero-counterforce/hero_evidence_library/backend/data/pdfs"
+DEV_HOST="MacBookM4.local"  # Update if needed
+DEV_PDF_PATH="/Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/backend/data/pdfs"
 MOUNT_POINT="/tmp/dev-pdfs"
 
 # Check if SSHFS is installed
-if ! command -v sshfs &> /dev/null; then
-    print_error "SSHFS not found. Installing via Homebrew..."
-    if command -v brew &> /dev/null; then
-        brew install macfuse sshfs
-    else
-        print_error "Homebrew not found. Please install macfuse and sshfs manually."
-        exit 1
-    fi
+SSHFS_BIN="/usr/local/bin/sshfs"
+if [ ! -f "$SSHFS_BIN" ]; then
+    print_error "SSHFS not found at $SSHFS_BIN"
+    print_error "Please install macfuse and sshfs manually."
+    exit 1
 fi
 
 # Create mount point if it doesn't exist
@@ -72,13 +69,12 @@ print_status "SSH connection successful!"
 
 # Mount via SSHFS
 print_status "Mounting PDF directory from dev machine..."
-sshfs ${DEV_USER}@${DEV_HOST}:${DEV_PDF_PATH} ${MOUNT_POINT} \
+$SSHFS_BIN ${DEV_USER}@${DEV_HOST}:${DEV_PDF_PATH} ${MOUNT_POINT} \
     -o follow_symlinks \
     -o auto_cache \
     -o reconnect \
     -o ServerAliveInterval=15 \
-    -o ServerAliveCountMax=3 \
-    -o allow_other
+    -o ServerAliveCountMax=3
 
 if [ $? -eq 0 ]; then
     print_status "✓ PDF directory mounted successfully!"

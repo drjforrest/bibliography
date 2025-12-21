@@ -42,13 +42,13 @@ fi
 print_status "PostgreSQL is running"
 
 # Check if database already exists
-if psql -U "$DB_USER" -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+if psql -h localhost -U "$DB_USER" -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
     print_warning "Database '$DB_NAME' already exists"
     read -p "Do you want to DROP and recreate it? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status "Dropping existing database..."
-        psql -U "$DB_USER" -c "DROP DATABASE IF EXISTS $DB_NAME;"
+        psql -h localhost -U "$DB_USER" -c "DROP DATABASE IF EXISTS $DB_NAME;"
     else
         print_status "Keeping existing database"
         exit 0
@@ -57,7 +57,7 @@ fi
 
 # Create database
 print_status "Creating database '$DB_NAME'..."
-psql -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;"
+psql -h localhost -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;"
 
 if [ $? -eq 0 ]; then
     print_status "✓ Database created successfully"
@@ -68,7 +68,7 @@ fi
 
 # Install pgvector extension
 print_status "Installing pgvector extension..."
-psql -U "$DB_USER" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
 if [ $? -eq 0 ]; then
     print_status "✓ pgvector extension installed"
@@ -141,7 +141,7 @@ fi
 
 # Verify installation
 print_status "Verifying database setup..."
-TABLES=$(psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
+TABLES=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
 
 if [ "$TABLES" -gt 0 ]; then
     print_status "✓ Found $TABLES tables in database"
@@ -150,7 +150,7 @@ else
 fi
 
 # Check for pgvector extension
-VECTOR_EXT=$(psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector';")
+VECTOR_EXT=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector';")
 
 if [ "$VECTOR_EXT" -eq 1 ]; then
     print_status "✓ pgvector extension is active"
