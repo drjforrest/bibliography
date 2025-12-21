@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs';
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface APIKeyStatus {
   openai_api_key_set: boolean;
@@ -19,20 +19,14 @@ export default function APIKeySettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
- useEffect(() => {
-   if (isLoaded && isSignedIn && isOpen) {
-     fetchStatus();
-   }
- }, [isLoaded, isSignedIn, isOpen]);
-
- const fetchStatus = async () => {
+ const fetchStatus = useCallback(async () => {
    try {
      const token = await getToken();
      if (!token) {
        console.error('No auth token available');
        return;
      }
-     
+
      const response = await axios.get(
        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/api-keys`,
        {
@@ -45,7 +39,13 @@ export default function APIKeySettings() {
    } catch (error) {
      console.error('Failed to fetch API key status:', error);
    }
- };
+ }, [getToken]);
+
+ useEffect(() => {
+   if (isLoaded && isSignedIn && isOpen) {
+     fetchStatus();
+   }
+ }, [isLoaded, isSignedIn, isOpen, fetchStatus]);
 
   const updateKeys = async () => {
     const token = await getToken();

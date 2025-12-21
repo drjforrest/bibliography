@@ -9,6 +9,9 @@ from sqlalchemy import select
 
 from app.db import User, get_async_session
 from app.services.clerk_service import clerk_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 security = HTTPBearer(auto_error=False)
@@ -125,9 +128,11 @@ async def require_clerk_auth(
     except HTTPException:
         raise
     except Exception as e:
+        # Log full exception server-side, but do not expose internal details to clients
+        logger.exception("Error requiring Clerk authentication")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
+            detail="Authentication failed",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

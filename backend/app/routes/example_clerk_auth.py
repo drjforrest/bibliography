@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db import User, get_async_session, ScientificPaper
+from app.db import User, get_async_session, ScientificPaper, Document, SearchSpace
 from app.middleware.clerk_auth import require_clerk_auth, get_current_user_from_clerk
 
 
@@ -83,9 +83,15 @@ async def get_my_papers(
     
     This shows how to combine Clerk auth with database queries.
     """
-    # Query papers (this is just an example - adjust based on your schema)
+    # Query papers belonging to the current user. Papers are linked to a
+    # Document which belongs to a SearchSpace owned by a user. Join through
+    # those relationships and filter by `SearchSpace.user_id` to restrict
+    # results to the authenticated user's content.
     result = await session.execute(
         select(ScientificPaper)
+        .join(ScientificPaper.document)
+        .join(Document.search_space)
+        .where(SearchSpace.user_id == current_user.id)
         .limit(10)
     )
     papers = result.scalars().all()

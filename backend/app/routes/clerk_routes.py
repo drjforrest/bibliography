@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from svix.webhooks import Webhook, WebhookVerificationError
 import json
+import logging
 
 from app.db import get_async_session
 from app.services.clerk_service import clerk_service
@@ -12,6 +13,8 @@ from app.config import config
 
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/webhooks/clerk")
@@ -41,6 +44,22 @@ async def clerk_webhook(
     # Get the raw body
     body_bytes = await request.body()
     body_str = body_bytes.decode("utf-8")
+
+    # Ensure required Svix headers are present
+    missing_headers = []
+    if not svix_id:
+        missing_headers.append('svix-id')
+    if not svix_timestamp:
+        missing_headers.append('svix-timestamp')
+    if not svix_signature:
+        missing_headers.append('svix-signature')
+
+    if missing_headers:
+        missing = ', '.join(missing_headers)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Missing required webhook header: {missing}"
+        )
     
     # Verify the webhook signature
     try:
@@ -99,20 +118,39 @@ async def clerk_webhook(
                 "message": "Event received but not processed"
             }
     
-    except Exception as e:
-        # Log the error but return 200 to prevent webhook retries
-        print(f"Error processing Clerk webhook: {str(e)}")
+    except (ValueError, json.JSONDecodeError) as e:
+        # Permanent/client-side error (bad payload/validation). Rollback and
+        # return 200 so Svix/Clerk does not retry.
+        try:
+            await session.rollback()
+        except Exception:
+            logger.exception("Failed to rollback DB session after permanent webhook error")
+
+        logger.exception("Permanent error processing Clerk webhook")
         return {
             "success": False,
             "error": str(e),
-            "event_type": event_type
+            "event_type": event_type,
         }
+
+    except Exception as e:
+        # Transient/server error (DB, network, unexpected). Rollback and
+        # return 500 so the webhook sender can retry.
+        try:
+            await session.rollback()
+        except Exception:
+            logger.exception("Failed to rollback DB session after transient webhook error")
+
+        logger.exception("Transient error processing Clerk webhook")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
 
 
 @router.get("/webhooks/clerk/test")
 async def test_clerk_webhook():
     """Test endpoint to verify Clerk webhook route is accessible."""
     return {
-        "message": "Clerk webhook endpoint is active",
-        "configured": bool(config.CLERK_WEBHOOK_SIGNING_KEY)
+        "message": "Clerk webhook endpoint is active"
     }
