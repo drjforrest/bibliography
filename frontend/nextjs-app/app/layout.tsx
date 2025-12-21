@@ -1,8 +1,8 @@
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from "next";
 import { Inter, Merriweather } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/contexts/AuthContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,9 +38,11 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${merriweather.variable} font-display antialiased`}
       >
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        <ClerkProvider>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

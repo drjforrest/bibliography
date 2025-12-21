@@ -5,13 +5,13 @@ import Sidebar from "@/components/layout/Sidebar";
 import BookGrid from "@/components/library/BookGrid";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
-import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import type { Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
+import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 export default function FavoritesPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -21,7 +21,7 @@ export default function FavoritesPage() {
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
-    if (!isAuthenticated || authLoading) {
+    if (!isLoaded || !isSignedIn) {
       setIsLoading(false);
       return;
     }
@@ -52,7 +52,7 @@ export default function FavoritesPage() {
       }
     };
     fetchData();
-  }, [isAuthenticated, authLoading]);
+  }, [isLoaded, isSignedIn]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

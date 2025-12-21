@@ -1,13 +1,14 @@
 'use client';
 
 import { useTheme } from '@/components/ThemeProvider';
-import { useAuth } from '@/contexts/AuthContext';
+import { useClerk, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useState } from 'react';
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   return (
@@ -43,9 +44,9 @@ export default function Header() {
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 cursor-pointer hover:ring-2 hover:ring-[#4e989e] transition-all"
             style={{
-              backgroundImage: user?.avatar
-                ? `url(${user.avatar})`
-                : `url(https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')})`
+              backgroundImage: user?.imageUrl
+                ? `url(${user.imageUrl})`
+                : `url(https://ui-avatars.com/api/?name=${encodeURIComponent(user?.firstName || 'User')})`
             }}
           />
 
@@ -54,15 +55,15 @@ export default function Header() {
             <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user?.name}
+                  {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName || 'User'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {user?.email}
+                  {user?.primaryEmailAddress?.emailAddress}
                 </p>
               </div>
               <button
                 onClick={() => {
-                  logout();
+                  signOut();
                   setShowUserMenu(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

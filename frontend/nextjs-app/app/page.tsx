@@ -7,13 +7,13 @@ import ChatPanel from "@/components/library/ChatPanel";
 import LiteratureTypeFilter from "@/components/library/LiteratureTypeFilter";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
-import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import type { LiteratureType, Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
+import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -27,7 +27,7 @@ export default function HomePage() {
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
-    if (!isAuthenticated || authLoading) {
+    if (!isLoaded || !isSignedIn) {
       setIsLoading(false);
       return;
     }
@@ -61,7 +61,7 @@ export default function HomePage() {
       }
     };
     fetchData();
-  }, [isAuthenticated, authLoading, selectedLiteratureType]);
+  }, [isLoaded, isSignedIn, selectedLiteratureType]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

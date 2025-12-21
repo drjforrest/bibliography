@@ -1,12 +1,11 @@
 'use client';
 
-import { useAuth } from '@/contexts/AuthContext';
 import type { Topic } from '@/types';
+import { useClerk, useUser } from '@clerk/nextjs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import APIKeySettings from './APIKeySettings';
 
 interface SidebarProps {
   topics?: Topic[];
@@ -14,7 +13,8 @@ interface SidebarProps {
 
 export default function Sidebar({ topics = [] }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const isActive = (path: string) => pathname === path;
@@ -51,10 +51,10 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
             />
             <div className="flex flex-col flex-1 text-left">
               <h1 className="text-base font-medium leading-normal text-gray-900 dark:text-white">
-                {user?.name || 'Digital Library'}
+                {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName || 'Digital Library'}
               </h1>
               <p className="text-sm font-normal leading-normal text-gray-500 dark:text-gray-400 truncate">
-                {user?.email || 'user@example.com'}
+                {user?.primaryEmailAddress?.emailAddress || 'user@example.com'}
               </p>
             </div>
             <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">
@@ -75,7 +75,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
               </Link>
               <button
                 onClick={() => {
-                  logout();
+                  signOut();
                   setShowUserMenu(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg transition-colors"

@@ -1,30 +1,38 @@
 'use client';
 
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@clerk/nextjs';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 
 interface APIKeyStatus {
   openai_api_key_set: boolean;
   anthropic_api_key_set: boolean;
+  openrouter_api_key_set: boolean;
 }
 
 export default function APIKeySettings() {
-  const { token } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [status, setStatus] = useState<APIKeyStatus | null>(null);
   const [openaiKey, setOpenaiKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
+  const [openrouterKey, setOpenrouterKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
  useEffect(() => {
-   if (token && isOpen) {
+   if (isLoaded && isSignedIn && isOpen) {
      fetchStatus();
    }
- }, [token, isOpen]);
+ }, [isLoaded, isSignedIn, isOpen]);
 
  const fetchStatus = async () => {
    try {
+     const token = await getToken();
+     if (!token) {
+       console.error('No auth token available');
+       return;
+     }
+     
      const response = await axios.get(
        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/api-keys`,
        {
@@ -40,7 +48,11 @@ export default function APIKeySettings() {
  };
 
   const updateKeys = async () => {
-    if (!token) return;
+    const token = await getToken();
+    if (!token) {
+      alert('Please sign in to update API keys');
+      return;
+    }
 
     setIsLoading(true);
     try {

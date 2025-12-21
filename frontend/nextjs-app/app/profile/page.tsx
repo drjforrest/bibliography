@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, useUser } from "@clerk/nextjs";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,7 +15,8 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const { token, user } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const router = useRouter();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -31,12 +32,11 @@ export default function ProfilePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
-    if (!token) {
-      router.push("/auth/login");
+    if (!isLoaded || !isSignedIn) {
       return;
     }
     fetchProfile();
-  }, [token]);
+  }, [isLoaded, isSignedIn]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -46,6 +46,7 @@ export default function ProfilePage() {
   }, [displayName, bio, avatarFile, openrouterKey, profile]);
 
   const fetchProfile = async () => {
+    const token = await getToken();
     if (!token) return;
 
     setIsLoading(true);
@@ -84,6 +85,7 @@ export default function ProfilePage() {
   };
 
   const uploadAvatar = async () => {
+    const token = await getToken();
     if (!token || !avatarFile) return;
 
     const formData = new FormData();
@@ -107,6 +109,7 @@ export default function ProfilePage() {
   };
 
   const deleteAvatar = async () => {
+    const token = await getToken();
     if (!token || !confirm("Are you sure you want to delete your avatar?")) return;
 
     try {
@@ -124,6 +127,7 @@ export default function ProfilePage() {
   };
 
   const handleSaveProfile = async () => {
+    const token = await getToken();
     if (!token) return;
 
     setIsSaving(true);

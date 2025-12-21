@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Sidebar from "@/components/layout/Sidebar";
-import PapersByTopicChart from "@/components/dashboard/PapersByTopicChart";
 import LibraryGrowthChart from "@/components/dashboard/LibraryGrowthChart";
+import PapersByTopicChart from "@/components/dashboard/PapersByTopicChart";
+import Sidebar from "@/components/layout/Sidebar";
 import { api } from "@/lib/api";
-import type { DashboardStats, Topic, LiteratureTypeStats } from "@/types";
-import { LITERATURE_TYPE_LABELS, LITERATURE_TYPE_COLORS, LiteratureType } from "@/types";
-import { useAuth } from "@/contexts/AuthContext";
+import type { DashboardStats, LiteratureTypeStats, Topic } from "@/types";
+import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS, LiteratureType } from "@/types";
+import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!isAuthenticated || authLoading) {
+    if (!isLoaded || !isSignedIn) {
       setIsLoading(false);
       return;
     }
@@ -64,7 +64,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [isAuthenticated, authLoading]);
+  }, [isLoaded, isSignedIn]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';

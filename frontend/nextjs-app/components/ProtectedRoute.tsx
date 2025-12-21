@@ -1,24 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@clerk/nextjs';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth/login');
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  if (isLoading) {
+  if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-background-light dark:bg-background-dark">
         <div className="text-center">
@@ -29,8 +20,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (!isSignedIn) {
+    return null; // Clerk middleware will handle redirect
   }
 
   return <>{children}</>;
