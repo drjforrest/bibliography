@@ -11,6 +11,8 @@ from app.db import Document, ScientificPaper, DocumentType, User
 from app.services.file_storage import FileStorageService
 from app.services.folder_watcher import folder_watcher_manager
 from app.services.pdf_processor import PDFProcessor
+from app.services.embedding_service import EmbeddingService
+from app.services.llm_enrichment_service import LLMEnrichmentService
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,8 @@ class PaperManagerService:
         self.session = session
         self.pdf_processor = PDFProcessor(session)
         self.file_storage = FileStorageService()
+        self.embedding_service = EmbeddingService(session)
+        self.llm_enrichment = LLMEnrichmentService(session)
 
     async def process_pdf_file(
         self,
@@ -100,6 +104,13 @@ class PaperManagerService:
             logger.info(
                 f"Successfully processed PDF: {file_path} -> Paper ID: {paper_id}"
             )
+
+            # Trigger vectorization and LLM enrichment pipelines
+            try:
+                await self._enrich_paper(paper_id, search_space_id)
+            except Exception as e:
+                logger.warning(f"Enrichment pipeline failed for paper {paper_id}: {str(e)}")
+                # Don't fail the whole upload if enrichment fails
 
             return {
                 "status": "success",
@@ -180,6 +191,60 @@ class PaperManagerService:
         await self.session.commit()
 
         return scientific_paper.id
+
+    async def _enrich_paper(self, paper_id: int, search_space_id: int):
+        """
+        Run enrichment pipelines on a newly created paper.
+
+        This includes:
+        1. Vectorization (embeddings and chunks for semantic search)
+        2. LLM enrichment (lay summary, short description, insights, citations)
+
+        Args:
+            paper_id: ID of the paper to enrich
+            search_space_id: ID of the search space
+        """
+        try:
+            logger.info(f"Starting enrichment pipeline for paper {paper_id}")
+
+            # Get the paper with document
+            paper = await self.get_paper_by_id(paper_id)
+            if not paper or not paper.document:
+                logger.error(f"Paper {paper_id} or document not found for enrichment")
+                return
+
+            # Step 1: Vectorization (embeddings and chunks)
+            logger.info(f"Step 1/2: Generating embeddings for paper {paper_id}")
+            try:
+                # Embed the document itself
+                doc_embedded = await self.embedding_service.embed_document(paper.document_id)
+                if doc_embedded:
+                    logger.info(f"Successfully embedded document {paper.document_id}")
+
+                # Create and embed chunks
+                chunks_embedded = await self.embedding_service.create_and_embed_chunks(paper.document)
+                if chunks_embedded:
+                    logger.info(f"Successfully created and embedded chunks for document {paper.document_id}")
+            except Exception as e:
+                logger.error(f"Vectorization failed for paper {paper_id}: {str(e)}")
+                # Continue to LLM enrichment even if vectorization fails
+
+            # Step 2: LLM enrichment (lay summary, short description, insights, citations)
+            logger.info(f"Step 2/2: Running LLM enrichment for paper {paper_id}")
+            try:
+                enriched = await self.llm_enrichment.enrich_paper(paper_id)
+                if enriched:
+                    logger.info(f"Successfully enriched paper {paper_id} with LLM-generated content")
+                else:
+                    logger.warning(f"LLM enrichment returned False for paper {paper_id}")
+            except Exception as e:
+                logger.error(f"LLM enrichment failed for paper {paper_id}: {str(e)}")
+
+            logger.info(f"Completed enrichment pipeline for paper {paper_id}")
+
+        except Exception as e:
+            logger.error(f"Error in enrichment pipeline for paper {paper_id}: {str(e)}")
+            # Don't re-raise - enrichment failures shouldn't block paper creation
 
     async def get_paper_by_id(self, paper_id: int) -> Optional[ScientificPaper]:
         """Get a scientific paper by ID."""

@@ -1061,6 +1061,10 @@ def display_paper(paper: Dict, api: BibliographyAPI):
     col1, col2 = st.columns([3, 1])
 
     with col1:
+        # Short description (LLM-generated, concise summary)
+        if paper.get("short_description"):
+            st.info(paper["short_description"])
+
         # Basic information
         if paper.get("authors"):
             st.write(f"**Authors:** {', '.join(paper['authors'])}")
@@ -1078,9 +1082,21 @@ def display_paper(paper: Dict, api: BibliographyAPI):
         if paper.get("doi"):
             st.write(f"**DOI:** {paper['doi']}")
 
+        # Lay summary (LLM-generated, accessible language)
+        if paper.get("lay_summary"):
+            with st.expander("📖 Lay Summary"):
+                st.write(paper["lay_summary"])
+
+        # Abstract
         if paper.get("abstract"):
-            with st.expander("Abstract"):
+            with st.expander("📄 Abstract"):
                 st.write(paper["abstract"])
+
+        # Key insights (LLM-generated)
+        if paper.get("insights") and len(paper["insights"]) > 0:
+            with st.expander(f"💡 Key Insights ({len(paper['insights'])})"):
+                for i, insight in enumerate(paper["insights"], 1):
+                    st.write(f"{i}. {insight}")
 
         if paper.get("keywords"):
             st.write(f"**Keywords:** {', '.join(paper['keywords'])}")

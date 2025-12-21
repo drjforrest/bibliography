@@ -30,6 +30,7 @@ class PaperResponse(BaseModel):
     arxiv_id: Optional[str]
     abstract: Optional[str]
     summary: Optional[str] = None  # DEVONthink Finder Comment (article summary)
+    lay_summary: Optional[str] = None  # LLM-generated accessible summary
     keywords: List[str] = []
     subject_areas: List[str] = []
     tags: List[str] = []
@@ -39,7 +40,12 @@ class PaperResponse(BaseModel):
     file_size: Optional[int]
     created_at: datetime
 
-    @field_validator("keywords", "subject_areas", "tags", mode="before")
+    # LLM-generated enrichment fields from extraction_metadata
+    short_description: Optional[str] = None
+    insights: List[str] = []
+    citations: Optional[Dict[str, str]] = None  # Dict of citation styles to formatted citations
+
+    @field_validator("keywords", "subject_areas", "tags", "insights", mode="before")
     @classmethod
     def convert_none_to_list(cls, v):
         """Convert None values to empty lists for list fields."""
@@ -75,7 +81,15 @@ class PaperResponse(BaseModel):
             metadata = data.get('extraction_metadata', {})
             if isinstance(metadata, dict) and 'finder_comment' in metadata:
                 data['summary'] = metadata['finder_comment']
-        
+
+        # Extract LLM-generated enrichment fields from extraction_metadata
+        if hasattr(obj, 'extraction_metadata') and obj.extraction_metadata:
+            metadata = obj.extraction_metadata
+            if isinstance(metadata, dict):
+                data['short_description'] = metadata.get('short_description')
+                data['insights'] = metadata.get('insights', [])
+                data['citations'] = metadata.get('citations', {})
+
         return cls(**data)
 
     class Config:

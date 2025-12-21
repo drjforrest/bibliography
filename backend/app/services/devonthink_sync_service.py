@@ -33,6 +33,7 @@ from app.services.semantic_search_service import SemanticSearchService
 # Need to refactor to use modern langchain without RetrievalQA (deprecated in langchain 1.2.0)
 # from app.services.enhanced_rag_service import EnhancedRAGService
 from app.services.embedding_service import EmbeddingService
+from app.services.llm_enrichment_service import LLMEnrichmentService
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class DevonthinkSyncService:
         # TODO: EnhancedRAGService temporarily disabled - see import comment above
         # self.enhanced_rag = EnhancedRAGService(session)
         self.embedding_service = EmbeddingService(session)
+        self.llm_enrichment = LLMEnrichmentService(session)
 
     async def sync_database(
         self, request: DevonthinkSyncRequest, user_id: UUID
@@ -572,7 +574,7 @@ class DevonthinkSyncService:
         return paper
 
     async def _process_for_search(self, paper: ScientificPaper, search_space_id: int):
-        """Process paper for semantic search using both pgvector and Enhanced RAG"""
+        """Process paper for semantic search using pgvector and LLM enrichment"""
         try:
             # Step 1: Populate pgvector embeddings in PostgreSQL
             logger.info(f"Generating pgvector embeddings for paper {paper.id}")
@@ -595,10 +597,22 @@ class DevonthinkSyncService:
                     f"Successfully created and embedded chunks for document {paper.document_id}"
                 )
 
-            # TODO: Step 2 temporarily disabled - EnhancedRAGService uses deprecated RetrievalQA
+            # Step 2: LLM enrichment (lay summary, short description, insights, citations)
+            logger.info(f"Running LLM enrichment for paper {paper.id}")
+            try:
+                enriched = await self.llm_enrichment.enrich_paper(paper.id)
+                if enriched:
+                    logger.info(f"Successfully enriched paper {paper.id} with LLM-generated content")
+                else:
+                    logger.warning(f"LLM enrichment returned False for paper {paper.id}")
+            except Exception as e:
+                logger.error(f"LLM enrichment failed for paper {paper.id}: {str(e)}")
+                # Continue sync even if LLM enrichment fails
+
+            # TODO: Step 3 temporarily disabled - EnhancedRAGService uses deprecated RetrievalQA
             # pgvector embeddings are still being created above, which is the primary search backend
             # Once EnhancedRAGService is refactored, uncomment this section
-            # # Step 2: Also add to Enhanced RAG FAISS store for compatibility
+            # # Step 3: Also add to Enhanced RAG FAISS store for compatibility
             # try:
             #     await self.enhanced_rag.add_paper_to_vector_store(paper)
             #     logger.info(
@@ -612,7 +626,7 @@ class DevonthinkSyncService:
 
         except Exception as e:
             logger.error(f"Error processing paper {paper.id} for search: {str(e)}")
-            # Continue sync even if vectorization fails - documents are still stored
+            # Continue sync even if vectorization/enrichment fails - documents are still stored
 
     async def monitor_changes(
         self, database_name: str = "Reference", days: int = 1

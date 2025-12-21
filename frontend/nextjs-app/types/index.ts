@@ -44,6 +44,10 @@ export interface Paper {
   arxiv_id?: string;
   abstract?: string;
   summary?: string;  // DEVONthink Finder Comment (article summary)
+  lay_summary?: string;  // LLM-generated accessible summary
+  short_description?: string;  // LLM-generated concise description (1-2 sentences)
+  insights?: string[];  // LLM-generated key insights (3-5 items)
+  citations?: Record<string, string>;  // LLM-generated citations in multiple formats
   coverImage: string;
   keywords: string[];
   subject_areas: string[];

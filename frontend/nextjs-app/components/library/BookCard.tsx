@@ -131,7 +131,7 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
           style={{
             backgroundImage: getBackgroundImage(),
           }}
-          title={`${paper.title}\n\n${paper.summary || 'No summary available'}`}
+          title={`${paper.title}\n\n${paper.short_description || paper.summary || 'No summary available'}`}
         >
           {/* Literature Type Badge */}
           {paper.literature_type && paper.literature_type !== 'PEER_REVIEWED' && (

@@ -111,6 +111,9 @@ export default function PaperAnnotationPage() {
                 annotations={annotations}
                 paperTitle={paper?.title || 'Document'}
                 paperSummary={paper?.summary}
+                shortDescription={paper?.short_description}
+                laySummary={paper?.lay_summary}
+                insights={paper?.insights}
               />
             )}
             
