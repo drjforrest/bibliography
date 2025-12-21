@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 
@@ -20,7 +19,6 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initialMessages = [], onMessagesChange }: ChatPanelProps) {
-  const { token, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +50,7 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
   }, [isOpen]);
 
   const sendMessage = async (content: string) => {
-    if (!content.trim() || !token) return;
+    if (!content.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -87,10 +85,10 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
         requestData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          responseType: 'stream'
+          responseType: 'stream',
+          withCredentials: true
         }
       );
 
