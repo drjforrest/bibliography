@@ -15,6 +15,7 @@ from app.routes.devonthink_sync_routes import router as devonthink_router
 # from app.routes.enhanced_rag_routes import router as enhanced_rag_router
 from app.routes.automated_ingestion_routes import router as automated_ingestion_router
 from app.routes.admin_routes import router as admin_router
+from app.routes.clerk_routes import router as clerk_router
 from app.config import config
 
 from app.users import SECRET, auth_backend, fastapi_users, current_active_user
@@ -73,6 +74,7 @@ if config.AUTH_TYPE == "GOOGLE":
         tags=["auth"],
     )
 
+app.include_router(clerk_router, tags=["clerk"])
 app.include_router(crud_router, prefix="/api/v1", tags=["crud"])
 app.include_router(devonthink_router, prefix="/devonthink", tags=["devonthink"])
 # TODO: Enhanced RAG router temporarily disabled - see import comment above

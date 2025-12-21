@@ -21,7 +21,10 @@ export default function TopicsPage() {
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
+    if (!isLoaded) {
+      return;
+    }
+    if (!isSignedIn) {
       setIsLoading(false);
       return;
     }

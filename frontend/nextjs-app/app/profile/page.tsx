@@ -32,11 +32,21 @@ export default function ProfilePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
+    // Wait for Clerk to finish loading. If loaded and not signed in,
+    // redirect to the sign-in page. Only fetch the profile when
+    // auth is loaded and the user is signed in.
+    if (!isLoaded) return;
+
+    if (isLoaded && !isSignedIn) {
+      // perform a client-side redirect to sign-in
+      router.push("/sign-in");
       return;
     }
-    fetchProfile();
-  }, [isLoaded, isSignedIn]);
+
+    if (isSignedIn) {
+      fetchProfile();
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -183,6 +193,22 @@ export default function ProfilePage() {
     if (profile?.avatar_url) return `${API_URL}${profile.avatar_url}`;
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || profile?.email || "User")}`;
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-600 dark:text-gray-400">Checking authentication...</div>
+      </div>
+    );
+  }
+
+  if (isLoaded && !isSignedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-600 dark:text-gray-400">Redirecting to sign-in...</div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

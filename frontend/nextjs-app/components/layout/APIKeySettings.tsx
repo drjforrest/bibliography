@@ -59,6 +59,7 @@ export default function APIKeySettings() {
       const data: any = {};
       if (openaiKey.trim()) data.openai_api_key = openaiKey.trim();
       if (anthropicKey.trim()) data.anthropic_api_key = anthropicKey.trim();
+      if (openrouterKey.trim()) data.openrouter_api_key = openrouterKey.trim();
 
       const response = await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/api-keys`,
@@ -73,6 +74,7 @@ export default function APIKeySettings() {
       setStatus(response.data);
       setOpenaiKey('');
       setAnthropicKey('');
+      setOpenrouterKey('');
       alert('API keys updated successfully!');
     } catch (error) {
       console.error('Failed to update API keys:', error);
@@ -151,9 +153,32 @@ export default function APIKeySettings() {
               />
             </div>
 
+            {/* OpenRouter Key */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                OpenRouter API Key
+                {status && (
+                  <span className={`ml-2 text-xs px-2 py-1 rounded ${
+                    status.openrouter_api_key_set
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                  }`}>
+                    {status.openrouter_api_key_set ? 'Set' : 'Not Set'}
+                  </span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={openrouterKey}
+                onChange={(e) => setOpenrouterKey(e.target.value)}
+                placeholder="sk-or-v1-..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
+              />
+            </div>
+
             <button
               onClick={updateKeys}
-              disabled={isLoading || (!openaiKey.trim() && !anthropicKey.trim())}
+              disabled={isLoading || (!openaiKey.trim() && !anthropicKey.trim() && !openrouterKey.trim())}
               className="w-full px-4 py-2 bg-[#4e989e] hover:bg-[#3d7a7f] disabled:bg-gray-400 text-white rounded-lg transition-colors"
             >
               {isLoading ? 'Updating...' : 'Update Keys'}

@@ -27,7 +27,10 @@ export default function HomePage() {
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
+    if (!isLoaded) {
+      return; // Keep loading state active while auth initializes
+    }
+    if (!isSignedIn) {
       setIsLoading(false);
       return;
     }

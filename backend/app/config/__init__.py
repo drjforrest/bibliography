@@ -146,6 +146,11 @@ class Config:
 
     # OAuth JWT
     SECRET_KEY = os.getenv("SECRET_KEY")
+    
+    # Clerk Authentication
+    CLERK_API_KEY = os.getenv("CLERK_SECRET_KEY")  # Clerk API key for backend
+    CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY")
+    CLERK_WEBHOOK_SIGNING_KEY = os.getenv("CLERK_WEBHOOK_SECRET")  # Webhook signing key
 
     # Unstructured API Key
     UNSTRUCTURED_API_KEY = os.getenv("UNSTRUCTURED_API_KEY")
