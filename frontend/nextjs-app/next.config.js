@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 const nextConfig = {
+  // Set the output file tracing root to the project root
+  // This resolves the warning about multiple lockfiles
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   images: {
     remotePatterns: [
       {
