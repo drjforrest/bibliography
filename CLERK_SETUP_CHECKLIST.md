@@ -21,66 +21,30 @@ Follow these steps to complete your Clerk authentication integration.
    - Go to [https://clerk.com](https://clerk.com)
    - Sign up for a free account
 
-2. **Create Application**
-
-   - Click "Add application"
-   - Name it "Hero Evidence Library"
-   - Choose authentication methods (Email, Google, etc.)
-
-3. **Get API Keys**
-
-   - Go to "API Keys" in sidebar
-   - Copy **Publishable key** (starts with `pk_test_`)
-   - Copy **Secret key** (starts with `sk_test_`)
-
-4. **Create Webhook**
-   - Go to "Webhooks" in sidebar
-   - Click "Add Endpoint"
-   - **Endpoint URL**: `http://your-backend-domain/webhooks/clerk`
-     - For local dev: Use ngrok (see below)
-   - **Subscribe to events**:
-     - ✅ `user.created`
-     - ✅ `user.updated`
-     - ✅ `user.deleted`
-   - Copy **Signing Secret** (starts with `whsec_`)
-
 ### Step 2: Configure Environment Variables
 
 **Backend** - Create/Edit `backend/.env`:
 
-```bash
-# Add these lines (replace with your actual Clerk keys from dashboard)
-CLERK_SECRET_KEY=
-CLERK_PUBLISHABLE_KEY=
-CLERK_WEBHOOK_SECRET=
-```
-
 **Frontend** - Create/Edit `frontend/nextjs-app/.env.local`:
 
-```bash
-# Add these lines (replace with your actual Clerk keys from dashboard)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-```
-
-### Step 3: Install Dependencies
-
-```bash
 # Backend
+
 cd backend
 pip install -r requirements.txt
 
 # Frontend (already installed)
+
 cd frontend/nextjs-app
 npm install
-```
+
+````
 
 ### Step 4: Run Database Migration
 
 ```bash
 cd backend
 python scripts/add_clerk_user_id_migration.py
-```
+````
 
 Expected output:
 

@@ -3,7 +3,7 @@
 import { useAuth, useUser } from "@clerk/nextjs";
 import axios from "axios";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface UserProfile {
   id: string;
@@ -31,31 +31,7 @@ export default function ProfilePage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  useEffect(() => {
-    // Wait for Clerk to finish loading. If loaded and not signed in,
-    // redirect to the sign-in page. Only fetch the profile when
-    // auth is loaded and the user is signed in.
-    if (!isLoaded) return;
-
-    if (isLoaded && !isSignedIn) {
-      // perform a client-side redirect to sign-in
-      router.push("/sign-in");
-      return;
-    }
-
-    if (isSignedIn) {
-      fetchProfile();
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  // Track unsaved changes
-  useEffect(() => {
-    const originalDisplayName = profile?.display_name || "";
-    const originalBio = profile?.bio || "";
-    setHasUnsavedChanges(displayName !== originalDisplayName || bio !== originalBio || !!avatarFile || !!openrouterKey.trim());
-  }, [displayName, bio, avatarFile, openrouterKey, profile]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     const token = await getToken();
     if (!token) return;
 
@@ -75,7 +51,31 @@ export default function ProfilePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getToken, API_URL]);
+
+  useEffect(() => {
+    // Wait for Clerk to finish loading. If loaded and not signed in,
+    // redirect to the sign-in page. Only fetch the profile when
+    // auth is loaded and the user is signed in.
+    if (!isLoaded) return;
+
+    if (isLoaded && !isSignedIn) {
+      // perform a client-side redirect to sign-in
+      router.push("/sign-in");
+      return;
+    }
+
+    if (isSignedIn) {
+      fetchProfile();
+    }
+  }, [isLoaded, isSignedIn, router, fetchProfile]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    const originalDisplayName = profile?.display_name || "";
+    const originalBio = profile?.bio || "";
+    setHasUnsavedChanges(displayName !== originalDisplayName || bio !== originalBio || !!avatarFile || !!openrouterKey.trim());
+  }, [displayName, bio, avatarFile, openrouterKey, profile]);
 
   const showMessage = (type: "success" | "error", text: string) => {
     setMessage({ type, text });
