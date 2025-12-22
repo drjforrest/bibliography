@@ -100,13 +100,30 @@ rsync -avz -e "ssh -o Ciphers=aes256-gcm@openssh.com" \
     --exclude='frontend/nextjs-app/.next' \
     "$SCRIPT_DIR/" ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/
 
-# Copy production environment file if it exists
+# Copy production environment files
 if [ -f ".env.production" ]; then
-    print_status "Copying production .env file..."
-    scp -o Ciphers=aes256-gcm@openssh.com .env.production ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/backend/.env
-    print_status "✓ Production .env file copied"
+    print_status "Copying production .env template..."
+    scp -o Ciphers=aes256-gcm@openssh.com .env.production ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/backend/.env.template
+    
+    # If local secrets file exists, merge it
+    if [ -f ".env.production.local" ]; then
+        print_status "Copying production secrets..."
+        scp -o Ciphers=aes256-gcm@openssh.com .env.production.local ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/backend/.env.secrets
+        print_status "✓ Merging environment files on server..."
+        ssh ${SERVER_USER}@${SERVER_HOST} "cd ${SERVER_PATH}/backend && cat .env.template .env.secrets > .env && rm .env.secrets"
+    else
+        print_warning "⚠ No .env.production.local found - copying template only"
+        ssh ${SERVER_USER}@${SERVER_HOST} "cd ${SERVER_PATH}/backend && cp .env.template .env"
+        print_warning "⚠ You'll need to manually update secrets in backend/.env on the server"
+    fi
 else
     print_warning "⚠ No .env.production file found - make sure to set up environment variables on the server"
+fi
+
+# Copy frontend production environment
+if [ -f "frontend/nextjs-app/.env.production.local" ]; then
+    print_status "Copying frontend production secrets..."
+    scp -o Ciphers=aes256-gcm@openssh.com frontend/nextjs-app/.env.production.local ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/frontend/nextjs-app/.env.local
 fi
 
 print_status "Setting up production environment and restarting services..."
@@ -218,12 +235,16 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
     nvm install 22 2>/dev/null || true
     nvm use 22 2>/dev/null || nvm use default
 
-    # Create production .env.local for frontend
-    echo 'Setting up production frontend environment variables...'
-    cat > .env.local << EOF
+    # Check if .env.local exists (copied from .env.production.local earlier)
+    if [ ! -f .env.local ]; then
+        echo 'Creating minimal production .env.local for frontend...'
+        cat > .env.local << EOF
 # Frontend .env.local for hero-evidence-library Project - Production
 NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT}
 EOF
+    else
+        echo '✓ Using .env.local copied from production secrets'
+    fi
 
     npm install --production
 

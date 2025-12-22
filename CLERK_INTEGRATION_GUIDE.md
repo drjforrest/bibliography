@@ -37,24 +37,6 @@ The application now uses **Clerk** for authentication instead of the previous fa
 
 ### 2. Get Your Clerk Credentials
 
-From your Clerk Dashboard ([dashboard.clerk.com](https://dashboard.clerk.com)):
-
-1. **API Keys** (in sidebar):
-
-   - Copy `Publishable Key` (starts with `pk_test_` or `pk_live_`)
-   - Copy `Secret Key` (starts with `sk_test_` or `sk_live_`)
-
-2. **Webhooks** (in sidebar):
-   - Click "Add Endpoint"
-   - URL: `https://your-backend-url.com/webhooks/clerk`
-   - Subscribe to events:
-     - `user.created`
-     - `user.updated`
-     - `user.deleted`
-   - Copy the **Signing Secret** (starts with `whsec_`)
-
-### 5. Install Backend Dependencies
-
 ```bash
 cd backend
 pip install -r requirements.txt
@@ -193,13 +175,6 @@ If you have existing users in your database:
 4. No data is lost, and all user relationships are preserved
 
 ## Troubleshooting
-
-### Webhook Not Receiving Events
-
-1. Check that your backend is publicly accessible (use ngrok for local dev)
-2. Verify the webhook URL in Clerk Dashboard matches your backend URL
-3. Check that you subscribed to the correct events
-4. Check backend logs for webhook errors
 
 ### Users Not Being Created
 

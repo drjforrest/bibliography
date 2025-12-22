@@ -79,7 +79,8 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
-.env.production
+# Note: .env.production is NOT ignored - it contains placeholders for deployment
+# Real secrets go in .env.production.local (which IS ignored)
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
