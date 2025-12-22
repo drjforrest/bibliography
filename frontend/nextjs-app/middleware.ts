@@ -13,10 +13,11 @@ const isProtectedRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
-    const signInUrl = new URL('/auth/login', req.url)
+    // Use external Clerk hosted sign-in page
+    const clerkSignInUrl = process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || 'https://accounts.counterforce-hero.tech/sign-in'
     await auth.protect({
-      unauthenticatedUrl: signInUrl.toString(),
-      unauthorizedUrl: signInUrl.toString(),
+      unauthenticatedUrl: clerkSignInUrl,
+      unauthorizedUrl: clerkSignInUrl,
     })
   }
 })
