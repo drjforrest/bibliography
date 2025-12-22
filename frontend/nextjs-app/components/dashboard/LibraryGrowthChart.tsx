@@ -124,7 +124,7 @@ export default function LibraryGrowthChart() {
                 }}
                 labelStyle={{ color: '#f3f4f6' }}
                 labelFormatter={(value) => formatDate(value as string)}
-                formatter={(value: number) => [value, 'Total Papers']}
+                formatter={(value) => [typeof value === 'number' ? value : 0, 'Total Papers']}
               />
               <Area
                 type="monotone"
