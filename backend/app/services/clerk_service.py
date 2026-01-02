@@ -51,7 +51,7 @@ class ClerkService:
                         self._jwks_cache = await response.json()
             except Exception as e:
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=f"Failed to fetch JWKS: {str(e)}",
                 )
         return self._jwks_cache
@@ -158,10 +158,7 @@ class ClerkService:
                 **decode_kwargs,
             )
 
-            logger.info(
-                f"Token verified successfully for user: {decoded.get('sub')}, "
-                f"email: {decoded.get('email')}"
-            )
+            logger.info(f"Token verified successfully for user: {decoded.get('sub')}")
             return decoded
 
         except jwt.ExpiredSignatureError as e:
@@ -238,7 +235,15 @@ class ClerkService:
         if user:
             # Update user information if changed
             updated = False
-            if email and user.email != email:
+            # If email is missing from token but user exists, log warning (configuration issue)
+            # but continue using existing user's email
+            if not email:
+                logger.warning(
+                    f"Email missing from Clerk token for existing user {clerk_user_id}. "
+                    f"Using existing email from database: {user.email}. "
+                    f"Please configure JWT template to include email field."
+                )
+            elif email and user.email != email:
                 user.email = email
                 updated = True
             if profile_image_url and user.avatar_url != profile_image_url:
@@ -301,11 +306,18 @@ class ClerkService:
             return user
 
         # Create new user
-        # If email is not provided, generate one from clerk_user_id
+        # Email should always be present in Clerk JWT tokens (configured in JWT template)
+        # If missing, this indicates a configuration issue that should be fixed
         if not email:
-            email = f"{clerk_user_id}@clerk.local"
-            logger.warning(
-                f"Email not in token for user {clerk_user_id}, using generated email: {email}"
+            logger.error(
+                f"Email missing from Clerk token for user {clerk_user_id}. "
+                f"This indicates the JWT template is not configured correctly. "
+                f"Please ensure the JWT template includes: {{'email': '{{{{user.primary_email_address}}}}'}}"
+            )
+            raise ValueError(
+                f"Email is required but missing from Clerk token for user {clerk_user_id}. "
+                f"Please configure the Clerk JWT template to include the email field. "
+                f"See docs/CLERK_JWT_TEMPLATE_REQUIREMENTS.md for details."
             )
 
         display_name = (

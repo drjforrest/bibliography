@@ -32,11 +32,11 @@ ingress:
   # Frontend (Next.js)
   - hostname: library.counterforce-hero.tech
     service: http://localhost:3400
-  
+
   # Backend API (FastAPI)
   - hostname: api.counterforce-hero.tech
     service: http://localhost:8400
-  
+
   # Catch-all (must be last)
   - service: http_status:404
 ```
@@ -90,9 +90,10 @@ Update `lib/api.ts` to use the API domain in production:
 
 ```typescript
 // Use dedicated API domain in production, localhost in development
-const API_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-  ? (process.env.NEXT_PUBLIC_API_URL || 'https://api.counterforce-hero.tech')
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+const API_URL =
+  typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? process.env.NEXT_PUBLIC_API_URL || "https://api.counterforce-hero.tech"
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8400";
 ```
 
 ## Step 6: Remove Next.js Rewrites (Optional)
@@ -124,12 +125,14 @@ async rewrites() {
 ## Step 8: Verify Setup
 
 1. **Test API domain directly:**
+
    ```bash
    curl https://api.counterforce-hero.tech/docs
    # Should show FastAPI docs
    ```
 
 2. **Test from browser:**
+
    - Open `https://library.counterforce-hero.tech`
    - Check Network tab - API calls should go to `api.counterforce-hero.tech`
    - Verify tokens are being sent in Authorization headers
@@ -141,15 +144,18 @@ async rewrites() {
 ## Troubleshooting
 
 ### API domain not resolving
+
 - Check DNS record in Cloudflare (should be proxied)
 - Verify tunnel config has the API route
 - Restart tunnel: `launchctl unload ... && launchctl load ...`
 
 ### CORS errors
+
 - Backend CORS is already configured to allow all origins
 - If issues persist, check browser console for specific CORS error
 
 ### 401 errors persist
+
 - Check that tokens are being sent (Network tab → Headers)
 - Verify backend can reach Clerk JWKS endpoint
 - Use `/debug/token` endpoint to test token verification
@@ -176,4 +182,3 @@ localhost:8400 (FastAPI Backend)
 - ✅ Clean separation: frontend domain vs API domain
 - ✅ Easier debugging (direct API access)
 - ✅ Better for API documentation (accessible at api.counterforce-hero.tech/docs)
-

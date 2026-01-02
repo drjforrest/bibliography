@@ -4,6 +4,7 @@ Clerk webhook routes for user synchronization.
 
 import json
 import logging
+import os
 from typing import Optional
 
 from app.config import config
@@ -17,6 +18,10 @@ from svix.webhooks import Webhook, WebhookVerificationError
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+# Check if debug endpoints should be enabled
+DEBUG_ENABLED = os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
 
 
 @router.post("/webhooks/clerk")
@@ -170,6 +175,8 @@ async def debug_token_verification(
     """
     Debug endpoint to test token verification and display token claims.
 
+    WARNING: This endpoint is only available in development environments.
+
     This endpoint helps diagnose authentication issues by:
     - Showing whether a token is present
     - Displaying token claims (iss, aud, sub, exp, etc.)
@@ -181,6 +188,10 @@ async def debug_token_verification(
     2. Token claims match expected values
     3. Issuer configuration is correct
     """
+    # Only allow in development
+    if ENVIRONMENT == "production":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
     debug_info = {
         "token_present": credentials is not None,
         "config": {

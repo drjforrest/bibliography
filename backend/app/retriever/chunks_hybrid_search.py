@@ -1,4 +1,4 @@
-class ChucksHybridSearchRetriever:
+class ChunksHybridSearchRetriever:
     def __init__(self, db_session):
         """
         Initialize the hybrid search retriever with a database session.
@@ -23,10 +23,10 @@ class ChucksHybridSearchRetriever:
         Returns:
             List of chunks sorted by vector similarity
         """
+        from app.config import config
+        from app.db import Chunk, Document, SearchSpace
         from sqlalchemy import select
         from sqlalchemy.orm import joinedload
-        from app.db import Chunk, Document, SearchSpace
-        from app.config import config
 
         # Get embedding for the query
         embedding_model = config.embedding_model_instance
@@ -69,9 +69,9 @@ class ChucksHybridSearchRetriever:
         Returns:
             List of chunks sorted by text relevance
         """
-        from sqlalchemy import select, func
-        from sqlalchemy.orm import joinedload
         from app.db import Chunk, Document, SearchSpace
+        from sqlalchemy import func, select
+        from sqlalchemy.orm import joinedload
 
         # Create tsvector and tsquery for PostgreSQL full-text search
         tsvector = func.to_tsvector("english", Chunk.content)
@@ -123,10 +123,10 @@ class ChucksHybridSearchRetriever:
         Returns:
             List of dictionaries containing chunk data and relevance scores
         """
-        from sqlalchemy import select, func, text
-        from sqlalchemy.orm import joinedload
-        from app.db import Chunk, Document, SearchSpace, DocumentType
         from app.config import config
+        from app.db import Chunk, Document, DocumentType, SearchSpace
+        from sqlalchemy import func, select, text
+        from sqlalchemy.orm import joinedload
 
         # Get embedding for the query
         embedding_model = config.embedding_model_instance

@@ -62,11 +62,9 @@ if [ ! -d "frontend/nextjs-app" ]; then
     exit 1
 fi
 
-print_status "Building frontend..."
-cd frontend/nextjs-app
-npm install
-npm run build
-cd ../..
+# Skip local build - we'll build on the server with production environment variables
+# This ensures the build uses the correct production API URLs and secrets
+print_status "Skipping local frontend build - will build on server with production environment..."
 
 print_status "Preparing backend..."
 # Just verify requirements exist, don't install locally
@@ -237,14 +235,33 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
 
     # Check if .env.local exists (copied from .env.production.local earlier)
     if [ ! -f .env.local ]; then
-        echo 'Creating minimal production .env.local for frontend...'
-        cat > .env.local << EOF
+        echo '⚠ No .env.local found - checking for .env.production.local...'
+        if [ -f .env.production.local ]; then
+            echo '✓ Found .env.production.local, using it as .env.local'
+            cp .env.production.local .env.local
+        elif [ -f .env.production ]; then
+            echo '✓ Found .env.production, using it as .env.local'
+            cp .env.production .env.local
+        else
+            echo '⚠ Creating minimal production .env.local for frontend...'
+            cat > .env.local << EOF
 # Frontend .env.local for hero-evidence-library Project - Production
-NEXT_PUBLIC_API_URL=https://library.counterforce-hero.tech
+# NOTE: This is a fallback - should use .env.production.local with actual secrets
+NEXT_PUBLIC_API_URL=https://api.counterforce-hero.tech
 BACKEND_URL=http://localhost:${BACKEND_PORT}
 EOF
+        fi
     else
-        echo '✓ Using .env.local copied from production secrets'
+        echo '✓ Using existing .env.local'
+    fi
+    
+    # Verify NEXT_PUBLIC_API_URL is set correctly
+    if grep -q "NEXT_PUBLIC_API_URL=https://api.counterforce-hero.tech" .env.local 2>/dev/null; then
+        echo '✓ NEXT_PUBLIC_API_URL is correctly set to api.counterforce-hero.tech'
+    elif grep -q "NEXT_PUBLIC_API_URL=" .env.local 2>/dev/null; then
+        echo '⚠ WARNING: NEXT_PUBLIC_API_URL in .env.local does not point to api.counterforce-hero.tech'
+        echo '   Current value:'
+        grep "NEXT_PUBLIC_API_URL=" .env.local || echo '   (not found)'
     fi
 
     npm install

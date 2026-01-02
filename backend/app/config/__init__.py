@@ -2,6 +2,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
+from typing import Optional
 
 from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
 from dotenv import load_dotenv
@@ -151,13 +152,38 @@ class Config:
     CLERK_API_KEY = os.getenv("CLERK_SECRET_KEY")  # Clerk API key for backend
     CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY")
     CLERK_WEBHOOK_SIGNING_KEY = os.getenv("CLERK_WEBHOOK_SECRET")  # Webhook signing key
-    CLERK_ISSUER = os.getenv("CLERK_ISSUER", "https://clerk.counterforce-hero.tech")
-    CLERK_JWKS_URL = os.getenv(
-        "CLERK_JWKS_URL", "https://clerk.counterforce-hero.tech/.well-known/jwks.json"
-    )
-    CLERK_AUDIENCE = os.getenv(
-        "CLERK_AUDIENCE"
-    )  # Optional: audience for token verification
+
+    # Environment-aware defaults for Clerk issuer and JWKS URL
+    # Prevents non-production environments from accidentally using production auth
+    APP_ENV = os.getenv("APP_ENV", "").lower()
+    if APP_ENV == "production":
+        # Only allow production defaults in explicit production environment
+        _default_clerk_issuer = "https://clerk.counterforce-hero.tech"
+        _default_clerk_jwks_url = (
+            "https://clerk.counterforce-hero.tech/.well-known/jwks.json"
+        )
+    else:
+        # For dev/staging/other environments, require explicit configuration
+        # Use placeholder values that will fail safely if not overridden
+        _default_clerk_issuer = None
+        _default_clerk_jwks_url = None
+
+    CLERK_ISSUER = os.getenv("CLERK_ISSUER", _default_clerk_issuer)
+    if not CLERK_ISSUER:
+        raise ValueError(
+            "CLERK_ISSUER environment variable is required. "
+            f"Set APP_ENV=production to use production defaults, or set CLERK_ISSUER explicitly."
+        )
+
+    CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", _default_clerk_jwks_url)
+    if not CLERK_JWKS_URL:
+        raise ValueError(
+            "CLERK_JWKS_URL environment variable is required. "
+            f"Set APP_ENV=production to use production defaults, or set CLERK_JWKS_URL explicitly."
+        )
+
+    # Optional: audience for token verification (None means audience validation is skipped)
+    CLERK_AUDIENCE: Optional[str] = os.getenv("CLERK_AUDIENCE") or None
 
     # Unstructured API Key
     UNSTRUCTURED_API_KEY = os.getenv("UNSTRUCTURED_API_KEY")

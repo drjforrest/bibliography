@@ -23,10 +23,10 @@ class DocumentHybridSearchRetriever:
         Returns:
             List of documents sorted by vector similarity
         """
+        from app.config import config
+        from app.db import Document, SearchSpace
         from sqlalchemy import select
         from sqlalchemy.orm import joinedload
-        from app.db import Document, SearchSpace
-        from app.config import config
 
         # Get embedding for the query
         embedding_model = config.embedding_model_instance
@@ -70,9 +70,9 @@ class DocumentHybridSearchRetriever:
         Returns:
             List of documents sorted by text relevance
         """
-        from sqlalchemy import select, func
-        from sqlalchemy.orm import joinedload
         from app.db import Document, SearchSpace
+        from sqlalchemy import func, select
+        from sqlalchemy.orm import joinedload
 
         # Create tsvector and tsquery for PostgreSQL full-text search
         tsvector = func.to_tsvector("english", Document.content)
@@ -121,10 +121,10 @@ class DocumentHybridSearchRetriever:
             document_type: Optional document type to filter results (e.g., "FILE", "CRAWLED_URL")
 
         """
-        from sqlalchemy import select, func, text
-        from sqlalchemy.orm import joinedload
-        from app.db import Document, SearchSpace, DocumentType
         from app.config import config
+        from app.db import Document, DocumentType, SearchSpace
+        from sqlalchemy import func, select, text
+        from sqlalchemy.orm import joinedload
 
         # Get embedding for the query
         embedding_model = config.embedding_model_instance
@@ -229,18 +229,30 @@ class DocumentHybridSearchRetriever:
         if not documents_with_scores:
             return []
 
+        # Batch fetch all chunks for all documents to avoid N+1 queries
+        from app.db import Chunk
+
+        doc_ids = [document.id for document, score in documents_with_scores]
+        chunks_query = (
+            select(Chunk)
+            .where(Chunk.document_id.in_(doc_ids))
+            .order_by(Chunk.document_id, Chunk.id)
+        )
+        chunks_result = await self.db_session.execute(chunks_query)
+        all_chunks = chunks_result.scalars().all()
+
+        # Group chunks by document_id, preserving order
+        chunks_by_doc_id = {}
+        for chunk in all_chunks:
+            if chunk.document_id not in chunks_by_doc_id:
+                chunks_by_doc_id[chunk.document_id] = []
+            chunks_by_doc_id[chunk.document_id].append(chunk)
+
         # Convert to serializable dictionaries
         serialized_results = []
         for document, score in documents_with_scores:
-            # Fetch associated chunks for this document
-            from sqlalchemy import select
-            from app.db import Chunk
-
-            chunks_query = (
-                select(Chunk).where(Chunk.document_id == document.id).order_by(Chunk.id)
-            )
-            chunks_result = await self.db_session.execute(chunks_query)
-            chunks = chunks_result.scalars().all()
+            # Get chunks for this document from the grouped map
+            chunks = chunks_by_doc_id.get(document.id, [])
 
             # Concatenate chunks content
             concatenated_chunks_content = (
@@ -264,6 +276,9 @@ class DocumentHybridSearchRetriever:
                     "score": float(score),  # Ensure score is a Python float
                     "search_space_id": document.search_space_id,
                 }
+            )
+
+        return serialized_results
             )
 
         return serialized_results
