@@ -1,8 +1,8 @@
 import os
-from pathlib import Path
 import shutil
-
 import warnings
+from pathlib import Path
+
 from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
 from dotenv import load_dotenv
 from rerankers import Reranker
@@ -146,11 +146,18 @@ class Config:
 
     # OAuth JWT
     SECRET_KEY = os.getenv("SECRET_KEY")
-    
+
     # Clerk Authentication
     CLERK_API_KEY = os.getenv("CLERK_SECRET_KEY")  # Clerk API key for backend
     CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY")
     CLERK_WEBHOOK_SIGNING_KEY = os.getenv("CLERK_WEBHOOK_SECRET")  # Webhook signing key
+    CLERK_ISSUER = os.getenv("CLERK_ISSUER", "https://clerk.counterforce-hero.tech")
+    CLERK_JWKS_URL = os.getenv(
+        "CLERK_JWKS_URL", "https://clerk.counterforce-hero.tech/.well-known/jwks.json"
+    )
+    CLERK_AUDIENCE = os.getenv(
+        "CLERK_AUDIENCE"
+    )  # Optional: audience for token verification
 
     # Unstructured API Key
     UNSTRUCTURED_API_KEY = os.getenv("UNSTRUCTURED_API_KEY")

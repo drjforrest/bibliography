@@ -4,16 +4,16 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import LibraryGrowthChart from "@/components/dashboard/LibraryGrowthChart";
 import PapersByTopicChart from "@/components/dashboard/PapersByTopicChart";
 import Sidebar from "@/components/layout/Sidebar";
-import { api } from "@/lib/api";
+import { api, createAuthenticatedClient } from "@/lib/api";
 import type { DashboardStats, LiteratureTypeStats, Topic } from "@/types";
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS, LiteratureType } from "@/types";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +21,9 @@ export default function DashboardPage() {
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Create authenticated API client
+  const authenticatedApi = useMemo(() => createAuthenticatedClient(getToken), [getToken]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) {
@@ -34,10 +37,10 @@ export default function DashboardPage() {
         setError(null);
 
         const [dashboardStats, tagsData, activityData, notificationsData] = await Promise.all([
-          api.getDashboardStats(),
-          api.getTagHierarchy(),
-          api.getActivityFeed(10),
-          api.getNotifications(false, 10, 0),
+          authenticatedApi.get('/api/v1/dashboard/user').then(r => r.data),
+          authenticatedApi.get('/api/v1/tags/hierarchy').then(r => r.data),
+          authenticatedApi.get('/api/v1/dashboard/activity', { params: { limit: 10 } }).then(r => r.data),
+          authenticatedApi.get('/api/v1/notifications', { params: { unread_only: false, limit: 10, offset: 0 } }).then(r => r.data),
         ]);
 
         setStats(dashboardStats);
@@ -64,7 +67,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, authenticatedApi]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
@@ -105,9 +108,9 @@ export default function DashboardPage() {
 
   const handleMarkNotificationAsRead = async (notificationId: number) => {
     try {
-      await api.markNotificationAsRead(notificationId);
+      await authenticatedApi.post(`/api/v1/notifications/${notificationId}/read`);
       // Refresh notifications
-      const notificationsData = await api.getNotifications(false, 10, 0);
+      const notificationsData = await authenticatedApi.get('/api/v1/notifications', { params: { unread_only: false, limit: 10, offset: 0 } }).then(r => r.data);
       setNotifications(notificationsData.notifications || []);
       setUnreadCount(notificationsData.unread_count || 0);
     } catch (error) {
