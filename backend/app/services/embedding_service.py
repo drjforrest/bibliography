@@ -279,16 +279,38 @@ class EmbeddingService:
 
             # Create chunks using the configured chunker
             if hasattr(self.chunker, "chunk"):
-                chunk_texts = await asyncio.to_thread(
+                chunk_results = await asyncio.to_thread(
                     self.chunker.chunk, document.content
                 )
             elif callable(self.chunker):
-                chunk_texts = await asyncio.to_thread(self.chunker, document.content)
+                chunk_results = await asyncio.to_thread(self.chunker, document.content)
             else:
                 raise ValueError(f"Unknown chunker interface: {type(self.chunker)}")
 
-            if not chunk_texts:
+            if not chunk_results:
                 logger.warning(f"No chunks created for document {document.id}")
+                return False
+
+            # Extract text from chunks (chunker may return Chunk objects or strings)
+            chunk_texts = []
+            for chunk_item in chunk_results:
+                if isinstance(chunk_item, str):
+                    chunk_texts.append(chunk_item)
+                elif hasattr(chunk_item, "page_content"):
+                    # LangChain Document/Chunk object
+                    chunk_texts.append(chunk_item.page_content)
+                elif hasattr(chunk_item, "content"):
+                    # Chunk object with content attribute
+                    chunk_texts.append(chunk_item.content)
+                elif hasattr(chunk_item, "text"):
+                    # Chunk object with text attribute
+                    chunk_texts.append(chunk_item.text)
+                else:
+                    # Try to convert to string
+                    chunk_texts.append(str(chunk_item))
+            
+            if not chunk_texts:
+                logger.warning(f"No valid chunk texts extracted for document {document.id}")
                 return False
 
             # Generate embeddings for all chunks

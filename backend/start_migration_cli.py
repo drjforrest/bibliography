@@ -29,16 +29,24 @@ logger = logging.getLogger(__name__)
 
 
 async def create_default_search_space(session, user_id: UUID):
-    """Create a default search space if none exists"""
-    stmt = select(SearchSpace).where(SearchSpace.user_id == user_id)
+    """Get or create a default search space for DEVONthink migration"""
+    stmt = select(SearchSpace).where(SearchSpace.user_id == user_id).order_by(SearchSpace.id)
     result = await session.execute(stmt)
-    existing = result.scalar_one_or_none()
+    existing_spaces = result.scalars().all()
 
-    if existing:
-        logger.info(f"Using existing search space: {existing.name} (ID: {existing.id})")
-        return existing.id
+    if existing_spaces:
+        # Use the first existing search space (prefer one named "DEVONthink Migration" if it exists)
+        for space in existing_spaces:
+            if "DEVONthink" in space.name or "Migration" in space.name:
+                logger.info(f"Using existing search space: {space.name} (ID: {space.id})")
+                return space.id
+        
+        # Otherwise use the first one
+        first_space = existing_spaces[0]
+        logger.info(f"Using existing search space: {first_space.name} (ID: {first_space.id})")
+        return first_space.id
 
-    # Create default search space
+    # Create default search space if none exists
     search_space = SearchSpace(
         name="DEVONthink Migration",
         description="Automatically created for DEVONthink migration",
@@ -59,6 +67,7 @@ async def start_migration(
     folder_path: str = None,
     force_resync: bool = False,
     redis_url: str = None,
+    search_space_id: int = None,
 ):
     """Start the enhanced migration process"""
 
@@ -77,8 +86,23 @@ async def start_migration(
 
         # Create database session
         async with get_async_session_context() as session:
-            # Create or get search space
-            search_space_id = await create_default_search_space(session, user_uuid)
+            # Get or create search space
+            if search_space_id:
+                # Validate the provided search space exists and belongs to user
+                stmt = select(SearchSpace).where(
+                    SearchSpace.id == search_space_id,
+                    SearchSpace.user_id == user_uuid
+                )
+                result = await session.execute(stmt)
+                space = result.scalar_one_or_none()
+                if not space:
+                    logger.error(f"Search space {search_space_id} not found or not accessible")
+                    return False
+                final_search_space_id = space.id
+                logger.info(f"Using specified search space: {space.name} (ID: {final_search_space_id})")
+            else:
+                # Use default search space logic
+                final_search_space_id = await create_default_search_space(session, user_uuid)
 
             # Initialize enhanced migration service
             migration_service = EnhancedMigrationService(session, redis_url)
@@ -87,7 +111,7 @@ async def start_migration(
             job_id = await migration_service.start_complete_migration(
                 database_name=database_name,
                 user_id=user_uuid,
-                search_space_id=search_space_id,
+                search_space_id=final_search_space_id,
                 folder_path=folder_path,
                 force_resync=force_resync,
             )
@@ -107,12 +131,18 @@ async def start_migration(
                         break
 
                     phase = status.get("phase", "unknown")
-                    progress = status.get("progress", {})
-                    completed = progress.get("completed", 0)
-                    total = progress.get("total", 0)
+                    # get_job_stats returns completed_records and total_records directly
+                    completed = status.get("completed_records", 0)
+                    total = status.get("total_records", 0)
+                    failed = status.get("failed_records", 0)
+                    pending = status.get("pending_records", 0)
 
                     logger.info(f"📊 Current job status: {phase}")
                     logger.info(f"📈 Progress: {completed}/{total} records")
+                    if failed > 0:
+                        logger.info(f"   ⚠️  Failed: {failed} records")
+                    if pending > 0:
+                        logger.info(f"   ⏳ Pending: {pending} records")
 
                     # Check if completed
                     if phase in ["completed", "failed"]:
@@ -212,11 +242,16 @@ Prerequisites:
     parser.add_argument(
         "--database",
         "-d",
-        default="References",
-        help="DEVONthink database name (default: References)",
+        default="BIBLIOGRAPHY",
+        help="DEVONthink database name (default: BIBLIOGRAPHY)",
     )
     parser.add_argument(
         "--user-id", "-u", required=True, help="User UUID from the database (required)"
+    )
+    parser.add_argument(
+        "--search-space-id",
+        type=int,
+        help="Search space ID to use (optional, will use first available if not specified)",
     )
     parser.add_argument(
         "--folder",
@@ -249,6 +284,7 @@ Prerequisites:
                 folder_path=args.folder,
                 force_resync=args.force_resync,
                 redis_url=args.redis_url,
+                search_space_id=args.search_space_id,
             )
         )
 
