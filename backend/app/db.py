@@ -3,31 +3,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
 
-from fastapi import Depends
-from pgvector.sqlalchemy import Vector
-from sqlalchemy import (
-    ARRAY,
-    JSON,
-    TIMESTAMP,
-    Boolean,
-    Column,
-    Date,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Table,
-    Text,
-    text,
-)
-from sqlalchemy import Enum as SQLAlchemyEnum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, relationship
-
 from app.config import config
 from app.retriver.chunks_hybrid_search import ChucksHybridSearchRetriever
 from app.retriver.documents_hybrid_search import DocumentHybridSearchRetriever
+from fastapi import Depends
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import ARRAY, JSON, TIMESTAMP, Boolean, Column, Date
+from sqlalchemy import Enum as SQLAlchemyEnum
+from sqlalchemy import Float, ForeignKey, Integer, String, Table, Text, text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, relationship
 
 if config.AUTH_TYPE == "GOOGLE":
     from fastapi_users.db import (
@@ -547,8 +533,10 @@ class DevonthinkSync(BaseModel, TimestampMixin):
     )  # When the user deleted this record
 
     # Relations
+    # Note: ondelete="SET NULL" allows sync record to persist when paper is deleted
+    # This preserves the user_deleted flag to prevent re-syncing deleted papers
     scientific_paper_id = Column(
-        Integer, ForeignKey("scientific_papers.id", ondelete="CASCADE"), nullable=True
+        Integer, ForeignKey("scientific_papers.id", ondelete="SET NULL"), nullable=True
     )
     scientific_paper = relationship("ScientificPaper")
 

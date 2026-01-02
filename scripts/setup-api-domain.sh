@@ -48,6 +48,11 @@ if [ -z "$TUNNEL_ID" ]; then
     exit 1
 fi
 
+if [ -z "$CREDENTIALS_FILE" ]; then
+    print_error "Could not extract credentials file from config"
+    exit 1
+fi
+
 print_status "Found tunnel ID: $TUNNEL_ID"
 
 # Create new config with API domain
@@ -82,11 +87,14 @@ fi
 cat > "$FRONTEND_ENV" << 'EOF'
 # Use dedicated API domain in production
 NEXT_PUBLIC_API_URL=https://api.counterforce-hero.tech
-BACKEND_URL=http://localhost:8400
-EOF
-
-print_status "✅ Frontend environment updated"
-
+# Restart tunnel
+print_status "Restarting Cloudflare tunnel..."
+launchctl unload ~/Library/LaunchAgents/com.cloudflare.tunnel.hero-evidence-library.plist 2>/dev/null || true
+sleep 2
+if ! launchctl load ~/Library/LaunchAgents/com.cloudflare.tunnel.hero-evidence-library.plist 2>/dev/null; then
+    print_error "Failed to load Cloudflare tunnel. Check configuration at $CLOUDFLARED_CONFIG"
+    exit 1
+fi
 # Restart tunnel
 print_status "Restarting Cloudflare tunnel..."
 launchctl unload ~/Library/LaunchAgents/com.cloudflare.tunnel.hero-evidence-library.plist 2>/dev/null || true

@@ -2,9 +2,6 @@ import logging
 import os
 from typing import Dict, List, Optional
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.config import config
 from app.db import Document, DocumentType, ScientificPaper
 from app.services.embedding_service import EmbeddingService
@@ -12,6 +9,8 @@ from app.services.file_storage import FileStorageService
 from app.services.folder_watcher import folder_watcher_manager
 from app.services.llm_enrichment_service import LLMEnrichmentService
 from app.services.pdf_processor import PDFProcessor
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +340,9 @@ class PaperManagerService:
             return False
 
         # If this paper was synced from DEVONthink, mark the sync record as user_deleted
-        # This prevents the sync from re-adding it
+        # This prevents the sync from re-adding it.
+        # Note: The foreign key constraint uses ON DELETE SET NULL, so the sync record
+        # will persist after paper deletion, preserving the user_deleted flag.
         if paper.dt_source_uuid:
             stmt = select(DevonthinkSync).where(
                 DevonthinkSync.dt_uuid == paper.dt_source_uuid

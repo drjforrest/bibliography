@@ -53,8 +53,10 @@ async def get_current_user_from_clerk(
             session=session,
             clerk_user_id=clerk_user_id,
             email=email,
-            first_name=token_claims.get("first_name") or token_claims.get("given_name"),  # Support both naming conventions
-            last_name=token_claims.get("last_name") or token_claims.get("family_name"),  # Support both naming conventions
+            first_name=token_claims.get("first_name")
+            or token_claims.get("given_name"),  # Support both naming conventions
+            last_name=token_claims.get("last_name")
+            or token_claims.get("family_name"),  # Support both naming conventions
             profile_image_url=token_claims.get("picture"),
         )
 
@@ -109,20 +111,27 @@ async def require_clerk_auth(
         )
 
         if not clerk_user_id:
-            logger.error(f"Invalid token claims. Missing sub. Claims: {token_claims}")
+            # Log only safe identifiers to avoid PII exposure
+            claim_keys = list(token_claims.keys()) if token_claims else []
+            jti = token_claims.get("jti") if token_claims else None
+            safe_info = f"claim_keys={claim_keys}"
+            if jti:
+                safe_info += f", jti={jti}"
+            logger.error(f"Invalid token claims: missing sub. {safe_info}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token claims: missing user ID",
+                detail="Invalid token claims: missing sub",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
         # Get or create user in database
-        # If email is not in token, get_or_create_user will use existing user's email or generate one
+        # Email should always be present in Clerk JWT tokens (configured in JWT template)
+        # If missing, get_or_create_user will raise ValueError indicating configuration issue
         logger.debug(f"Getting or creating user: {clerk_user_id}")
         user = await clerk_service.get_or_create_user(
             session=session,
             clerk_user_id=clerk_user_id,
-            email=email,  # May be None - will be handled in get_or_create_user
+            email=email,  # Required - should be present in JWT token
             first_name=token_claims.get("first_name")
             or token_claims.get("given_name"),  # Support both naming conventions
             last_name=token_claims.get("last_name")
