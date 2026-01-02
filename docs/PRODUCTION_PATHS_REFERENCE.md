@@ -5,6 +5,7 @@ Quick reference for all important paths, commands, and configurations used in pr
 ## Server Access
 
 ### SSH Hosts
+
 ```bash
 # Primary mac-mini access (via Tailscale)
 ssh mac-mini
@@ -17,6 +18,7 @@ ssh mac-mini-local  # IP: 192.168.1.69
 ```
 
 ### SSH Configuration
+
 - **User**: `jforrest`
 - **SSH Config**: `~/.ssh/config`
 - **SSH Key**: `~/.ssh/Mac-mini` (managed by 1Password)
@@ -25,6 +27,7 @@ ssh mac-mini-local  # IP: 192.168.1.69
 ## Python & Package Management
 
 ### Python on mac-mini
+
 ```bash
 # Python is managed via pyenv
 export PYENV_ROOT=~/.pyenv
@@ -36,6 +39,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ```
 
 ### Pyenv Paths
+
 - **Root**: `~/.pyenv/`
 - **Versions**: `~/.pyenv/versions/`
 - **Shims**: `~/.pyenv/shims/`
@@ -44,6 +48,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ## Homebrew on mac-mini
 
 ### Homebrew Paths
+
 ```bash
 # Homebrew is at /usr/local (Intel Mac)
 /usr/local/bin/brew --version
@@ -53,6 +58,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ```
 
 ### Installed Packages
+
 ```bash
 /usr/local/bin/brew list | grep -E '(postgresql|pgvector|sshfs|cloudflared)'
 # - postgresql@17
@@ -64,6 +70,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ## PostgreSQL on mac-mini
 
 ### PostgreSQL Paths
+
 ```bash
 # PostgreSQL 17 installation
 /usr/local/opt/postgresql@17/
@@ -78,6 +85,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ```
 
 ### PostgreSQL Status
+
 ```bash
 # Service status
 /usr/local/bin/brew services list | grep postgresql
@@ -89,6 +97,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ```
 
 ### Production Database
+
 - **Database Name**: `hero_evidence_library_prod`
 - **User**: `postgres`
 - **Host**: `localhost`
@@ -98,6 +107,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ## Application Paths
 
 ### Local Development (drjforrest's laptop)
+
 ```
 /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/
 ├── backend/                 # FastAPI backend
@@ -114,6 +124,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ```
 
 ### Production (mac-mini)
+
 ```
 ~/production/hero-evidence-library/
 ├── backend/
@@ -126,6 +137,7 @@ python3 --version  # 3.12.9 (via pyenv)
 ## Deployment Scripts
 
 ### Available Scripts
+
 ```bash
 # Located in: /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/scripts/
 
@@ -143,12 +155,14 @@ python3 --version  # 3.12.9 (via pyenv)
 ## Service Ports
 
 ### Production Ports
+
 - **Backend API**: `8400`
 - **Frontend**: `3400`
 - **PostgreSQL**: `5432`
 - **PDF Tunnel**: `9999` (SSH tunnel from dev machine)
 
 ### Service URLs
+
 ```bash
 # Backend API
 http://localhost:8400
@@ -164,6 +178,7 @@ https://library.counterforce-hero.tech
 ## Environment Files
 
 ### Development (.env)
+
 ```
 Location: /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/backend/.env
 Database: postgresql+asyncpg://postgres:postgres@localhost:5432/bibliography_db
@@ -171,6 +186,7 @@ PDF Storage: ./data/pdfs
 ```
 
 ### Production (.env.production → backend/.env on mac-mini)
+
 ```
 Location (dev): /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/.env.production
 Location (prod): ~/production/hero-evidence-library/backend/.env
@@ -181,12 +197,14 @@ PDF Storage: /tmp/dev-pdfs (SSHFS mount)
 ## Log Files (on mac-mini)
 
 ### Application Logs
+
 ```bash
 ~/production/hero-evidence-library/hero_evidence_library_backend.log
 ~/production/hero-evidence-library/hero_evidence_library_frontend.log
 ```
 
 ### Viewing Logs
+
 ```bash
 # Backend logs
 ssh mac-mini "tail -f ~/production/hero-evidence-library/hero_evidence_library_backend.log"
@@ -198,6 +216,7 @@ ssh mac-mini "tail -f ~/production/hero-evidence-library/hero_evidence_library_f
 ## Common Commands
 
 ### Deployment Workflow
+
 ```bash
 # 1. From dev machine - deploy application
 ./deploy.sh
@@ -213,6 +232,7 @@ ssh mac-mini "cd ~/production/hero-evidence-library && ./scripts/health-check.sh
 ```
 
 ### Service Management
+
 ```bash
 # Check running services
 ssh mac-mini "ps aux | grep -E '(uvicorn|next|hero)' | grep -v grep"
@@ -226,6 +246,7 @@ ssh mac-mini "lsof -i:3400"  # Frontend
 ```
 
 ### Database Operations
+
 ```bash
 # Connect to production database
 ssh mac-mini "/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod"
@@ -240,15 +261,17 @@ ssh mac-mini "/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d 
 ## DEVONthink Sync
 
 ### DEVONthink MCP Configuration
+
 ```bash
 # Backend .env setting
 DEVONTHINK_MCP_BACKEND="real"
 
 # DEVONthink Database
-Database: "Reference"
+Database: "BIBLIOGRAPHY"
 ```
 
 ### Sync Endpoints
+
 ```bash
 # Full sync
 curl -X POST http://localhost:8400/api/v1/devonthink/sync
@@ -266,6 +289,7 @@ curl http://localhost:8400/api/v1/devonthink/health
 ## Troubleshooting
 
 ### SSH Issues
+
 ```bash
 # Check 1Password SSH agent
 SSH_AUTH_SOCK=~/.1password/agent.sock ssh-add -l
@@ -275,12 +299,14 @@ SSH_AUTH_SOCK=~/.1password/agent.sock ssh-add -l
 ```
 
 ### Python/Pyenv Issues on mac-mini
+
 ```bash
 # Set pyenv environment
 ssh mac-mini "export PYENV_ROOT=~/.pyenv && export PATH=\$PYENV_ROOT/shims:\$PATH && python3 --version"
 ```
 
 ### Database Connection Issues
+
 ```bash
 # Check PostgreSQL is running
 ssh mac-mini "/usr/local/opt/postgresql@17/bin/pg_isready -h localhost -p 5432"
@@ -300,22 +326,26 @@ ssh mac-mini "/usr/local/bin/brew services list | grep postgresql"
 ## Quick Copy-Paste Commands
 
 ### Deploy to production
+
 ```bash
 cd /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library
 ./deploy.sh
 ```
 
 ### Check production status
+
 ```bash
 ssh mac-mini "cd ~/production/hero-evidence-library && ./scripts/health-check.sh"
 ```
 
 ### View backend API docs
+
 ```bash
 open http://mac-mini:8400/docs
 ```
 
 ### Run DEVONthink sync
+
 ```bash
 ssh mac-mini "cd ~/production/hero-evidence-library && source backend/venv/bin/activate && curl -X POST http://localhost:8400/api/v1/devonthink/sync"
 ```

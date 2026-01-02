@@ -76,8 +76,11 @@ class DevonthinkMCPClient:
             # Import and use the real MCP client
             from .devonthink_mcp_client_real_v2 import DevonthinkMCPClientRealV2
 
-            # Create a real MCP client instance
-            real_client = DevonthinkMCPClientRealV2()
+            # Reuse the same real MCP client instance for persistent connection
+            if not hasattr(self, '_real_client') or self._real_client is None:
+                self._real_client = DevonthinkMCPClientRealV2()
+            
+            real_client = self._real_client
 
             # Map our tool calls to the real client methods
             try:
@@ -163,9 +166,8 @@ class DevonthinkMCPClient:
                     )
                     return await self._simulate_tool_call(tool_name, parameters)
 
-            finally:
-                # Clean up the client
-                await real_client.close()
+            # Don't close the client here - keep it persistent for reuse
+            # It will be closed when DevonthinkSyncService.close() is called
 
         except Exception as e:
             logger.error(f"Error calling real MCP for {tool_name}: {str(e)}")
@@ -432,6 +434,11 @@ class DevonthinkMCPClient:
         return None
 
     async def close(self):
-        """Clean up any resources"""
-        # No persistent connections to clean up in current implementation
-        pass
+        """Clean up any resources and close persistent MCP connection"""
+        if hasattr(self, '_real_client') and self._real_client is not None:
+            try:
+                await self._real_client.close()
+            except Exception as e:
+                logger.debug(f"Error closing real MCP client: {e}")
+            finally:
+                self._real_client = None

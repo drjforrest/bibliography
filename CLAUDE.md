@@ -162,7 +162,7 @@ This system supports two methods for importing papers from DEVONthink:
 
 **Setup Requirements**:
 1. Install DEVONthink MCP server: `npx -y mcp-server-devonthink`
-2. Configure database name (default: "Reference")
+2. Configure database name (default: "BIBLIOGRAPHY")
 3. Run sync via API endpoints
 
 **Database Models**:
@@ -273,6 +273,7 @@ Two major technical issues were resolved to achieve full functionality:
 - **Ready for**: Full 2000+ record migration when needed
 
 ### Next Steps
-- Run full migration of 2000+ records from DEVONthink "Reference" database
+- Run full migration of ~4000 records from DEVONthink "BIBLIOGRAPHY" database
 - Set up authentication flow for production use
 - Enable continuous monitoring for file changes
+- **See**: `docs/PRODUCTION_SYNC_SETUP.md` for permanent sync solution

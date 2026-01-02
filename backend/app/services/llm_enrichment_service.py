@@ -11,7 +11,7 @@ Provides reusable methods for enriching papers with LLM-generated content:
 import asyncio
 import logging
 import os
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 import aiohttp
 from sqlalchemy import select
@@ -31,27 +31,27 @@ class LLMEnrichmentService:
         self.session = session
 
         # Use LM Studio (OpenAI-compatible API)
-        self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv("LLM_API_BASE", "http://localhost:1234/v1")
+        self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv(
+            "LLM_API_BASE", "http://localhost:1234/v1"
+        )
         self.llm_model = os.getenv("FAST_LLM", "gpt-3.5-turbo")
         self.http_session: Optional[aiohttp.ClientSession] = None
         self.timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout
 
-        logger.info(f"LLM Enrichment Service initialized: {self.llm_base} with model {self.llm_model}")
+        logger.info(
+            f"LLM Enrichment Service initialized: {self.llm_base} with model {self.llm_model}"
+        )
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session."""
         if self.http_session is None or self.http_session.closed:
             self.http_session = aiohttp.ClientSession(
-                timeout=self.timeout,
-                headers={"Content-Type": "application/json"}
+                timeout=self.timeout, headers={"Content-Type": "application/json"}
             )
         return self.http_session
 
     async def _call_llm(
-        self,
-        messages: list,
-        max_tokens: int = 500,
-        temperature: float = 0.7
+        self, messages: list, max_tokens: int = 500, temperature: float = 0.7
     ) -> Optional[str]:
         """Call OpenAI-compatible LLM API."""
         try:
@@ -63,7 +63,7 @@ class LLMEnrichmentService:
                     "messages": messages,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
-                }
+                },
             ) as response:
                 if response.status == 200:
                     result = await response.json()
@@ -96,7 +96,9 @@ class LLMEnrichmentService:
                 logger.error(f"Paper {paper_id} not found")
                 return False
 
-            logger.info(f"Enriching paper {paper_id}: {paper.title[:60] if paper.title else 'Untitled'}...")
+            logger.info(
+                f"Enriching paper {paper_id}: {paper.title[:60] if paper.title else 'Untitled'}..."
+            )
 
             # Initialize or get existing extraction_metadata
             metadata = paper.extraction_metadata or {}
@@ -159,12 +161,12 @@ class LLMEnrichmentService:
             messages = [
                 {
                     "role": "system",
-                    "content": "You are a science communicator who explains research in accessible language for non-experts."
+                    "content": "You are a science communicator who explains research in accessible language for non-experts.",
                 },
                 {
                     "role": "user",
-                    "content": f"Write a 2-3 paragraph lay summary of this research paper. Use accessible language that a general audience can understand. Avoid jargon.\n\n{input_text}"
-                }
+                    "content": f"Write a 2-3 paragraph lay summary of this research paper. Use accessible language that a general audience can understand. Avoid jargon.\n\n{input_text}",
+                },
             ]
 
             result = await self._call_llm(messages, max_tokens=500, temperature=0.7)
@@ -174,7 +176,9 @@ class LLMEnrichmentService:
             logger.error(f"Error generating lay summary: {str(e)}")
             return None
 
-    async def _generate_short_description(self, paper: ScientificPaper) -> Optional[str]:
+    async def _generate_short_description(
+        self, paper: ScientificPaper
+    ) -> Optional[str]:
         """Generate a 1-2 sentence description."""
         try:
             # Prepare input text
@@ -187,12 +191,12 @@ class LLMEnrichmentService:
             messages = [
                 {
                     "role": "system",
-                    "content": "You are a technical writer who creates concise summaries of research papers."
+                    "content": "You are a technical writer who creates concise summaries of research papers.",
                 },
                 {
                     "role": "user",
-                    "content": f"Summarize this in one sentence:\n\n{input_text}"
-                }
+                    "content": f"Summarize this in one sentence:\n\n{input_text}",
+                },
             ]
 
             result = await self._call_llm(messages, max_tokens=200, temperature=0.5)
@@ -215,12 +219,12 @@ class LLMEnrichmentService:
             messages = [
                 {
                     "role": "system",
-                    "content": "You are a research analyst who extracts key insights from papers."
+                    "content": "You are a research analyst who extracts key insights from papers.",
                 },
                 {
                     "role": "user",
-                    "content": f"List 3-5 key insights from this paper. Return ONLY a valid JSON array of strings, like [\"insight 1\", \"insight 2\", ...].\n\n{input_text}"
-                }
+                    "content": f'List 3-5 key insights from this paper. Return ONLY a valid JSON array of strings, like ["insight 1", "insight 2", ...].\n\n{input_text}',
+                },
             ]
 
             result = await self._call_llm(messages, max_tokens=1200, temperature=0.7)
@@ -228,6 +232,7 @@ class LLMEnrichmentService:
             if result:
                 # Try to parse as JSON
                 import json
+
                 try:
                     # Clean up the response - remove markdown code blocks if present
                     cleaned = result.strip()
@@ -245,14 +250,17 @@ class LLMEnrichmentService:
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to parse insights as JSON: {result[:100]}")
                     # Fall back to splitting by newlines
-                    lines = [line.strip() for line in result.split('\n') if line.strip()]
+                    lines = [
+                        line.strip() for line in result.split("\n") if line.strip()
+                    ]
                     # Remove numbering like "1.", "2." etc.
                     cleaned_lines = []
                     for line in lines:
                         # Remove leading numbers and punctuation
                         import re
-                        cleaned = re.sub(r'^\d+\.\s*', '', line)
-                        cleaned = re.sub(r'^[-*•]\s*', '', cleaned)
+
+                        cleaned = re.sub(r"^\d+\.\s*", "", line)
+                        cleaned = re.sub(r"^[-*•]\s*", "", cleaned)
                         if cleaned:
                             cleaned_lines.append(cleaned)
                     return cleaned_lines[:5] if cleaned_lines else None
@@ -266,18 +274,26 @@ class LLMEnrichmentService:
     def _generate_citations(self, paper: ScientificPaper) -> Optional[Dict[str, str]]:
         """Generate citations in multiple formats."""
         try:
-            formatter = CitationFormatter()
-
             citations = {}
 
-            # Generate each format
-            for format_name in ['apa', 'mla', 'chicago', 'ieee', 'harvard', 'bibtex']:
+            # Generate standard citation formats
+            for format_name in ["apa", "mla", "chicago", "ieee", "harvard"]:
                 try:
-                    citation = formatter.format(paper, format_name)
+                    citation = CitationFormatter.format_citation(paper, format_name)
                     if citation:
                         citations[format_name] = citation
                 except Exception as e:
-                    logger.warning(f"Failed to generate {format_name} citation: {str(e)}")
+                    logger.warning(
+                        f"Failed to generate {format_name} citation: {str(e)}"
+                    )
+
+            # Generate BibTeX separately (uses different method)
+            try:
+                bibtex = CitationFormatter.format_bibtex(paper)
+                if bibtex:
+                    citations["bibtex"] = bibtex
+            except Exception as e:
+                logger.warning(f"Failed to generate bibtex citation: {str(e)}")
 
             return citations if citations else None
 
