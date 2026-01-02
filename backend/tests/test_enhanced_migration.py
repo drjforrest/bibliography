@@ -15,7 +15,7 @@ import asyncio
 import logging
 import os
 import sys
-from uuid import UUID, uuid4
+from uuid import UUID
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 

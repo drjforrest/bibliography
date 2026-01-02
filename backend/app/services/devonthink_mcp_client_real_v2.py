@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import subprocess
-from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -74,12 +73,16 @@ class DevonthinkMCPClientRealV2:
         user_home = os.path.expanduser("~")
         common_paths = [
             f"{user_home}/mcp-server-devonthink/dist/index.js",
-            "/Users/jforrest/mcp-server-devonthink/dist/index.js",  # Production server
             os.path.join(
                 os.path.dirname(__file__),
                 "../../../mcp-server-devonthink/dist/index.js",
             ),
         ]
+
+        # Add production path from environment variable if set
+        prod_path = os.getenv("MCP_SERVER_PRODUCTION_PATH")
+        if prod_path:
+            common_paths.append(prod_path)
 
         for path in common_paths:
             if os.path.exists(path):
@@ -157,7 +160,19 @@ class DevonthinkMCPClientRealV2:
         # Find node executable dynamically for cross-platform support
         node_path = self._find_node_executable()
 
-        if not os.path.exists(node_path) and node_path != "node":
+        # Validate node_path availability
+        node_available = False
+        if os.path.dirname(node_path) == "" or node_path == os.path.basename(node_path):
+            # node_path is a basename (e.g., "node"), check if it's in PATH
+            resolved_path = shutil.which(node_path)
+            if resolved_path:
+                node_available = True
+        else:
+            # node_path is a full path, check if it exists and is executable
+            if os.path.exists(node_path) and os.access(node_path, os.X_OK):
+                node_available = True
+
+        if not node_available:
             raise FileNotFoundError(
                 f"Node.js not found at {node_path}. "
                 f"Please install Node.js or set NODE_PATH environment variable."
@@ -248,7 +263,6 @@ class DevonthinkMCPClientRealV2:
         try:
             # Read response in chunks, accumulating until we have complete JSON
             # MCP protocol uses newline-delimited JSON, but responses can be very large
-            response_chunks = []
             buffer = b""
             max_size = 10 * 1024 * 1024  # 10MB max response size
             chunk_size = 1024 * 1024  # 1MB chunks
@@ -281,82 +295,81 @@ class DevonthinkMCPClientRealV2:
                     buffer += chunk
                     total_read += len(chunk)
 
-                    # Try to decode and find complete JSON
-                    try:
-                        text = buffer.decode("utf-8")
-                        # Look for complete JSON objects (ending with })
-                        # Count braces to find complete JSON
-                        brace_count = 0
-                        json_start = -1
-                        json_end = -1
+                    # Try to find a complete newline-delimited JSON line
+                    # MCP protocol uses newline-delimited JSON (NDJSON)
+                    while b"\n" in buffer:
+                        # Find the first newline
+                        newline_pos = buffer.find(b"\n")
+                        # Extract the line (including the newline)
+                        line_bytes = buffer[: newline_pos + 1]
+                        # Keep remaining bytes in buffer for next read
+                        buffer = buffer[newline_pos + 1 :]
 
-                        for i, char in enumerate(text):
-                            if char == "{":
-                                if json_start == -1:
-                                    json_start = i
-                                brace_count += 1
-                            elif char == "}":
-                                brace_count -= 1
-                                if brace_count == 0 and json_start != -1:
-                                    json_end = i + 1
-                                    break
-
-                        if json_end > 0:
-                            # Found complete JSON
-                            response_text = text[json_start:json_end]
-                            # Keep any remaining data in buffer for next response
-                            buffer = text[json_end:].encode("utf-8")
-                            return json.loads(response_text)
-
-                    except (UnicodeDecodeError, json.JSONDecodeError):
-                        # Not complete JSON yet, continue reading
-                        pass
+                        # Try to decode and parse the complete line
+                        try:
+                            # Decode the line (strip the newline for parsing)
+                            line_text = line_bytes.rstrip(b"\n\r").decode("utf-8")
+                            # Parse the complete JSON line
+                            response = json.loads(line_text)
+                            return response
+                        except UnicodeDecodeError:
+                            # Partial UTF-8 sequence, put the line back in buffer and continue reading
+                            buffer = line_bytes + buffer
+                            break
+                        except json.JSONDecodeError:
+                            # Invalid JSON on this line, log and continue to next line
+                            logger.warning(
+                                f"Failed to parse JSON line, continuing: {line_bytes[:100]}"
+                            )
+                            continue
 
                 except asyncio.TimeoutError:
-                    # If we have data, try to parse it anyway
+                    # If we have data, try to parse any complete lines
                     if buffer:
-                        try:
-                            text = buffer.decode("utf-8")
-                            # Look for complete JSON
-                            brace_count = 0
-                            json_start = -1
-                            json_end = -1
+                        # Try to find a complete newline-delimited JSON line
+                        while b"\n" in buffer:
+                            newline_pos = buffer.find(b"\n")
+                            line_bytes = buffer[: newline_pos + 1]
+                            buffer = buffer[newline_pos + 1 :]
 
-                            for i, char in enumerate(text):
-                                if char == "{":
-                                    if json_start == -1:
-                                        json_start = i
-                                    brace_count += 1
-                                elif char == "}":
-                                    brace_count -= 1
-                                    if brace_count == 0 and json_start != -1:
-                                        json_end = i + 1
-                                        break
-
-                            if json_end > 0:
-                                response_text = text[json_start:json_end]
-                                buffer = text[json_end:].encode("utf-8")
-                                return json.loads(response_text)
-                        except:
-                            pass
-                    # Continue reading if timeout but no complete JSON yet
+                            try:
+                                line_text = line_bytes.rstrip(b"\n\r").decode("utf-8")
+                                response = json.loads(line_text)
+                                return response
+                            except (UnicodeDecodeError, json.JSONDecodeError):
+                                # Invalid or incomplete line, continue to next line
+                                continue
+                    # Continue reading if timeout but no complete line yet
                     continue
 
-            # If we get here, try to parse whatever we have
+            # If we get here, try to parse whatever we have (EOF reached)
             if buffer:
+                # Try to parse any complete lines remaining in buffer
+                while b"\n" in buffer:
+                    newline_pos = buffer.find(b"\n")
+                    line_bytes = buffer[: newline_pos + 1]
+                    buffer = buffer[newline_pos + 1 :]
+
+                    try:
+                        line_text = line_bytes.rstrip(b"\n\r").decode("utf-8")
+                        response = json.loads(line_text)
+                        return response
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        # Invalid line, continue to next line
+                        continue
+
+                # If no newline found but we have data, try to parse it as a single JSON object
+                # (some responses might not end with newline)
                 try:
                     text = buffer.decode("utf-8").strip()
-                    # Remove any leading text before first {
-                    json_start = text.find("{")
-                    if json_start >= 0:
-                        text = text[json_start:]
-                    return json.loads(text)
+                    if text:
+                        return json.loads(text)
                 except (UnicodeDecodeError, json.JSONDecodeError) as e:
                     logger.error(
                         f"Failed to decode MCP response. Buffer length: {len(buffer)}"
                     )
                     logger.error(
-                        f"Buffer preview: {text[:1000] if 'text' in locals() else buffer[:1000]}"
+                        f"Buffer preview: {buffer[:1000].decode('utf-8', errors='replace')}"
                     )
                     raise Exception(f"Invalid JSON response from MCP server: {str(e)}")
 
@@ -385,8 +398,15 @@ class DevonthinkMCPClientRealV2:
             "params": {"name": tool_name, "arguments": arguments},
         }
 
+        logger.debug(
+            f"Sending MCP tool request: {tool_name} with {len(str(arguments))} bytes of arguments"
+        )
         await self._send_request(request)
+        logger.debug(f"Waiting for MCP tool response: {tool_name}")
         response = await self._read_response()
+        logger.debug(
+            f"Received MCP tool response: {tool_name} (response size: {len(str(response))} bytes)"
+        )
 
         if "error" in response:
             logger.error(f"MCP tool error: {response['error']}")
@@ -404,7 +424,7 @@ class DevonthinkMCPClientRealV2:
                             # Try to parse as JSON
                             parsed_content = json.loads(content[0]["text"])
                             return {"success": True, **parsed_content}
-                        except:
+                        except (json.JSONDecodeError, ValueError, TypeError):
                             # Return as text if not JSON - might be base64 content
                             # Check if this is the content field we're looking for
                             text_content = content[0]["text"]
@@ -461,8 +481,14 @@ class DevonthinkMCPClientRealV2:
             seen_uuids = set()  # Track unique records by UUID
             consecutive_empty_batches = 0
             max_empty_batches = 3  # Stop after 3 empty batches
+            batch_number = 0
+
+            logger.info(
+                f"Starting search for '{query}' in database '{database_name}' (limit: {limit})"
+            )
 
             while len(all_results) < limit:
+                batch_number += 1
                 # Calculate how many more records we need
                 remaining = limit - len(all_results)
                 current_batch_size = min(batch_size, remaining)
@@ -472,10 +498,27 @@ class DevonthinkMCPClientRealV2:
                     params["database"] = database_name
                 params["limit"] = current_batch_size
 
-                result = await self._call_tool("search", params)
+                logger.info(
+                    f"Search batch {batch_number}: requesting {current_batch_size} records (total unique so far: {len(all_results)})"
+                )
+
+                try:
+                    # Add timeout wrapper around the tool call
+                    result = await asyncio.wait_for(
+                        self._call_tool("search", params),
+                        timeout=180.0,  # 3 minute timeout per batch
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(
+                        f"Search batch {batch_number} timed out after 180 seconds"
+                    )
+                    raise Exception(f"Search timed out on batch {batch_number}")
 
                 if result.get("success"):
                     batch_results = result.get("results", [])
+                    logger.info(
+                        f"Search batch {batch_number} completed: received {len(batch_results)} records"
+                    )
 
                     if not batch_results:
                         # No more results
@@ -499,9 +542,18 @@ class DevonthinkMCPClientRealV2:
 
                     all_results.extend(unique_in_batch)
 
-                    logger.debug(
-                        f"Batch returned {len(batch_results)} records, {len(unique_in_batch)} unique (total unique: {len(all_results)})"
+                    logger.info(
+                        f"Batch {batch_number}: {len(batch_results)} records received, {len(unique_in_batch)} unique (total unique: {len(all_results)})"
                     )
+
+                    # If we got no unique records, the MCP server is returning duplicates
+                    # This means it doesn't support pagination - stop here
+                    if len(unique_in_batch) == 0:
+                        logger.info(
+                            f"No unique records in batch {batch_number} - MCP server doesn't support pagination. "
+                            f"Stopping search with {len(all_results)} total unique records."
+                        )
+                        break
 
                     # If we got fewer unique results than requested, we might be getting duplicates
                     # Continue anyway since we're deduplicating
@@ -586,8 +638,11 @@ class DevonthinkMCPClientRealV2:
                         )
                         return None
 
-                    # Remove any whitespace/newlines from the string
-                    content_str = "".join(content_val.split())
+                    # Remove only leading/trailing whitespace and newlines within
+                    # Base64 can have newlines for formatting but not spaces within the data
+                    content_str = (
+                        content_val.replace("\n", "").replace("\r", "").strip()
+                    )
 
                     # Check if the string is pure ASCII (required for base64)
                     try:
@@ -704,11 +759,19 @@ class DevonthinkMCPClientRealV2:
             result = await self._call_tool("copy_record_to_path", params)
 
             if result.get("success"):
+                try:
+                    self.process.kill()
+                    await self.process.wait()
+                except (ProcessLookupError, OSError) as e:
+                    logger.debug(f"Process already terminated: {e}")
+                finally:
+                    # Reset connection state since we killed the process
+                    self.process = None
+                    self._connection_initialized = False
                 return result
             else:
                 logger.error(f"Failed to copy record to path: {result}")
                 return None
-
         except Exception as e:
             logger.error(f"Error copying record to path: {str(e)}")
             return None
@@ -724,7 +787,7 @@ class DevonthinkMCPClientRealV2:
                 try:
                     self.process.kill()
                     await self.process.wait()
-                except:
+                except Exception:
                     pass
             except Exception as e:
                 logger.debug(f"Error closing MCP process: {e}")

@@ -35,7 +35,7 @@ async def test_paper_743():
             print("❌ Paper 743 not found!")
             return False
         
-        print(f"\n✅ Paper found in database")
+        print("\n✅ Paper found in database")
         print(f"   Database ID: {paper.id}")
         print(f"   Scientific Paper Title: {paper.title}")
         
@@ -57,13 +57,13 @@ async def test_paper_743():
         try:
             response = PaperResponse.from_orm(paper)
             
-            print(f"\n✅ PaperResponse created successfully")
+            print("\n✅ PaperResponse created successfully")
             print(f"   Response Title: {response.title}")
             print(f"   Has Summary: {bool(response.summary)}")
             if response.summary:
                 summary_len = len(response.summary)
                 print(f"   Summary length: {summary_len} chars")
-                print(f"\n   Summary preview (first 200 chars):")
+                print("\n   Summary preview (first 200 chars):")
                 print(f"   {response.summary[:200]}...")
             else:
                 print("   ❌ No summary in response!")

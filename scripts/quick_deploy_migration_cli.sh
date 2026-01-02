@@ -15,7 +15,7 @@ echo -e "${BLUE}Quick Deploy: Migration CLI Script${NC}"
 echo ""
 
 # Test SSH connection
-if ! ssh mac-mini "echo 'Connection successful'" 2>/dev/null; then
+if ! ssh mac-mini "echo 'Connection successful'" >/dev/null; then
     echo -e "${YELLOW}Error: Cannot connect to mac-mini${NC}"
     exit 1
 fi

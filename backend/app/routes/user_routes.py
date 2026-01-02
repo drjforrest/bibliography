@@ -6,7 +6,6 @@ from app.users import current_active_user
 from pydantic import BaseModel
 from typing import Optional
 import os
-import uuid
 from pathlib import Path
 
 router = APIRouter()

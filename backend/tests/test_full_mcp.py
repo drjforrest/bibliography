@@ -5,11 +5,9 @@ Full MCP Integration Test - Test the actual DEVONthink MCP server via npx
 
 import asyncio
 import json
-import subprocess
 import sys
 import os
-import tempfile
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 
 class MCPClient:
@@ -241,7 +239,7 @@ async def test_mcp_availability():
 
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10)
-            print(f"✅ MCP server is available")
+            print("✅ MCP server is available")
             print(f"   stdout: {stdout.decode().strip()}")
             if stderr.decode().strip():
                 print(f"   stderr: {stderr.decode().strip()}")

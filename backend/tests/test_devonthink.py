@@ -4,7 +4,6 @@ Simple test script for DEVONthink integration without starting the full server
 """
 
 import sys
-import os
 
 sys.path.insert(0, ".")
 
@@ -26,7 +25,7 @@ def test_imports():
         print("✅ DEVONthink MCP client imported successfully")
 
         print("Testing database models...")
-        from app.db import DevonthinkSync, DevonthinkFolder, DevonthinkSyncStatus
+        from app.db import DevonthinkFolder, DevonthinkSync, DevonthinkSyncStatus
 
         print("✅ DEVONthink database models imported successfully")
 

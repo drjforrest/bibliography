@@ -9,11 +9,9 @@ from app.users import current_active_user
 from app.schemas.messages import (
     MessageCreate,
     MessageResponse,
-    MessageListResponse,
     MessageTopicCreate,
     MessageTopicUpdate,
     MessageTopicResponse,
-    MessageTopicListResponse,
     UserInfo,
 )
 

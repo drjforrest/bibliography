@@ -1,7 +1,7 @@
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from datetime import datetime, timedelta
-from sqlalchemy import select, func, text, desc
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import (
@@ -10,7 +10,6 @@ from app.db import (
     SearchSpace,
     User,
     PaperAnnotation,
-    DocumentType,
     LiteratureType,
 )
 from app.schemas.dashboard import (

@@ -13,7 +13,7 @@ from pathlib import Path
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -99,7 +99,7 @@ async def delete_duplicates():
         # Commit all deletions
         await session.commit()
         logger.info(f"\n{'='*60}")
-        logger.info(f"DELETION COMPLETE")
+        logger.info("DELETION COMPLETE")
         logger.info(f"{'='*60}")
         logger.info(f"Total papers deleted: {total_deleted}")
         logger.info(f"Duplicate title sets processed: {len(duplicate_titles)}")

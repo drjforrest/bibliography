@@ -1,38 +1,41 @@
 #!/usr/bin/env python3
 """Direct test of SSH tunnel to verify it's working"""
+
 import asyncio
+import os
+
 import asyncpg
-import sys
+
 
 async def test():
     print("Testing direct connection through SSH tunnel (localhost:5433)...")
-    print("="*60)
-    
+    print("=" * 60)
+
     try:
         # Try connecting directly via asyncpg to port 5433
         # Force IPv4 to avoid IPv6 localhost issues
         conn = await asyncpg.connect(
-            host='127.0.0.1',  # Use IPv4 explicitly, not 'localhost' (which can use IPv6)
-            port=5433,  # SSH tunnel port
-            user='postgres',
-            password='postgres',
-            database='hero_evidence_library_prod',
-            timeout=5
+            host="127.0.0.1",  # Use IPv4 explicitly, not 'localhost' (which can use IPv6)
+            port=int(os.getenv("DB_PORT", "5433")),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME", "hero_evidence_library_prod"),
+            timeout=5,
         )
-        
+
         # Get server info
-        version = await conn.fetchval('SELECT version()')
-        server_addr = await conn.fetchval('SELECT inet_server_addr()')
-        server_port = await conn.fetchval('SELECT inet_server_port()')
-        db_name = await conn.fetchval('SELECT current_database()')
-        
-        print(f"✓ Connected successfully!")
+        version = await conn.fetchval("SELECT version()")
+        server_addr = await conn.fetchval("SELECT inet_server_addr()")
+        server_port = await conn.fetchval("SELECT inet_server_port()")
+        db_name = await conn.fetchval("SELECT current_database()")
+
+        print("✓ Connected successfully!")
         print(f"  Database: {db_name}")
         print(f"  Server address: {server_addr or 'N/A (local)'}")
         print(f"  Server port: {server_port or 'N/A (local)'}")
         print(f"  PostgreSQL version: {version[:60]}...")
         print()
-        
+
         if server_addr:
             print("🌐 REMOTE connection (mac-mini production)")
             print("   ✓ SSH tunnel is working correctly!")
@@ -44,20 +47,19 @@ async def test():
             print("   ❌ SSH tunnel not being used - connecting to local DB")
         else:
             print("🤔 Unclear connection status")
-        
+
         # Count records
         synced = await conn.fetchval(
-            'SELECT COUNT(*) FROM devonthink_sync WHERE sync_status = $1',
-            'synced'
+            "SELECT COUNT(*) FROM devonthink_sync WHERE sync_status = $1", "synced"
         )
-        papers = await conn.fetchval('SELECT COUNT(*) FROM scientific_papers')
-        
-        print(f"\n📊 Database contents:")
+        papers = await conn.fetchval("SELECT COUNT(*) FROM scientific_papers")
+
+        print("\n📊 Database contents:")
         print(f"   ✅ Synced records: {synced}")
         print(f"   📄 Total papers: {papers}")
-        
+
         await conn.close()
-        
+
     except Exception as e:
         print(f"✗ Connection failed: {e}")
         print("\n   This could mean:")
@@ -65,6 +67,6 @@ async def test():
         print("   - PostgreSQL isn't running on mac-mini")
         print("   - Wrong database name or credentials")
 
+
 if __name__ == "__main__":
     asyncio.run(test())
-

@@ -98,18 +98,18 @@ async def create_chat(
         return db_chat
     except HTTPException:
         raise
-    except IntegrityError as e:
+    except IntegrityError:
         await session.rollback()
         raise HTTPException(
             status_code=400,
             detail="Database constraint violation. Please check your input data.",
         )
-    except OperationalError as e:
+    except OperationalError:
         await session.rollback()
         raise HTTPException(
             status_code=503, detail="Database operation failed. Please try again later."
         )
-    except Exception as e:
+    except Exception:
         await session.rollback()
         raise HTTPException(
             status_code=500,

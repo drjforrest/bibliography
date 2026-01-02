@@ -18,7 +18,6 @@ import logging
 import os
 import sys
 from pathlib import Path
-from uuid import UUID
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -40,69 +39,70 @@ async def check_database_status(database_url: str = None, label: str = "DATABASE
     engine = create_async_engine(db_url, echo=False)
     async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
-    async with async_session_maker() as session:
-        print("\n" + "=" * 60)
-        print(f"{label} STATUS")
-        print("=" * 60)
+    try:
+        async with async_session_maker() as session:
+            print("\n" + "=" * 60)
+            print(f"{label} STATUS")
+            print("=" * 60)
 
-        # Count total papers
-        papers_count = await session.scalar(select(func.count(ScientificPaper.id)))
-        print(f"\n📄 Scientific Papers: {papers_count}")
+            # Count total papers
+            papers_count = await session.scalar(select(func.count(ScientificPaper.id)))
+            print(f"\n📄 Scientific Papers: {papers_count}")
 
-        # Count papers with DEVONthink UUID (imported from DEVONthink)
-        dt_papers = await session.scalar(
-            select(func.count(ScientificPaper.id)).where(
-                ScientificPaper.dt_source_uuid.isnot(None)
+            # Count papers with DEVONthink UUID (imported from DEVONthink)
+            dt_papers = await session.scalar(
+                select(func.count(ScientificPaper.id)).where(
+                    ScientificPaper.dt_source_uuid.isnot(None)
+                )
             )
-        )
-        print(f"   └─ From DEVONthink: {dt_papers}")
+            print(f"   └─ From DEVONthink: {dt_papers}")
 
-        # Count documents
-        docs_count = await session.scalar(select(func.count(Document.id)))
-        print(f"\n📚 Documents: {docs_count}")
+            # Count documents
+            docs_count = await session.scalar(select(func.count(Document.id)))
+            print(f"\n📚 Documents: {docs_count}")
 
-        # Count documents with embeddings
-        docs_with_embeddings = await session.scalar(
-            select(func.count(Document.id)).where(Document.embedding.isnot(None))
-        )
-        print(f"   └─ With embeddings: {docs_with_embeddings}")
-
-        # Count DEVONthink sync records
-        sync_count = await session.scalar(select(func.count(DevonthinkSync.id)))
-        print(f"\n🔄 DEVONthink Sync Records: {sync_count}")
-
-        # Count by sync status
-        from app.db import DevonthinkSyncStatus
-
-        synced_count = await session.scalar(
-            select(func.count(DevonthinkSync.id)).where(
-                DevonthinkSync.sync_status == DevonthinkSyncStatus.SYNCED
+            # Count documents with embeddings
+            docs_with_embeddings = await session.scalar(
+                select(func.count(Document.id)).where(Document.embedding.isnot(None))
             )
-        )
-        print(f"   └─ Synced: {synced_count}")
+            print(f"   └─ With embeddings: {docs_with_embeddings}")
 
-        # Count users
-        users_count = await session.scalar(select(func.count(User.id)))
-        print(f"\n👤 Users: {users_count}")
+            # Count DEVONthink sync records
+            sync_count = await session.scalar(select(func.count(DevonthinkSync.id)))
+            print(f"\n🔄 DEVONthink Sync Records: {sync_count}")
 
-        if users_count > 0:
-            result = await session.execute(select(User))
-            users = result.scalars().all()
-            print("   User IDs:")
-            for user in users:
-                print(f"   └─ {user.email}: {user.id}")
+            # Count by sync status
+            from app.db import DevonthinkSyncStatus
 
-        # Count search spaces
-        spaces_count = await session.scalar(select(func.count(SearchSpace.id)))
-        print(f"\n🔍 Search Spaces: {spaces_count}")
+            synced_count = await session.scalar(
+                select(func.count(DevonthinkSync.id)).where(
+                    DevonthinkSync.sync_status == DevonthinkSyncStatus.SYNCED
+                )
+            )
+            print(f"   └─ Synced: {synced_count}")
 
-        if spaces_count > 0:
-            result = await session.execute(select(SearchSpace))
-            spaces = result.scalars().all()
-            for space in spaces:
-                print(f"   └─ {space.name} (ID: {space.id})")
+            # Count users
+            users_count = await session.scalar(select(func.count(User.id)))
+            print(f"\n👤 Users: {users_count}")
 
-    await engine.dispose()
+            if users_count > 0:
+                result = await session.execute(select(User))
+                users = result.scalars().all()
+                print("   User IDs:")
+                for user in users:
+                    print(f"   └─ {user.email}: {user.id}")
+
+            # Count search spaces
+            spaces_count = await session.scalar(select(func.count(SearchSpace.id)))
+            print(f"\n🔍 Search Spaces: {spaces_count}")
+
+            if spaces_count > 0:
+                result = await session.execute(select(SearchSpace))
+                spaces = result.scalars().all()
+                for space in spaces:
+                    print(f"   └─ {space.name} (ID: {space.id})")
+    finally:
+        await engine.dispose()
 
 
 def check_csv_status(csv_path: str):
@@ -114,9 +114,9 @@ def check_csv_status(csv_path: str):
     csv_file = Path(csv_path)
     if not csv_file.exists():
         print(f"\n❌ CSV file not found: {csv_path}")
-        print(f"\n💡 Expected locations:")
-        print(f"   - ~/PDFs/Evidence_Library_Sync/active_library.csv")
-        print(f"   - /data/thumbnail_index.csv")
+        print("\n💡 Expected locations:")
+        print("   - ~/PDFs/Evidence_Library_Sync/active_library.csv")
+        print("   - /data/thumbnail_index.csv")
         return None
 
     print(f"\n✅ CSV file found: {csv_file}")
@@ -187,10 +187,16 @@ async def check_production_database():
     import subprocess
 
     try:
+        # Get database credentials from environment variables
+        pg_user = os.environ.get("PG_USER", "postgres")
+        pg_database = os.environ.get("PG_DATABASE", "hero_evidence_library_prod")
+        ssh_host = os.environ.get("SSH_HOST", "mac-mini")
+        psql_path = os.environ.get("PSQL_PATH", "/usr/local/opt/postgresql@17/bin/psql")
+
         # Use properly escaped command strings for zsh (prevents glob expansion of *)
         # Count scientific papers
         sql = "SELECT COUNT(*) FROM scientific_papers;"
-        cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
+        cmd_str = f"ssh {ssh_host} '{psql_path} -h localhost -U {pg_user} -d {pg_database} -t -c \"{sql}\"'"
         result = subprocess.run(
             cmd_str, shell=True, capture_output=True, text=True, check=True
         )
@@ -199,7 +205,7 @@ async def check_production_database():
 
         # Count DEVONthink papers
         sql = "SELECT COUNT(*) FROM scientific_papers WHERE dt_source_uuid IS NOT NULL;"
-        cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
+        cmd_str = f"ssh {ssh_host} '{psql_path} -h localhost -U {pg_user} -d {pg_database} -t -c \"{sql}\"'"
         result = subprocess.run(
             cmd_str, shell=True, capture_output=True, text=True, check=True
         )
@@ -208,7 +214,7 @@ async def check_production_database():
 
         # Count documents
         sql = "SELECT COUNT(*) FROM documents;"
-        cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
+        cmd_str = f"ssh {ssh_host} '{psql_path} -h localhost -U {pg_user} -d {pg_database} -t -c \"{sql}\"'"
         result = subprocess.run(
             cmd_str, shell=True, capture_output=True, text=True, check=True
         )
@@ -217,7 +223,7 @@ async def check_production_database():
 
         # Count DEVONthink sync records
         sql = "SELECT COUNT(*) FROM devonthink_sync;"
-        cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
+        cmd_str = f"ssh {ssh_host} '{psql_path} -h localhost -U {pg_user} -d {pg_database} -t -c \"{sql}\"'"
         result = subprocess.run(
             cmd_str, shell=True, capture_output=True, text=True, check=True
         )
@@ -236,7 +242,7 @@ async def check_production_database():
         print(f"   stderr: {e.stderr}")
         return None
     except FileNotFoundError:
-        print(f"\n❌ SSH not available or mac-mini not accessible")
+        print("\n❌ SSH not available or mac-mini not accessible")
         return None
 
 
@@ -299,15 +305,19 @@ async def main():
     if not args.production:
         engine = create_async_engine(config.DATABASE_URL, echo=False)
         async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
-        async with async_session_maker() as session:
-            papers_count = await session.scalar(select(func.count(ScientificPaper.id)))
-            dt_papers = await session.scalar(
-                select(func.count(ScientificPaper.id)).where(
-                    ScientificPaper.dt_source_uuid.isnot(None)
+        try:
+            async with async_session_maker() as session:
+                papers_count = await session.scalar(
+                    select(func.count(ScientificPaper.id))
                 )
-            )
-            local_stats = {"papers": papers_count, "dt_papers": dt_papers}
-        await engine.dispose()
+                dt_papers = await session.scalar(
+                    select(func.count(ScientificPaper.id)).where(
+                        ScientificPaper.dt_source_uuid.isnot(None)
+                    )
+                )
+                local_stats = {"papers": papers_count, "dt_papers": dt_papers}
+        finally:
+            await engine.dispose()
 
     # Summary
     print("\n" + "=" * 60)
@@ -318,7 +328,7 @@ async def main():
     expected_total = 4000  # User stated ~4000 records in DEVONthink
 
     if production_stats:
-        print(f"\n📊 Production Database:")
+        print("\n📊 Production Database:")
         print(f"   - Papers in database: {production_stats['papers']}")
         print(f"   - From DEVONthink: {production_stats['dt_papers']}")
 
@@ -326,10 +336,10 @@ async def main():
         if remaining_prod > 0:
             print(f"   - Remaining to import: ~{remaining_prod} records")
         else:
-            print(f"   ✅ All records imported!")
+            print("   ✅ All records imported!")
 
     if local_stats:
-        print(f"\n📊 Local Development Database:")
+        print("\n📊 Local Development Database:")
         print(f"   - Papers in database: {local_stats['papers']}")
         print(f"   - From DEVONthink: {local_stats['dt_papers']}")
 
@@ -343,29 +353,29 @@ async def main():
                     f"\n✅ Next Step (Local): Import remaining {remaining_local} records from CSV"
                 )
                 print(
-                    f"   Run: python backend/scripts/import_from_devonthink_csv.py \\"
+                    "   Run: python backend/scripts/import_from_devonthink_csv.py \\"
                 )
                 print(
-                    f"     --csv ../../data/thumbnail_index.csv --user-id <your-user-id>"
+                    "     --csv ../../data/thumbnail_index.csv --user-id <your-user-id>"
                 )
 
     # Recommendations
-    print(f"\n💡 Recommendations:")
+    print("\n💡 Recommendations:")
 
     if production_stats and production_stats["dt_papers"] < expected_total:
         print(
             f"   1. Complete DEVONthink sync on production (~{expected_total - production_stats['dt_papers']} remaining)"
         )
-        print(f"      SSH to mac-mini and run sync via API or migration CLI")
+        print("      SSH to mac-mini and run sync via API or migration CLI")
 
     if csv_record_count and csv_record_count > 0:
         print(f"   2. CSV file has {csv_record_count} records (including header)")
-        print(f"      Consider importing via CSV for better control")
+        print("      Consider importing via CSV for better control")
 
-    print(f"\n   3. For full DEVONthink database sync (~4000 records):")
-    print(f"      - Production: Use API endpoint or migration CLI on mac-mini")
-    print(f"      - Local: python backend/start_migration_cli.py \\")
-    print(f'              --database "BIBLIOGRAPHY" --user-id <your-user-id>')
+    print("\n   3. For full DEVONthink database sync (~4000 records):")
+    print("      - Production: Use API endpoint or migration CLI on mac-mini")
+    print("      - Local: python backend/start_migration_cli.py \\")
+    print('              --database "BIBLIOGRAPHY" --user-id <your-user-id>')
 
     print("\n" + "=" * 60 + "\n")
 

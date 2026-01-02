@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any
 
 from app.db import get_async_session, User
 from app.services.dashboard_service import DashboardService

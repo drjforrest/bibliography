@@ -5,11 +5,10 @@ CLI script to start DEVONthink migration using the Enhanced Migration Service
 
 import argparse
 import asyncio
-import json
 import logging
 import os
 import sys
-from uuid import UUID, uuid4
+from uuid import UUID
 
 # Add the backend directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

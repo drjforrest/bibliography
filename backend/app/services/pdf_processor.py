@@ -3,8 +3,7 @@ import logging
 import os
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import fitz  # PyMuPDF
 from sqlalchemy.ext.asyncio import AsyncSession

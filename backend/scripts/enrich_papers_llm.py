@@ -18,7 +18,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -347,7 +347,7 @@ Format: ["Insight 1", "Insight 2", "Insight 3"]"""
                         else:
                             logger.warning(f"Insights parsed but invalid: {insights}")
                     else:
-                        logger.warning(f"No JSON array found in insights response")
+                        logger.warning("No JSON array found in insights response")
                 except Exception as parse_error:
                     logger.warning(f"Failed to parse insights JSON: {str(parse_error)}")
 

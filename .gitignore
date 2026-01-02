@@ -298,5 +298,5 @@ cython_debug/
 
 #macOS
 .DS_Store
-CLERK_INTEGRATION_GUIDE.md
+frontend/nextjs-app/.env.production
 CLERK_SETUP_CHECKLIST.md

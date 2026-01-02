@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from enum import Enum
-from typing import Optional, List, Any
+from typing import Optional, List
 
 from langchain_core.runnables import RunnableConfig
 

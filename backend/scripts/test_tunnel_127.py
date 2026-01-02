@@ -2,9 +2,25 @@
 """Test SSH tunnel using 127.0.0.1 (IPv4) instead of localhost"""
 
 import asyncio
+import os
 import sys
 
 import asyncpg
+
+
+def get_env_var(name: str, default: str = None) -> str:
+    """Get environment variable with validation."""
+    value = os.environ.get(name, default)
+    if value is None:
+        print(f"✗ Error: Required environment variable '{name}' is not set")
+        print("\n💡 Please set the following environment variables:")
+        print("   - DB_HOST (database host, default: 127.0.0.1)")
+        print("   - DB_PORT (database port, default: 5433)")
+        print("   - DB_USER (database username, default: postgres)")
+        print("   - DB_PASSWORD (database password)")
+        print("   - DB_NAME (database name, default: hero_evidence_library_prod)")
+        sys.exit(1)
+    return value
 
 
 async def test():
@@ -14,11 +30,11 @@ async def test():
     try:
         # Use 127.0.0.1 explicitly (IPv4) to avoid IPv6 ::1 issues
         conn = await asyncpg.connect(
-            host="127.0.0.1",  # IPv4 localhost
-            port=5433,  # SSH tunnel port
-            user="postgres",
-            password="postgres",
-            database="hero_evidence_library_prod",
+            host=os.getenv("DB_HOST", "127.0.0.1"),  # IPv4 localhost
+            port=int(os.getenv("DB_PORT", "5433")),  # SSH tunnel port
+            user=os.getenv("DB_USER", "postgres"),
+            password=get_env_var("DB_PASSWORD"),
+            database=os.getenv("DB_NAME", "hero_evidence_library_prod"),
             timeout=5,
         )
 
@@ -28,7 +44,7 @@ async def test():
         server_port = await conn.fetchval("SELECT inet_server_port()")
         db_name = await conn.fetchval("SELECT current_database()")
 
-        print(f"✓ Connected successfully!")
+        print("✓ Connected successfully!")
         print(f"  Database: {db_name}")
         print(f"  Server address: {server_addr or 'N/A'}")
         print(f"  Server port: {server_port or 'N/A'}")
@@ -60,7 +76,7 @@ async def test():
             )
             papers = await conn.fetchval("SELECT COUNT(*) FROM scientific_papers")
 
-            print(f"\n📊 Database contents:")
+            print("\n📊 Database contents:")
             print(f"   ✅ Synced records: {synced}")
             print(f"   📄 Total papers: {papers}")
         except Exception as e:

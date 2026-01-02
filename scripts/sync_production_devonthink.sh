@@ -162,8 +162,6 @@ fi
 
 print_success "Found user ID: $USER_ID"
 
-# Check if DEVONthink is accessible (we'll check this via the API endpoint)
-print_info "Checking DEVONthink connection..."
 
 # Run the sync using the migration CLI
 print_info "Starting DEVONthink sync..."

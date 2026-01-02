@@ -91,7 +91,6 @@ async def create_documents(
             try:
                 # Save file to a temporary location to avoid stream issues
                 import tempfile
-                import aiofiles
                 import os
 
                 # Create temp file

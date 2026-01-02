@@ -1,28 +1,26 @@
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from contextlib import asynccontextmanager
-from typing import List, Optional
 
 from fastapi import Depends
-
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
+    JSON,
+    TIMESTAMP,
     Boolean,
     Column,
     Date,
-    Enum as SQLAlchemyEnum,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Table,
     Text,
     text,
-    TIMESTAMP,
 )
+from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, relationship
@@ -38,10 +36,7 @@ if config.AUTH_TYPE == "GOOGLE":
         SQLAlchemyUserDatabase,
     )
 else:
-    from fastapi_users.db import (
-        SQLAlchemyBaseUserTableUUID,
-        SQLAlchemyUserDatabase,
-    )
+    from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 
 DATABASE_URL = config.DATABASE_URL
 
@@ -236,7 +231,9 @@ class ScientificPaper(BaseModel, TimestampMixin):
     tag_objects = relationship("Tag", secondary="paper_tags", back_populates="papers")
 
     # Users who favorited this paper
-    favorited_by = relationship("User", secondary="user_favorites", back_populates="favorite_papers")
+    favorited_by = relationship(
+        "User", secondary="user_favorites", back_populates="favorite_papers"
+    )
 
 
 class PaperAnnotation(BaseModel, TimestampMixin):
@@ -457,7 +454,9 @@ class UserNotification(BaseModel, TimestampMixin):
 
     # Related entity information
     related_entity_type = Column(SQLAlchemyEnum(NotificationEntityType), nullable=True)
-    related_entity_id = Column(Integer, nullable=True)  # ID of the annotation/message/paper
+    related_entity_id = Column(
+        Integer, nullable=True
+    )  # ID of the annotation/message/paper
 
     # Read status
     is_read = Column(Boolean, nullable=False, default=False, index=True)
@@ -540,6 +539,12 @@ class DevonthinkSync(BaseModel, TimestampMixin):
         default=DevonthinkSyncStatus.PENDING,
     )
     error_message = Column(Text, nullable=True)  # Error details if sync failed
+    user_deleted = Column(
+        Boolean, nullable=False, default=False, index=True
+    )  # True if user deleted this record (prevents re-sync)
+    user_deleted_at = Column(
+        TIMESTAMP(timezone=True), nullable=True
+    )  # When the user deleted this record
 
     # Relations
     scientific_paper_id = Column(
@@ -614,13 +619,17 @@ if config.AUTH_TYPE == "GOOGLE":
         message_topics = relationship(
             "MessageTopic", back_populates="user", cascade="all, delete-orphan"
         )
-        messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
-        favorite_papers = relationship("ScientificPaper", secondary="user_favorites", back_populates="favorited_by")
+        messages = relationship(
+            "Message", back_populates="user", cascade="all, delete-orphan"
+        )
+        favorite_papers = relationship(
+            "ScientificPaper", secondary="user_favorites", back_populates="favorited_by"
+        )
         notifications = relationship(
             "UserNotification",
             back_populates="user",
             foreign_keys="UserNotification.user_id",
-            cascade="all, delete-orphan"
+            cascade="all, delete-orphan",
         )
 
 else:
@@ -647,13 +656,17 @@ else:
         message_topics = relationship(
             "MessageTopic", back_populates="user", cascade="all, delete-orphan"
         )
-        messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
-        favorite_papers = relationship("ScientificPaper", secondary="user_favorites", back_populates="favorited_by")
+        messages = relationship(
+            "Message", back_populates="user", cascade="all, delete-orphan"
+        )
+        favorite_papers = relationship(
+            "ScientificPaper", secondary="user_favorites", back_populates="favorited_by"
+        )
         notifications = relationship(
             "UserNotification",
             back_populates="user",
             foreign_keys="UserNotification.user_id",
-            cascade="all, delete-orphan"
+            cascade="all, delete-orphan",
         )
 
 

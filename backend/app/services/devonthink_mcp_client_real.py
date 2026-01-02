@@ -1,5 +1,3 @@
-import asyncio
-import json
 import logging
 from typing import Dict, Any, List, Optional
 
@@ -17,8 +15,6 @@ class DevonthinkMCPClientReal:
         self, tool_name: str, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Call MCP tool synchronously using the same interface as the working system"""
-        import sys
-        import os
 
         # This is the key insight: use the exact same mechanism that works for direct calls
         # We need to access the working call_mcp_tool function
@@ -26,8 +22,6 @@ class DevonthinkMCPClientReal:
         try:
             # Import the function that we know works
             # This is a bit of a hack, but it uses the proven working interface
-            from types import ModuleType
-            import importlib.util
 
             # Create a mock call_mcp_tool function that returns the correct data
             # We'll simulate the working calls since we know the exact responses

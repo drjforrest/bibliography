@@ -1,10 +1,9 @@
 import asyncio
 import aiohttp
-import json
 import logging
 import os
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +248,7 @@ Lay Summary:"""
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
         # Ensure it ends with proper punctuation
-        if cleaned and not cleaned[-1] in ".!?":
+        if cleaned and cleaned[-1] not in ".!?":
             cleaned += "."
 
         return cleaned

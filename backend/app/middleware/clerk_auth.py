@@ -2,10 +2,9 @@
 Clerk authentication middleware for FastAPI.
 """
 from typing import Optional
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.db import User, get_async_session
 from app.services.clerk_service import clerk_service
@@ -127,7 +126,7 @@ async def require_clerk_auth(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         # Log full exception server-side, but do not expose internal details to clients
         logger.exception("Error requiring Clerk authentication")
         raise HTTPException(

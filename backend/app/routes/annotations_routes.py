@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import Optional
 
 from app.db import get_async_session, User
 from app.services.annotation_service import AnnotationService
@@ -11,7 +11,6 @@ from app.schemas.papers import (
     AnnotationUpdate,
     AnnotationResponse,
     AnnotationListResponse,
-    PaperWithAnnotationsResponse,
 )
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])

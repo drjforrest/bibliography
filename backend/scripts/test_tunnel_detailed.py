@@ -2,6 +2,7 @@
 """Detailed test of SSH tunnel to see what database we're actually connecting to"""
 
 import asyncio
+import os
 import socket
 
 import asyncpg
@@ -34,9 +35,9 @@ async def test_tunnel():
         conn = await asyncpg.connect(
             host="127.0.0.1",
             port=5433,
-            user="postgres",
-            password="postgres",
-            database="hero_evidence_library_prod",
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME", "hero_evidence_library_prod"),
             timeout=5,
         )
 
@@ -47,7 +48,7 @@ async def test_tunnel():
         db_name = await conn.fetchval("SELECT current_database()")
         session_pid = await conn.fetchval("SELECT pg_backend_pid()")
 
-        print(f"\n   Connection details:")
+        print("\n   Connection details:")
         print(f"   - Database: {db_name}")
         print(f"   - PostgreSQL version: {version[:60]}...")
         print(f"   - Server address (from DB): {server_addr}")
@@ -60,7 +61,7 @@ async def test_tunnel():
                 "SELECT hostname FROM pg_stat_activity WHERE pid = pg_backend_pid()"
             )
             print(f"   - Hostname: {hostname}")
-        except:
+        except Exception:
             pass
 
         # Check if it's local or remote by examining the version string

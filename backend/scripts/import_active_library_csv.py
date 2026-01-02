@@ -6,7 +6,6 @@ This script processes the CSV with metadata alongside the PDFs
 
 import asyncio
 import csv
-import sys
 from pathlib import Path
 from uuid import UUID
 import logging
@@ -135,7 +134,7 @@ async def import_csv_records(csv_path: Path, user_id: UUID, search_space_id: int
                     await session.rollback()
                     continue
 
-        logger.info(f"\nImport complete:")
+        logger.info("\nImport complete:")
         logger.info(f"  Processed: {processed}")
         logger.info(f"  Skipped: {skipped}")
         logger.info(f"  Errors: {errors}")

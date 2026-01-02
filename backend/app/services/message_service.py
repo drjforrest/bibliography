@@ -3,7 +3,7 @@ from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db import Message, MessageTopic, User
+from app.db import Message, MessageTopic
 from app.schemas.messages import MessageCreate, MessageTopicCreate, MessageTopicUpdate
 
 

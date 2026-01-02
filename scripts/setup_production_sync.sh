@@ -38,7 +38,7 @@ CRON_EXISTS=$(crontab -l 2>/dev/null | grep -c "sync_production_devonthink.sh" |
 if [ "$CRON_EXISTS" -gt 0 ]; then
     echo -e "${YELLOW}Warning: Cron job already exists${NC}"
     echo "Current crontab entries:"
-    crontab -l | grep "sync_production_devonthink.sh"
+    crontab -l | grep "sync_production_devonthink.sh" || true
     echo ""
     read -p "Do you want to remove the existing entry and create a new one? (y/N): " -n 1 -r
     echo
@@ -79,14 +79,14 @@ case $FREQ_CHOICE in
 esac
 
 # Add cron job
-(crontab -l 2>/dev/null; echo "$CRON_SCHEDULE $SYNC_SCRIPT >> $CRON_LOG 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "$CRON_SCHEDULE $SYNC_SCRIPT >> $PROJECT_DIR/logs/cron_sync_$(date +%Y%m%d).log 2>&1") | crontab -
 
 echo ""
 echo -e "${GREEN}✓ Cron job set up successfully!${NC}"
 echo ""
 echo "Schedule: $DESCRIPTION"
 echo "Script: $SYNC_SCRIPT"
-echo "Log file: $CRON_LOG"
+echo "Log files: $PROJECT_DIR/logs/cron_sync_YYYYMMDD.log (dated daily)"
 echo ""
 echo "View cron jobs with: crontab -l"
 echo "Remove cron job with: crontab -e"
@@ -94,5 +94,5 @@ echo ""
 echo -e "${BLUE}Next steps:${NC}"
 echo "1. Test the sync script manually: $SYNC_SCRIPT"
 echo "2. Monitor the first automated sync"
-echo "3. Check logs at: $CRON_LOG"
+echo "3. Check logs at: $PROJECT_DIR/logs/cron_sync_\$(date +%Y%m%d).log"
 

@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 import pandas as pd
 from typing import Dict, List, Optional
-import io
-import base64
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/api/v1"
@@ -1464,7 +1462,7 @@ def devonthink_sync_panel(api: BibliographyAPI):
             if "error" in sync_result:
                 st.error(f"Sync failed: {sync_result['error']}")
             else:
-                st.success(f"✅ Sync completed!")
+                st.success("✅ Sync completed!")
                 st.json(sync_result)
 
     with col2:

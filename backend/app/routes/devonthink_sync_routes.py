@@ -1,31 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+import logging
+from datetime import datetime, timezone
 from typing import List
 from uuid import UUID
-from datetime import datetime, timezone
-import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 from app.db import (
-    get_async_session,
-    get_async_session_context,
-    DevonthinkSync,
     DevonthinkFolder,
+    DevonthinkSync,
     DevonthinkSyncStatus,
     SearchSpace,
+    User,
+    get_async_session,
+    get_async_session_context,
 )
 from app.schemas.devonthink_schemas import (
-    DevonthinkSyncRequest,
-    DevonthinkSyncResponse,
-    DevonthinkSyncStatus as SyncStatusSchema,
     DevonthinkFolderHierarchy,
     DevonthinkMonitorResponse,
+    DevonthinkSyncRequest,
+    DevonthinkSyncResponse,
 )
+from app.schemas.devonthink_schemas import DevonthinkSyncStatus as SyncStatusSchema
 from app.services.devonthink_sync_service import DevonthinkSyncService
 from app.users import current_active_user
-from app.db import User
 
 router = APIRouter(tags=["devonthink"])
 
@@ -344,6 +345,53 @@ async def remove_sync_record(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to remove sync record: {str(e)}"
+        )
+
+
+@router.post("/sync/{dt_uuid}/undelete")
+async def undelete_sync_record(
+    dt_uuid: str,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+):
+    """
+    Undelete a sync record that was marked as user_deleted.
+
+    This allows the record to be synced again from DEVONthink.
+    """
+    try:
+        # Find the sync record
+        stmt = select(DevonthinkSync).where(
+            DevonthinkSync.dt_uuid == dt_uuid, DevonthinkSync.user_id == user.id
+        )
+        result = await session.execute(stmt)
+        sync_record = result.scalar_one_or_none()
+
+        if not sync_record:
+            raise HTTPException(status_code=404, detail="Sync record not found")
+
+        if not sync_record.user_deleted:
+            return {
+                "success": True,
+                "message": "Sync record was not deleted, no action needed",
+            }
+
+        # Clear the user_deleted flag
+        sync_record.user_deleted = False
+        sync_record.user_deleted_at = None
+        await session.commit()
+
+        return {
+            "success": True,
+            "message": "Sync record undeleted - will be synced again on next sync",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to undelete sync record: {str(e)}"
         )
 
 

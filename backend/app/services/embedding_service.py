@@ -4,9 +4,9 @@ Embedding Service for handling embeddings with Ollama and pgvector
 
 import logging
 import asyncio
-from typing import List, Optional, Union
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.config import config
 from app.db import Document, Chunk

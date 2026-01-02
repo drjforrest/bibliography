@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, List, Optional, Any
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
