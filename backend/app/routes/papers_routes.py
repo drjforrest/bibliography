@@ -441,6 +441,50 @@ async def get_watcher_status(
     return WatcherStatusResponse(**status)
 
 
+@router.get("/for-devonthink-export")
+async def get_papers_for_devonthink_export(
+    limit: int = Query(100, le=500, description="Maximum number of papers to return"),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Get papers that were uploaded by users but not yet synced to DEVONthink.
+    
+    These papers have dt_source_uuid = NULL, meaning they were uploaded directly
+    to the library (not imported from DEVONthink). They can be exported back to
+    DEVONthink to complete bidirectional syncing.
+    
+    Returns papers that need to be synced TO DEVONthink.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.db import ScientificPaper, Document, SearchSpace
+    
+    # Query papers without dt_source_uuid (uploaded by users, not from DEVONthink)
+    # and belonging to the current user's search spaces
+    stmt = (
+        select(ScientificPaper)
+        .options(selectinload(ScientificPaper.document))
+        .join(Document)
+        .join(SearchSpace)
+        .where(
+            ScientificPaper.dt_source_uuid.is_(None),  # Not from DEVONthink
+            SearchSpace.user_id == user.id  # Belongs to current user
+        )
+        .order_by(ScientificPaper.created_at.desc())
+        .limit(limit)
+    )
+    
+    result = await session.execute(stmt)
+    papers = result.scalars().all()
+    
+    return {
+        "papers": [PaperResponse.from_orm(paper) for paper in papers],
+        "total": len(papers),
+        "message": f"Found {len(papers)} paper(s) ready for DEVONthink export"
+    }
+
+
 @router.get("/stats/by-room")
 async def get_papers_by_room(
     user: User = Depends(current_active_user),
