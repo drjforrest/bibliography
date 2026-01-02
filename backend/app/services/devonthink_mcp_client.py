@@ -430,4 +430,3 @@ class DevonthinkMCPClient:
                 self._real_client = None
                 self._real_client = None
                 self._real_client = None
-                self._real_client = None

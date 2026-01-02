@@ -191,28 +191,36 @@ async def check_production_database():
         # Count scientific papers
         sql = "SELECT COUNT(*) FROM scientific_papers;"
         cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
-        result = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd_str, shell=True, capture_output=True, text=True, check=True
+        )
         papers_count = int(result.stdout.strip())
         print(f"\n📄 Scientific Papers: {papers_count}")
 
         # Count DEVONthink papers
         sql = "SELECT COUNT(*) FROM scientific_papers WHERE dt_source_uuid IS NOT NULL;"
         cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
-        result = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd_str, shell=True, capture_output=True, text=True, check=True
+        )
         dt_papers = int(result.stdout.strip())
         print(f"   └─ From DEVONthink: {dt_papers}")
 
         # Count documents
         sql = "SELECT COUNT(*) FROM documents;"
         cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
-        result = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd_str, shell=True, capture_output=True, text=True, check=True
+        )
         docs_count = int(result.stdout.strip())
         print(f"\n📚 Documents: {docs_count}")
 
         # Count DEVONthink sync records
         sql = "SELECT COUNT(*) FROM devonthink_sync;"
         cmd_str = f"ssh mac-mini '/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -t -c \"{sql}\"'"
-        result = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd_str, shell=True, capture_output=True, text=True, check=True
+        )
         sync_count = int(result.stdout.strip())
         print(f"\n🔄 DEVONthink Sync Records: {sync_count}")
 
@@ -289,18 +297,17 @@ async def main():
 
     # Get local stats if not already fetched
     if not args.production:
-        async with create_async_engine(config.DATABASE_URL, echo=False) as engine:
-            async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
-            async with async_session_maker() as session:
-                papers_count = await session.scalar(
-                    select(func.count(ScientificPaper.id))
+        engine = create_async_engine(config.DATABASE_URL, echo=False)
+        async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with async_session_maker() as session:
+            papers_count = await session.scalar(select(func.count(ScientificPaper.id)))
+            dt_papers = await session.scalar(
+                select(func.count(ScientificPaper.id)).where(
+                    ScientificPaper.dt_source_uuid.isnot(None)
                 )
-                dt_papers = await session.scalar(
-                    select(func.count(ScientificPaper.id)).where(
-                        ScientificPaper.dt_source_uuid.isnot(None)
-                    )
-                )
-                local_stats = {"papers": papers_count, "dt_papers": dt_papers}
+            )
+            local_stats = {"papers": papers_count, "dt_papers": dt_papers}
+        await engine.dispose()
 
     # Summary
     print("\n" + "=" * 60)
