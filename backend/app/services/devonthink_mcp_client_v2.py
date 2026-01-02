@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from typing import Dict, Any, List, Optional
@@ -20,7 +19,6 @@ class DevonthinkMCPClientV2:
         
         # Import call_mcp_tool at runtime to avoid circular imports
         import sys
-        import os
         
         # Add the path to access call_mcp_tool
         sys.path.append('/Users/drjforrest/dev/devprojects/bibliography/backend')

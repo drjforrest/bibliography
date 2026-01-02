@@ -23,7 +23,7 @@ class ChucksHybridSearchRetriever:
         Returns:
             List of chunks sorted by vector similarity
         """
-        from sqlalchemy import select, func
+        from sqlalchemy import select
         from sqlalchemy.orm import joinedload
         from app.db import Chunk, Document, SearchSpace
         from app.config import config
@@ -69,7 +69,7 @@ class ChucksHybridSearchRetriever:
         Returns:
             List of chunks sorted by text relevance
         """
-        from sqlalchemy import select, func, text
+        from sqlalchemy import select, func
         from sqlalchemy.orm import joinedload
         from app.db import Chunk, Document, SearchSpace
 

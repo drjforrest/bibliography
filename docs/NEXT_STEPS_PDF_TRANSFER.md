@@ -46,7 +46,7 @@ python scripts/check_import_status.py --production
 Or manually via SSH:
 
 ```bash
-ssh mac-mini "/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -c 'SELECT COUNT(*) FROM scientific_papers WHERE dt_source_uuid IS NOT NULL;'"
+ssh <your-mac-hostname> "/usr/local/opt/postgresql@17/bin/psql -h localhost -U postgres -d hero_evidence_library_prod -c 'SELECT COUNT(*) FROM scientific_papers WHERE dt_source_uuid IS NOT NULL;'"
 ```
 
 ### Check Local Development Database

@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -380,18 +379,25 @@ class DevonthinkSyncService:
         """Sync a single PDF record from DEVONthink"""
         dt_uuid = record["uuid"]
 
-        # Check if already synced
+        # Check if already synced or user-deleted
         if not force_resync:
             stmt = select(DevonthinkSync).where(DevonthinkSync.dt_uuid == dt_uuid)
             result = await self.session.execute(stmt)
             existing_sync = result.scalar_one_or_none()
 
-            if (
-                existing_sync
-                and existing_sync.sync_status == DevonthinkSyncStatus.SYNCED
-            ):
-                logger.debug(f"Record {dt_uuid} already synced, skipping")
-                return
+            if existing_sync:
+                # Skip if user deleted this record
+                if existing_sync.user_deleted:
+                    logger.info(
+                        f"Record {dt_uuid} was deleted by user, skipping sync. "
+                        f"Use undelete API to restore if needed."
+                    )
+                    return
+
+                # Skip if already synced successfully
+                if existing_sync.sync_status == DevonthinkSyncStatus.SYNCED:
+                    logger.debug(f"Record {dt_uuid} already synced, skipping")
+                    return
 
         # Get detailed record properties
         record_props = await self.mcp_client.get_record_properties(record_uuid=dt_uuid)
@@ -438,17 +444,9 @@ class DevonthinkSyncService:
             pdf_path = await self._copy_pdf_binary(dt_uuid, local_uuid, record_props)
 
             # Step 2: Create scientific paper record (may return existing paper if DOI duplicate)
-            # Store whether paper is new before calling (paper might not be flushed yet)
-            paper_is_new = True
-            paper = await self._create_scientific_paper(
+            paper, paper_is_new = await self._create_scientific_paper(
                 local_uuid, record_props, pdf_path, search_space_id, dt_uuid
             )
-
-            # Check if paper is existing (loaded from DB) or new (just created)
-            from sqlalchemy import inspect
-
-            paper_insp = inspect(paper)
-            paper_is_new = not paper_insp.persistent
 
             if not paper_is_new:
                 # Existing paper - check what's missing and conditionally process
@@ -460,19 +458,19 @@ class DevonthinkSyncService:
                 )
 
                 if needs_processing["embeddings"] or needs_processing["chunks"]:
-                    logger.info(f"   🔍 Needs embeddings/chunks processing")
+                    logger.info("   🔍 Needs embeddings/chunks processing")
                     await self._process_embeddings_and_chunks(paper, search_space_id)
                 else:
-                    logger.debug(f"   ✓ Embeddings and chunks already exist")
+                    logger.debug("   ✓ Embeddings and chunks already exist")
 
                 if needs_processing["enrichment"]:
-                    logger.info(f"   🧠 Needs LLM enrichment")
+                    logger.info("   🧠 Needs LLM enrichment")
                     await self._process_llm_enrichment(paper)
                 else:
-                    logger.debug(f"   ✓ LLM enrichment already complete")
+                    logger.debug("   ✓ LLM enrichment already complete")
             else:
                 # New paper - process everything
-                logger.debug(f"📄 Paper is new - processing everything")
+                logger.debug("📄 Paper is new - processing everything")
                 await self._process_for_search(paper, search_space_id)
 
             # Update sync status
@@ -489,8 +487,15 @@ class DevonthinkSyncService:
             # Handle session rollback after errors
             try:
                 await self.session.rollback()
-            except:
-                pass
+            except Exception as rollback_error:
+                logger.exception(
+                    "Session rollback failed",
+                    extra={
+                        "original_error": str(e),
+                        "rollback_error": str(rollback_error),
+                    },
+                )
+                # Suppress rollback error since we're already handling the outer exception
 
             # Check if it's a duplicate DOI error
             if "duplicate key value violates unique constraint" in error_str and (
@@ -543,20 +548,27 @@ class DevonthinkSyncService:
                     logger.warning(
                         f"Could not link duplicate DOI record {dt_uuid} to existing paper. Marking as error but continuing."
                     )
-                except Exception as inner_e:
-                    logger.error(
-                        f"Error while trying to link to existing paper: {str(inner_e)}"
+                except Exception as doi_error:
+                    logger.warning(
+                        f"Error during duplicate DOI handling: {str(doi_error)}"
                     )
 
+            # Mark sync record as error
             sync_record.sync_status = DevonthinkSyncStatus.ERROR
             sync_record.error_message = error_str
             try:
                 await self.session.commit()
-            except:
+            except Exception as commit_error:
+                logger.error(
+                    f"Failed to commit error status for {dt_uuid}: {commit_error}"
+                )
                 try:
                     await self.session.rollback()
-                except:
-                    pass
+                except Exception as rollback_error:
+                    logger.error(
+                        f"Failed to rollback after commit failure: {rollback_error}"
+                    )
+
             logger.error(f"Error syncing record {dt_uuid}: {error_str}")
             return False
 
@@ -596,10 +608,8 @@ class DevonthinkSyncService:
         self, dt_uuid: str, local_uuid: UUID, record_props: Dict
     ) -> str:
         """Copy PDF binary from DEVONthink to local storage with UUID naming"""
-        import glob
         import os
         import shutil
-        import tempfile
 
         # Create temporary file path in home directory
         temp_dir = os.path.expanduser("~/tmp/devonthink_sync")
@@ -682,10 +692,7 @@ class DevonthinkSyncService:
                     )
 
             # Store the PDF using the file storage service
-            from app.services.file_storage import FileStorageService
-
-            file_storage = FileStorageService()
-            relative_path, file_uuid = file_storage.store_pdf(tmp_path)
+            relative_path, file_uuid = self.file_storage.store_pdf(tmp_path)
             logger.info(
                 f"Stored PDF {dt_uuid} to {relative_path} (size: {os.path.getsize(tmp_path)} bytes)"
             )
@@ -714,12 +721,10 @@ class DevonthinkSyncService:
         pdf_path: str,
         search_space_id: int,
         dt_uuid: str,
-    ) -> ScientificPaper:
+    ) -> tuple[ScientificPaper, bool]:
         """Create scientific paper record with extracted metadata"""
         # Convert relative path to absolute path for PDF processing
         import os
-
-        from app.config import config
 
         if not os.path.isabs(pdf_path):
             absolute_pdf_path = os.path.join(config.PDF_STORAGE_ROOT, pdf_path)
@@ -747,8 +752,8 @@ class DevonthinkSyncService:
                 await self._update_paper_metadata_if_needed(
                     existing_paper, metadata, record_props, pdf_path, dt_uuid
                 )
-                # Return existing paper - caller will link sync record to it
-                return existing_paper
+                # Return existing paper with is_new=False
+                return existing_paper, False
 
         # Create Document record first
         document = Document(
@@ -797,7 +802,8 @@ class DevonthinkSyncService:
         self.session.add(paper)
         await self.session.flush()
 
-        return paper
+        # Return new paper with is_new=True
+        return paper, True
 
     async def _check_what_needs_processing(
         self, paper: ScientificPaper, search_space_id: int
@@ -1011,7 +1017,6 @@ class DevonthinkSyncService:
         if not paper.dt_source_path:
             paper.dt_source_path = record_props.get("path")
             updated = True
-
         # Update full_text if missing (from document content)
         if not paper.full_text:
             try:
@@ -1187,3 +1192,5 @@ class DevonthinkSyncService:
     async def close(self):
         """Clean up resources"""
         await self.mcp_client.close()
+        if hasattr(self, "llm_enrichment"):
+            await self.llm_enrichment.close()

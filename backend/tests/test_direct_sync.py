@@ -7,7 +7,6 @@ import asyncio
 import logging
 import os
 import sys
-from uuid import UUID
 
 # Set up basic logging
 logging.basicConfig(
@@ -22,7 +21,6 @@ from app.db import User, SearchSpace
 from app.config import config
 from app.services.devonthink_mcp_client import DevonthinkMCPClient
 from app.services.devonthink_sync_service import DevonthinkSyncService
-from app.schemas.devonthink_schemas import DevonthinkSyncRequest
 
 logger = logging.getLogger(__name__)
 
@@ -150,10 +148,10 @@ async def test_direct_sync():
             # Run simplified sync
             result = await simplified_sync()
 
-            print(f"   Sync Results:")
+            print("   Sync Results:")
             print(f"     Synced: {result['synced']}")
             print(f"     Errors: {result['errors']}")
-            print(f"     Details:")
+            print("     Details:")
             for detail in result["details"]:
                 print(f"       - {detail}")
 

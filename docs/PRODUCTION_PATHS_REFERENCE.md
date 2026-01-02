@@ -99,10 +99,10 @@ python3 --version  # 3.12.9 (via pyenv)
 ### Production Database
 
 - **Database Name**: `hero_evidence_library_prod`
-- **User**: `postgres`
+- **User**: `postgres` (or your configured user)
 - **Host**: `localhost`
 - **Port**: `5432`
-- **Connection String**: `postgresql+asyncpg://postgres:postgres@localhost:5432/hero_evidence_library_prod`
+- **Connection String**: `postgresql+asyncpg://USERNAME:PASSWORD@localhost:5432/hero_evidence_library_prod`
 
 ## Application Paths
 
@@ -181,7 +181,7 @@ https://library.counterforce-hero.tech
 
 ```
 Location: /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/backend/.env
-Database: postgresql+asyncpg://postgres:postgres@localhost:5432/bibliography_db
+Database: postgresql+asyncpg://USERNAME:PASSWORD@localhost:5432/bibliography_db
 PDF Storage: ./data/pdfs
 ```
 
@@ -190,7 +190,7 @@ PDF Storage: ./data/pdfs
 ```
 Location (dev): /Users/drjforrest/dev/projects/hero-counterforce/hero_evidence_library/.env.production
 Location (prod): ~/production/hero-evidence-library/backend/.env
-Database: postgresql+asyncpg://postgres:postgres@localhost:5432/hero_evidence_library_prod
+Database: postgresql+asyncpg://USERNAME:PASSWORD@localhost:5432/hero_evidence_library_prod
 PDF Storage: /tmp/dev-pdfs (SSHFS mount)
 ```
 

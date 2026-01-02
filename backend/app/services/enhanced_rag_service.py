@@ -4,10 +4,9 @@ with the Bibliography app's database and semantic search capabilities.
 """
 
 import logging
-from typing import Dict, List, Optional, Any, Tuple
-from pathlib import Path
+from typing import Dict, List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from langchain.chains import RetrievalQA
@@ -16,8 +15,7 @@ from langchain_community.llms import Ollama
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document as LangChainDocument
 
-from app.db import ScientificPaper, Document, SearchSpace, Chunk
-from app.config import config
+from app.db import ScientificPaper, Document, SearchSpace
 
 logger = logging.getLogger(__name__)
 

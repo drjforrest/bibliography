@@ -60,8 +60,8 @@ export default function FavoritesPage() {
       if (query) {
         // Search within favorites
         const result = await api.getFavorites({ limit: 100 });
-        const filteredPapers = result.papers.filter((paper: Paper) =>
-          paper.title?.toLowerCase().includes(query.toLowerCase()) ||
+        const filteredPapers = (result.papers || []).filter((paper: Paper) =>
+          paper.title?.toLowerCase()?.includes(query.toLowerCase()) ||
           paper.authors?.some((author: string) => author.toLowerCase().includes(query.toLowerCase()))
         );
         setPapers(filteredPapers);

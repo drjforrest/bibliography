@@ -35,8 +35,6 @@ from app.db import ScientificPaper, Document, SearchSpace, DocumentType, Literat
 from app.services.file_storage import FileStorageService
 from app.services.pdf_processor import PDFProcessor
 from app.services.thumbnail_generator import ThumbnailGenerator
-from app.services.embedding_service import EmbeddingService
-from app.services.enhanced_rag_service import EnhancedRAGService
 from app.config import config
 
 logging.basicConfig(
@@ -261,12 +259,12 @@ class DEVONthinkCSVImporter:
         local_uuid = uuid4()
 
         # Step 1: Copy PDF to storage with UUID naming
-        logger.info(f"Copying PDF to storage...")
+        logger.info("Copying PDF to storage...")
         relative_path, file_uuid = self.file_storage.store_pdf(pdf_path)
         logger.info(f"PDF stored at: {relative_path}")
 
         # Step 2: Extract text and metadata from PDF
-        logger.info(f"Extracting PDF content...")
+        logger.info("Extracting PDF content...")
         absolute_pdf_path = self.file_storage.get_full_path(relative_path)
         pdf_processor = PDFProcessor(session)
         pdf_text = await pdf_processor.extract_text_from_file(str(absolute_pdf_path))
@@ -326,7 +324,7 @@ class DEVONthinkCSVImporter:
         logger.info(f"Created paper record: {paper.id}")
 
         # Step 5: Generate thumbnail
-        logger.info(f"Generating thumbnail...")
+        logger.info("Generating thumbnail...")
         try:
             thumbnail_path = self.thumbnail_gen.generate_thumbnail(
                 relative_path, paper.id, force_regenerate=False
@@ -334,13 +332,13 @@ class DEVONthinkCSVImporter:
             if thumbnail_path:
                 logger.info(f"Thumbnail generated: {thumbnail_path}")
             else:
-                logger.warning(f"Failed to generate thumbnail")
+                logger.warning("Failed to generate thumbnail")
         except Exception as e:
             logger.warning(f"Thumbnail generation failed: {e}")
 
         # Step 6: Skip individual vectorization - will be done in batch after all imports
         # This avoids greenlet/async session issues after rollbacks
-        logger.info(f"Deferring vectorization to batch process...")
+        logger.info("Deferring vectorization to batch process...")
 
         # Commit the transaction
         await session.commit()

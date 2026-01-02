@@ -10,7 +10,6 @@ This script will:
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
@@ -140,17 +139,17 @@ async def test_setup():
         print("Step 6: Available API Endpoints")
         print("-" * 70)
         print("PDF Viewing:")
-        print(f"  GET /api/v1/papers/{{paper_id}}/pdf")
+        print("  GET /api/v1/papers/{paper_id}/pdf")
         print(f"  Example: http://localhost:8000/api/v1/papers/{papers[0].id}/pdf")
         print()
         print("Thumbnail Access:")
-        print(f"  GET /api/v1/papers/{{paper_id}}/thumbnail")
+        print("  GET /api/v1/papers/{paper_id}/thumbnail")
         print(
             f"  Example: http://localhost:8000/api/v1/papers/{papers[0].id}/thumbnail"
         )
         print()
         print("Batch Thumbnail Generation:")
-        print(f"  POST /api/v1/papers/thumbnails/generate-batch")
+        print("  POST /api/v1/papers/thumbnails/generate-batch")
         print()
 
         # Step 7: Next Steps

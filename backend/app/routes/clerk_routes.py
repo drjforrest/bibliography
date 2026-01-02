@@ -133,7 +133,7 @@ async def clerk_webhook(
             "event_type": event_type,
         }
 
-    except Exception as e:
+    except Exception:
         # Transient/server error (DB, network, unexpected). Rollback and
         # return 500 so the webhook sender can retry.
         try:

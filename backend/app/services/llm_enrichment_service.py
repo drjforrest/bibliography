@@ -8,7 +8,6 @@ Provides reusable methods for enriching papers with LLM-generated content:
 - Citations (multiple formats: APA, MLA, Chicago, etc.)
 """
 
-import asyncio
 import logging
 import os
 from typing import Dict, List, Optional

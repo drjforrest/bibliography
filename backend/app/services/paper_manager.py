@@ -1,18 +1,17 @@
 import logging
 import os
-from datetime import datetime
 from typing import Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import config
-from app.db import Document, ScientificPaper, DocumentType, User
+from app.db import Document, DocumentType, ScientificPaper
+from app.services.embedding_service import EmbeddingService
 from app.services.file_storage import FileStorageService
 from app.services.folder_watcher import folder_watcher_manager
-from app.services.pdf_processor import PDFProcessor
-from app.services.embedding_service import EmbeddingService
 from app.services.llm_enrichment_service import LLMEnrichmentService
+from app.services.pdf_processor import PDFProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +108,9 @@ class PaperManagerService:
             try:
                 await self._enrich_paper(paper_id, search_space_id)
             except Exception as e:
-                logger.warning(f"Enrichment pipeline failed for paper {paper_id}: {str(e)}")
+                logger.warning(
+                    f"Enrichment pipeline failed for paper {paper_id}: {str(e)}"
+                )
                 # Don't fail the whole upload if enrichment fails
 
             return {
@@ -217,14 +218,20 @@ class PaperManagerService:
             logger.info(f"Step 1/2: Generating embeddings for paper {paper_id}")
             try:
                 # Embed the document itself
-                doc_embedded = await self.embedding_service.embed_document(paper.document_id)
+                doc_embedded = await self.embedding_service.embed_document(
+                    paper.document_id
+                )
                 if doc_embedded:
                     logger.info(f"Successfully embedded document {paper.document_id}")
 
                 # Create and embed chunks
-                chunks_embedded = await self.embedding_service.create_and_embed_chunks(paper.document)
+                chunks_embedded = await self.embedding_service.create_and_embed_chunks(
+                    paper.document
+                )
                 if chunks_embedded:
-                    logger.info(f"Successfully created and embedded chunks for document {paper.document_id}")
+                    logger.info(
+                        f"Successfully created and embedded chunks for document {paper.document_id}"
+                    )
             except Exception as e:
                 logger.error(f"Vectorization failed for paper {paper_id}: {str(e)}")
                 # Continue to LLM enrichment even if vectorization fails
@@ -234,9 +241,13 @@ class PaperManagerService:
             try:
                 enriched = await self.llm_enrichment.enrich_paper(paper_id)
                 if enriched:
-                    logger.info(f"Successfully enriched paper {paper_id} with LLM-generated content")
+                    logger.info(
+                        f"Successfully enriched paper {paper_id} with LLM-generated content"
+                    )
                 else:
-                    logger.warning(f"LLM enrichment returned False for paper {paper_id}")
+                    logger.warning(
+                        f"LLM enrichment returned False for paper {paper_id}"
+                    )
             except Exception as e:
                 logger.error(f"LLM enrichment failed for paper {paper_id}: {str(e)}")
 
@@ -249,7 +260,7 @@ class PaperManagerService:
     async def get_paper_by_id(self, paper_id: int) -> Optional[ScientificPaper]:
         """Get a scientific paper by ID."""
         from sqlalchemy.orm import selectinload
-        
+
         stmt = (
             select(ScientificPaper)
             .options(selectinload(ScientificPaper.document))
@@ -268,7 +279,7 @@ class PaperManagerService:
     ) -> List[ScientificPaper]:
         """Get papers for a user, optionally filtered by search space and literature type."""
         from sqlalchemy.orm import selectinload
-        
+
         stmt = (
             select(ScientificPaper)
             .options(selectinload(ScientificPaper.document))
@@ -292,7 +303,7 @@ class PaperManagerService:
         self, query: str, search_space_id: Optional[int] = None, limit: int = 20
     ) -> List[ScientificPaper]:
         """Search papers by title, authors, or abstract."""
-        from sqlalchemy import or_, func
+        from sqlalchemy import func, or_
         from sqlalchemy.orm import selectinload
 
         stmt = (
@@ -321,9 +332,30 @@ class PaperManagerService:
 
     async def delete_paper(self, paper_id: int) -> bool:
         """Delete a paper and its associated file."""
+        from datetime import datetime, timezone
+
+        from app.db import DevonthinkSync
+
         paper = await self.get_paper_by_id(paper_id)
         if not paper:
             return False
+
+        # If this paper was synced from DEVONthink, mark the sync record as user_deleted
+        # This prevents the sync from re-adding it
+        if paper.dt_source_uuid:
+            stmt = select(DevonthinkSync).where(
+                DevonthinkSync.dt_uuid == paper.dt_source_uuid
+            )
+            result = await self.session.execute(stmt)
+            sync_record = result.scalar_one_or_none()
+
+            if sync_record:
+                sync_record.user_deleted = True
+                sync_record.user_deleted_at = datetime.now(timezone.utc)
+                logger.info(
+                    f"Marked DEVONthink sync record {sync_record.dt_uuid} as user_deleted "
+                    f"for paper {paper_id}"
+                )
 
         # Delete the file from storage
         try:

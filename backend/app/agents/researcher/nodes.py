@@ -599,7 +599,7 @@ async def process_sections(
     section_contents = {}
 
     streaming_service.only_update_terminal(
-        f"🚀 Starting to process research sections..."
+        "🚀 Starting to process research sections..."
     )
     writer({"yeild_value": streaming_service._format_annotations()})
 

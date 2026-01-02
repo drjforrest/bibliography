@@ -4,7 +4,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.db import PaperAnnotation, ScientificPaper, User
+from app.db import PaperAnnotation, ScientificPaper
 from app.schemas.papers import AnnotationCreate, AnnotationUpdate
 
 logger = logging.getLogger(__name__)

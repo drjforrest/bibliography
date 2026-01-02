@@ -23,7 +23,7 @@ class DocumentHybridSearchRetriever:
         Returns:
             List of documents sorted by vector similarity
         """
-        from sqlalchemy import select, func
+        from sqlalchemy import select
         from sqlalchemy.orm import joinedload
         from app.db import Document, SearchSpace
         from app.config import config
@@ -70,7 +70,7 @@ class DocumentHybridSearchRetriever:
         Returns:
             List of documents sorted by text relevance
         """
-        from sqlalchemy import select, func, text
+        from sqlalchemy import select, func
         from sqlalchemy.orm import joinedload
         from app.db import Document, SearchSpace
 

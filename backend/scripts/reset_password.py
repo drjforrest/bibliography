@@ -13,12 +13,11 @@ from pathlib import Path
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.db import User
 from app.config import config
-from app.users import get_user_manager
 from fastapi_users.password import PasswordHelper
 
 

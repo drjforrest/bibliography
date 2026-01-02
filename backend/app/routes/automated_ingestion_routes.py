@@ -4,12 +4,10 @@ API routes for Automated Ingestion from DEVONthink to Bibliography RAG Pipeline.
 
 import logging
 from typing import Optional
-from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_async_session, User
+from app.db import User
 from app.users import current_active_user
 from app.services.automated_ingestion_service import (
     get_automated_ingestion_service,

@@ -12,8 +12,6 @@ import asyncio
 import logging
 import os
 import sys
-from uuid import UUID
-from datetime import datetime, timezone
 
 # Set up basic logging
 logging.basicConfig(
@@ -22,7 +20,7 @@ logging.basicConfig(
 
 # Database setup
 from sqlalchemy import select, func, text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 sys.path.append("/Users/drjforrest/dev/devprojects/bibliography/backend")
@@ -35,7 +33,6 @@ from app.db import (
     DevonthinkSync,
     DevonthinkSyncStatus,
     User,
-    DocumentType,
 )
 from app.config import config
 from app.services.devonthink_mcp_client import DevonthinkMCPClient
@@ -141,7 +138,7 @@ async def test_pipeline_status():
                         f"   Expected dimensions: {config.embedding_model_instance.dimension}"
                     )
                     print(
-                        f"   pgvector extension: ✅ Active (documents have embeddings)"
+                        "   pgvector extension: ✅ Active (documents have embeddings)"
                     )
             else:
                 print("   No embeddings found - checking pgvector extension...")

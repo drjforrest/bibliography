@@ -4,7 +4,7 @@ Notification service for managing user notifications and @mentions.
 
 import re
 import logging
-from typing import List, Optional, Set
+from typing import List, Set
 from datetime import datetime, timezone
 from sqlalchemy import select, and_, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +14,6 @@ from app.db import (
     User,
     NotificationType,
     NotificationEntityType,
-    PaperAnnotation,
-    Message,
 )
 
 logger = logging.getLogger(__name__)

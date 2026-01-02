@@ -5,8 +5,6 @@ Script to create a user directly in the database
 
 import asyncio
 import getpass
-import sys
-from uuid import uuid4
 
 from app.db import get_async_session_context, User, SearchSpace
 from app.users import get_user_manager
@@ -52,7 +50,6 @@ async def create_user():
             }
 
             # Use the user manager to create user with proper password hashing
-            from fastapi_users.schemas import BaseUserCreate
             from app.schemas import UserCreate
 
             user_create = UserCreate(**user_dict)
@@ -63,7 +60,7 @@ async def create_user():
             # Create the user
             user = await user_manager.create(user_create)
 
-            print(f"✅ User created successfully!")
+            print("✅ User created successfully!")
             print(f"   User ID: {user.id}")
             print(f"   Email: {user.email}")
 

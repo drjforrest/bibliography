@@ -1,6 +1,6 @@
+import asyncio
 import logging
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,9 @@ class DevonthinkMCPClient:
             "remove_tags",
             "delete_record",
         ]
+        # Lazy initialization of real MCP client with thread-safe lock
+        self._real_client = None
+        self._real_client_lock = asyncio.Lock()
 
     async def _execute_tool(
         self, tool_name: str, parameters: Dict[str, Any] = None
@@ -60,7 +63,7 @@ class DevonthinkMCPClient:
         else:
             # Use simulated responses for development
             logger.info(
-                f"Using simulated MCP responses (set DEVONTHINK_MCP_BACKEND=real for actual MCP)"
+                "Using simulated MCP responses (set DEVONTHINK_MCP_BACKEND=real for actual MCP)"
             )
             return await self._simulate_tool_call(tool_name, parameters)
 
@@ -73,8 +76,10 @@ class DevonthinkMCPClient:
             from .devonthink_mcp_client_real_v2 import DevonthinkMCPClientRealV2
 
             # Reuse the same real MCP client instance for persistent connection
-            if not hasattr(self, "_real_client") or self._real_client is None:
-                self._real_client = DevonthinkMCPClientRealV2()
+            # Use lock to prevent race conditions in concurrent coroutines
+            async with self._real_client_lock:
+                if self._real_client is None:
+                    self._real_client = DevonthinkMCPClientRealV2()
 
             real_client = self._real_client
 

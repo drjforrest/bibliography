@@ -8,9 +8,7 @@ for each entry, linking to thumbnails and preserving DEVONthink metadata.
 import asyncio
 import csv
 import sys
-import os
 from pathlib import Path
-from datetime import datetime
 from typing import Optional
 
 # Add parent directory to path for imports
@@ -27,7 +25,6 @@ from app.db import (
     User,
 )
 from app.db import DocumentType
-from app.config import config
 
 
 async def get_or_create_search_space(
@@ -194,7 +191,7 @@ async def main():
         print(f"   Using search space: {search_space.name} (ID: {search_space.id})")
 
         # Import records
-        print(f"\n📥 Importing records...")
+        print("\n📥 Importing records...")
         print("-" * 70)
 
         imported_count = 0
@@ -224,17 +221,17 @@ async def main():
                     traceback.print_exc()
 
         print("-" * 70)
-        print(f"\n✅ Import complete!")
+        print("\n✅ Import complete!")
         print(f"   Imported: {imported_count}")
         print(f"   Skipped:  {skipped_count}")
         print(f"   Errors:   {error_count}")
         print(f"   Total:    {len(records)}")
 
         if dry_run:
-            print(f"\n💡 This was a dry run. Run without --dry-run to actually import.")
+            print("\n💡 This was a dry run. Run without --dry-run to actually import.")
         else:
             print(f"\n🎉 Successfully imported {imported_count} papers!")
-            print(f"   View them at: http://localhost:3000")
+            print("   View them at: http://localhost:3000")
 
 
 if __name__ == "__main__":

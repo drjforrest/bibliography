@@ -1254,7 +1254,7 @@ async def index_linear_issues(
 
         # Commit all changes
         await session.commit()
-        logger.info(f"Successfully committed all Linear document changes to database")
+        logger.info("Successfully committed all Linear document changes to database")
 
         logger.info(
             f"Linear indexing completed: {documents_indexed} new issues, {documents_updated} updated, {documents_skipped} skipped"

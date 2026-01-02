@@ -1,15 +1,13 @@
 import gradio as gr
 from pathlib import Path
 from loguru import logger
-from fastapi import UploadFile
-import asyncio
 
 import config
 from backend.qa_chain import get_qa_system
 from ingest.extract_text import extract_text
 from process.chunk_text import chunk_text
 from process.embed_chunks import embed_chunks
-from index.vector_store_text import build_index, save_vector_store
+from index.vector_store_text import save_vector_store
 from services.watch_folder import get_watch_service
 
 

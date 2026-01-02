@@ -110,7 +110,7 @@ if [ -f ".env.production" ]; then
         print_status "Copying production secrets..."
         scp -o Ciphers=aes256-gcm@openssh.com .env.production.local ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/backend/.env.secrets
         print_status "✓ Merging environment files on server..."
-        ssh ${SERVER_USER}@${SERVER_HOST} "cd ${SERVER_PATH}/backend && cat .env.template .env.secrets > .env && rm .env.secrets"
+        ssh ${SERVER_USER}@${SERVER_HOST} "cd ${SERVER_PATH}/backend && { cat .env.template; echo; cat .env.secrets; } > .env && rm .env.secrets"
     else
         print_warning "⚠ No .env.production.local found - copying template only"
         ssh ${SERVER_USER}@${SERVER_HOST} "cd ${SERVER_PATH}/backend && cp .env.template .env"

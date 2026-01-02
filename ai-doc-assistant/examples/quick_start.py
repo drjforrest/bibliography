@@ -10,7 +10,6 @@ This script demonstrates how to:
 """
 
 import sys
-import time
 from pathlib import Path
 
 # Add the project root to Python path

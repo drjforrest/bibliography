@@ -163,8 +163,8 @@ async def clear_papers(user_id: UUID, delete_files: bool = False):
     logger.info("\nNext steps:")
     logger.info("1. Run your DEVONthink Smart Rule on selected records")
     logger.info("2. Import papers:")
-    logger.info(f"   python backend/scripts/import_from_devonthink_csv.py \\")
-    logger.info(f"     --csv ~/PDFs/Evidence_Library_Sync/active_library.csv \\")
+    logger.info("   python backend/scripts/import_from_devonthink_csv.py \\")
+    logger.info("     --csv ~/PDFs/Evidence_Library_Sync/active_library.csv \\")
     logger.info(f"     --user-id {user_id}")
     logger.info("=" * 70)
 

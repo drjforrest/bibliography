@@ -5,9 +5,7 @@ Test pgvector embeddings with Ollama nomic-text-embed
 
 import asyncio
 import logging
-import os
 import sys
-from typing import List
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -17,7 +15,7 @@ sys.path.append("/Users/drjforrest/dev/devprojects/bibliography/backend")
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from app.db import User, SearchSpace, Document, Chunk, ScientificPaper
+from app.db import User, SearchSpace, Document, Chunk
 from app.config import config
 from app.services.embedding_service import EmbeddingService
 from app.services.devonthink_sync_service import DevonthinkSyncService
@@ -76,7 +74,7 @@ async def test_embedding_service():
 
             # Test embedding service stats
             stats = embedding_service.get_embedding_stats()
-            print(f"✅ Embedding Service Stats:")
+            print("✅ Embedding Service Stats:")
             for key, value in stats.items():
                 print(f"   {key}: {value}")
 
@@ -140,7 +138,7 @@ async def test_populate_missing_embeddings():
                 select(func.count(Chunk.id)).where(Chunk.embedding.is_(None))
             )
 
-            print(f"📊 Current Status:")
+            print("📊 Current Status:")
             print(f"   Documents without embeddings: {docs_without_embeddings}")
             print(f"   Chunks without embeddings: {chunks_without_embeddings}")
 
@@ -150,11 +148,11 @@ async def test_populate_missing_embeddings():
 
             # Test embedding population (limit to 3 documents for testing)
             embedding_service = EmbeddingService(session)
-            print(f"\n🚀 Populating embeddings for up to 3 documents...")
+            print("\n🚀 Populating embeddings for up to 3 documents...")
 
             stats = await embedding_service.populate_missing_embeddings(limit=3)
 
-            print(f"\n📊 Embedding Population Results:")
+            print("\n📊 Embedding Population Results:")
             print(f"   Documents processed: {stats['documents_processed']}")
             print(f"   Documents embedded: {stats['documents_embedded']}")
             print(f"   Chunks created: {stats['chunks_created']}")
@@ -170,7 +168,7 @@ async def test_populate_missing_embeddings():
                 select(func.count(Chunk.id)).where(Chunk.embedding.isnot(None))
             )
 
-            print(f"\n📊 Updated Status:")
+            print("\n📊 Updated Status:")
             print(f"   Documents with embeddings: {docs_with_embeddings}")
             print(f"   Chunks with embeddings: {chunks_with_embeddings}")
 
@@ -235,7 +233,7 @@ async def test_new_sync_with_embeddings():
                 force_resync=False,  # Don't duplicate existing documents
             )
 
-            print(f"\n🚀 Starting sync with new embedding pipeline...")
+            print("\n🚀 Starting sync with new embedding pipeline...")
 
             # Get count before sync
             docs_before = await session.scalar(select(func.count(Document.id)))
@@ -247,7 +245,7 @@ async def test_new_sync_with_embeddings():
             docs_after = await session.scalar(select(func.count(Document.id)))
             chunks_after = await session.scalar(select(func.count(Chunk.id)))
 
-            print(f"\n📊 Sync Results:")
+            print("\n📊 Sync Results:")
             print(f"   Success: {response.success}")
             print(f"   Message: {response.message}")
             print(f"   Synced: {response.synced_count}")

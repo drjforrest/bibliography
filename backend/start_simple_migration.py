@@ -125,7 +125,7 @@ async def simple_migration():
             result = await session.execute(stmt)
             syncs = result.scalars().all()
 
-            logger.info(f"📊 System Status:")
+            logger.info("📊 System Status:")
             logger.info(f"   📚 Documents: {len(documents)}")
             logger.info(f"   📄 Scientific Papers: {len(papers)}")
             logger.info(f"   🔄 DEVONthink Sync Records: {len(syncs)}")

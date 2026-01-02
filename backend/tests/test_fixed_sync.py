@@ -5,7 +5,6 @@ Test the fixed sync service to confirm it works properly
 
 import asyncio
 import logging
-import os
 import sys
 
 logging.basicConfig(
@@ -62,14 +61,14 @@ async def test_fixed_sync():
             print("\n🚀 Testing sync with the fix...")
             response = await sync_service.sync_database(sync_request, user.id)
 
-            print(f"\n📊 Sync Results:")
+            print("\n📊 Sync Results:")
             print(f"   Success: {response.success}")
             print(f"   Message: {response.message}")
             print(f"   Synced: {response.synced_count}")
             print(f"   Errors: {response.error_count}")
             print(f"   Skipped: {response.skipped_count}")
 
-            print(f"\n📋 Details:")
+            print("\n📋 Details:")
             for detail in response.details:
                 print(f"   - {detail}")
 

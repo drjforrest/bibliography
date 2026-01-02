@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import text
-from app.db import engine, LiteratureType
+from app.db import engine
 
 
 async def migrate_add_literature_type():
@@ -142,7 +142,7 @@ async def check_migration_status():
 
             row = result.fetchone()
             if row:
-                print(f"✓ Migration applied: literature_type column exists")
+                print("✓ Migration applied: literature_type column exists")
                 print(f"  - Type: {row[1]}")
                 print(f"  - Default: {row[2]}")
 

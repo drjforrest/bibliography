@@ -74,8 +74,8 @@ if lsof -Pi :$LOCAL_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
     print_info "To stop the tunnel, run:"
     echo -e "${YELLOW}lsof -ti:$LOCAL_PORT | xargs kill${NC}"
     print_info ""
-    print_warning "Note: Keep this terminal open or run tunnel in background"
-    print_warning "The tunnel will close when this SSH session ends"
+    print_info "The tunnel is running in the background and will persist after closing this terminal"
+    print_warning "The tunnel will close if the SSH connection is terminated or the remote host becomes unreachable"
 else
     print_error "Failed to establish tunnel"
     exit 1

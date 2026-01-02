@@ -7,20 +7,15 @@ while preserving the hierarchical group structure and maintaining real-time RAG 
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Set
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
 from uuid import UUID
-from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db import (
-    DevonthinkSync,
     DevonthinkFolder,
-    DevonthinkSyncStatus,
-    SearchSpace,
-    User,
     get_async_session_context,
 )
 from app.services.devonthink_sync_service import DevonthinkSyncService

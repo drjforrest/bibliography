@@ -32,7 +32,9 @@ if pip show opencv-python >/dev/null 2>&1; then
     echo "Found opencv-python: $OPENCV_VERSION"
     
     # opencv-python 4.8.x works with NumPy 1.x
-    if [[ $(echo "$OPENCV_VERSION" | cut -d. -f1) -eq 4 ]] && [[ $(echo "$OPENCV_VERSION" | cut -d. -f2) -ge 12 ]]; then
+    MAJOR=$(echo "$OPENCV_VERSION" | sed -E 's/^([0-9]+)\..*$/\1/')
+    MINOR=$(echo "$OPENCV_VERSION" | sed -E 's/^[0-9]+\.([0-9]+).*$/\1/')
+    if [[ "$MAJOR" -eq 4 ]] && [[ "$MINOR" -ge 12 ]]; then
         echo -e "${YELLOW}Downgrading opencv-python for NumPy 1.x compatibility...${NC}"
         pip install "opencv-python<4.9.0,>=4.8.0" --upgrade --quiet
         echo -e "${GREEN}✓ opencv-python downgraded${NC}"

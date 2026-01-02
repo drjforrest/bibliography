@@ -3,6 +3,7 @@
 ## The Problem
 
 DEVONthink is running on your MacBook, but the production server (mac-mini) can't access it because:
+
 - DEVONthink MCP server needs to connect locally to DEVONthink
 - Running the sync on mac-mini means it tries to find DEVONthink on mac-mini (which doesn't exist)
 
@@ -18,12 +19,13 @@ Edit `backend/.env` on your MacBook to point to production database:
 
 ```bash
 # In backend/.env on your MacBook
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@mac-mini:5432/hero_evidence_library_prod
+DATABASE_URL=postgresql+asyncpg://USERNAME:PASSWORD@mac-mini:5432/hero_evidence_library_prod
 ```
 
 Or if mac-mini isn't accessible by hostname, use the IP:
+
 ```bash
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@192.168.1.69:5432/hero_evidence_library_prod
+DATABASE_URL=postgresql+asyncpg://USERNAME:PASSWORD@192.168.1.69:5432/hero_evidence_library_prod
 ```
 
 ### Step 2: Make Sure PostgreSQL is Accessible
@@ -66,7 +68,7 @@ If PostgreSQL isn't directly accessible, use SSH tunnel:
 ssh -L 5433:localhost:5432 mac-mini
 
 # Terminal 2: Run sync with tunneled database
-export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5433/hero_evidence_library_prod"
+export DATABASE_URL="postgresql+asyncpg://USERNAME:PASSWORD@localhost:5433/hero_evidence_library_prod"
 ./scripts/sync_from_macbook.sh
 ```
 
@@ -78,5 +80,4 @@ Watch the sync progress:
 tail -f logs/devonthink_sync_macbook.log
 ```
 
-The sync will take several hours for ~2700 records. You can safely close your terminal - the sync will continue running.
-
+The sync will take several hours for ~2700 records. To run it in the background and allow closing your terminal:

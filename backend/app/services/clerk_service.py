@@ -2,7 +2,6 @@
 Clerk authentication and user synchronization service.
 """
 import jwt
-import httpx
 from typing import Optional
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
@@ -182,10 +181,43 @@ class ClerkService:
             # Note: hashed_password is NOT set - auth is handled by Clerk
         )
         
-        session.add(new_user)
-        await session.commit()
-        await session.refresh(new_user)
-        return new_user
+        try:
+            session.add(new_user)
+            await session.commit()
+            await session.refresh(new_user)
+            return new_user
+        except IntegrityError:
+            # Another transaction may have created a user with the same
+            # clerk_user_id or email concurrently. Rollback and attempt to
+            # fetch the existing record.
+            await session.rollback()
+            
+            # Try to find by clerk_user_id first (primary identifier)
+            result = await session.execute(
+                select(User).where(User.clerk_user_id == clerk_user_id)
+            )
+            existing_user = result.scalar_one_or_none()
+            
+            if existing_user:
+                await session.refresh(existing_user)
+                return existing_user
+            
+            # If not found by clerk_user_id, try by email
+            result = await session.execute(
+                select(User).where(User.email == email)
+            )
+            existing_user = result.scalar_one_or_none()
+            
+            if existing_user:
+                await session.refresh(existing_user)
+                return existing_user
+            
+            # If still not found, raise HTTP conflict error
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"User creation failed due to constraint violation. "
+                      f"Unable to locate existing user with clerk_user_id={clerk_user_id} or email={email}"
+            )
 
     async def sync_user_from_webhook(
         self,
