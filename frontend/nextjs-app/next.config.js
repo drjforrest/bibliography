@@ -13,13 +13,35 @@ const nextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.counterforce-hero.tech https://cdn.jsdelivr.net https://js.sentry-cdn.com https://browser.sentry-cdn.com https://*.sentry.io https://challenges.cloudflare.com https://scdn.clerk.com https://segapi.clerk.com https://*.protect.clerk.com https://*.client.protect.clerk.com https://clerk-telemetry.com https://clerk.com https://api.stripe.com https://maps.googleapis.com https://*.js.stripe.com https://js.stripe.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: https: blob:",
+              "connect-src 'self' https://*.counterforce-hero.tech https://*.sentry.io https://*.clerk.com https://clerk-telemetry.com https://api.stripe.com",
+              "frame-src 'self' https://*.clerk.com https://js.stripe.com",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
   async rewrites() {
-    // Use environment variable for API URL, fallback to localhost for development
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    // For server-side rewrites, always use localhost backend
+    // Client-side calls will use NEXT_PUBLIC_API_URL directly
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8400';
     return [
       {
         source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },

@@ -240,15 +240,20 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
         echo 'Creating minimal production .env.local for frontend...'
         cat > .env.local << EOF
 # Frontend .env.local for hero-evidence-library Project - Production
-NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT}
+NEXT_PUBLIC_API_URL=https://library.counterforce-hero.tech
+BACKEND_URL=http://localhost:${BACKEND_PORT}
 EOF
     else
         echo '✓ Using .env.local copied from production secrets'
     fi
 
-    npm install --production
+    npm install
 
-    # Start frontend service (already built locally)
+    # Build the frontend on the server (to pick up production env vars)
+    echo 'Building frontend on production server...'
+    npm run build
+
+    # Start frontend service
     echo 'Starting hero-evidence-library frontend on port ${FRONTEND_PORT}...'
     nohup npm run start -- -p ${FRONTEND_PORT} > ../../hero_evidence_library_frontend.log 2>&1 &
 

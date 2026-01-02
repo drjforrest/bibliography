@@ -7,13 +7,13 @@ import ChatPanel from "@/components/library/ChatPanel";
 import LiteratureTypeFilter from "@/components/library/LiteratureTypeFilter";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
-import { api } from "@/lib/api";
+import { createAuthenticatedClient } from "@/lib/api";
 import type { LiteratureType, Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
 import { useAuth } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 export default function HomePage() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -24,6 +24,12 @@ export default function HomePage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+
+  // Create authenticated API client
+  const authenticatedApi = useMemo(
+    () => createAuthenticatedClient(getToken),
+    [getToken]
+  );
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
@@ -39,11 +45,13 @@ export default function HomePage() {
       try {
         setIsLoading(true);
         const [papersData, tagsData] = await Promise.all([
-          api.getPapers({
-            limit: 100,
-            literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
-          }),
-          api.getTagHierarchy(),
+          authenticatedApi.get('/api/v1/papers', {
+            params: {
+              limit: 100,
+              literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
+            }
+          }).then(r => r.data),
+          authenticatedApi.get('/api/v1/tags/hierarchy').then(r => r.data),
         ]);
         setPapers(papersData.papers || []);
         
@@ -64,19 +72,21 @@ export default function HomePage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn, selectedLiteratureType]);
+  }, [isLoaded, isSignedIn, selectedLiteratureType, authenticatedApi]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     try {
       if (query) {
-        const result = await api.searchPapers(query);
+        const result = await authenticatedApi.post('/api/v1/papers/search', { query }).then(r => r.data);
         setPapers(result.papers || []);
       } else {
-        const result = await api.getPapers({
-          limit: 100,
-          literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
-        });
+        const result = await authenticatedApi.get('/api/v1/papers', {
+          params: {
+            limit: 100,
+            literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
+          }
+        }).then(r => r.data);
         setPapers(result.papers || []);
       }
     } catch (error) {
@@ -87,10 +97,12 @@ export default function HomePage() {
   const handleDelete = async () => {
     // Refetch papers after deletion
     try {
-      const result = await api.getPapers({
-        limit: 100,
-        literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
-      });
+      const result = await authenticatedApi.get('/api/v1/papers', {
+        params: {
+          limit: 100,
+          literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
+        }
+      }).then(r => r.data);
       setPapers(result.papers || []);
     } catch (error) {
       console.error('Failed to reload papers after deletion:', error);

@@ -10,7 +10,7 @@ from app.db import get_async_session, User
 from app.services.paper_manager import PaperManagerService
 from app.services.citation_formatter import CitationFormatter
 from app.services.thumbnail_generator import ThumbnailGenerator
-from app.users import current_active_user
+from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas.papers import (
     PaperResponse,
     PaperListResponse,
@@ -31,7 +31,7 @@ async def upload_pdf(
     search_space_id: int = Form(...),
     literature_type: str = Form("PEER_REVIEWED"),
     move_file: bool = Form(True),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -80,7 +80,7 @@ async def upload_pdf(
 @router.post("/search", response_model=PaperListResponse)
 async def search_papers(
     search_request: PaperSearchRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -110,7 +110,7 @@ async def get_papers(
     ),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -137,7 +137,7 @@ async def get_papers(
 @router.get("/{paper_id}", response_model=PaperResponse)
 async def get_paper(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -155,7 +155,7 @@ async def get_paper(
 @router.get("/by-folder")
 async def search_papers(
     search_request: PaperSearchRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -179,7 +179,7 @@ async def search_papers(
 @router.get("/by-folder")
 async def get_papers_by_folder(
     folder_path: str = Query(...),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -238,7 +238,7 @@ async def get_paper_pdf(
 @router.get("/{paper_id}/download")
 async def download_paper(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -319,7 +319,7 @@ async def get_paper_thumbnail(
 async def get_citation(
     paper_id: int,
     citation_request: CitationRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -355,7 +355,7 @@ async def get_citation_styles():
 @router.delete("/{paper_id}")
 async def delete_paper(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -377,7 +377,7 @@ async def delete_paper(
 
 @router.get("/stats/storage", response_model=StorageStatsResponse)
 async def get_storage_stats(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -391,7 +391,7 @@ async def get_storage_stats(
 @router.post("/watcher/start")
 async def start_watcher(
     search_space_id: int = Form(...),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -407,7 +407,7 @@ async def start_watcher(
 
 @router.post("/watcher/stop")
 async def stop_watcher(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -421,7 +421,7 @@ async def stop_watcher(
 
 @router.get("/watcher/status", response_model=WatcherStatusResponse)
 async def get_watcher_status(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -444,7 +444,7 @@ async def get_watcher_status(
 @router.get("/for-devonthink-export")
 async def get_papers_for_devonthink_export(
     limit: int = Query(100, le=500, description="Maximum number of papers to return"),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -487,7 +487,7 @@ async def get_papers_for_devonthink_export(
 
 @router.get("/stats/by-room")
 async def get_papers_by_room(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -525,7 +525,7 @@ async def generate_thumbnails_batch(
     search_space_id: Optional[int] = Form(None),
     force_regenerate: bool = Form(False),
     limit: int = Form(100, le=500),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -576,7 +576,7 @@ async def generate_thumbnails_batch(
 @router.post("/{paper_id}/favorite")
 async def add_favorite(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -616,7 +616,7 @@ async def add_favorite(
 @router.delete("/{paper_id}/favorite")
 async def remove_favorite(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -642,7 +642,7 @@ async def remove_favorite(
 @router.get("/{paper_id}/is-favorited")
 async def is_favorited(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -665,7 +665,7 @@ async def is_favorited(
 async def get_favorites(
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """

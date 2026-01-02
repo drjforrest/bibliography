@@ -1,33 +1,39 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_async_session, User
-from app.services.dashboard_service import DashboardService
-from app.users import current_active_user
+from app.db import User, get_async_session
+from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas.dashboard import (
-    UserDashboardResponse,
-    GlobalDashboardResponse,
     DashboardStatsResponse,
+    GlobalDashboardResponse,
+    UserDashboardResponse,
 )
+from app.services.dashboard_service import DashboardService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-@router.get("/user", response_model=UserDashboardResponse)
+@router.get("/user", response_model=DashboardStatsResponse)
 async def get_user_dashboard(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
-    Get comprehensive dashboard data for the current user.
+    Get dashboard statistics for the current user.
+    Returns literature type breakdown and new papers since last login.
     """
     dashboard_service = DashboardService(session)
 
     try:
-        dashboard_data = await dashboard_service.get_user_dashboard(str(user.id))
-        return UserDashboardResponse(**dashboard_data)
+        stats = await dashboard_service.get_literature_type_stats(str(user.id))
+        return stats
 
     except Exception as e:
+        logger.exception(f"Dashboard generation failed for user {user.id}: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Dashboard generation failed: {str(e)}"
         )
@@ -36,7 +42,7 @@ async def get_user_dashboard(
 @router.get("/user/{user_id}", response_model=UserDashboardResponse)
 async def get_user_dashboard_by_id(
     user_id: str,
-    current_user: User = Depends(current_active_user),
+    current_user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -57,7 +63,7 @@ async def get_user_dashboard_by_id(
 
 @router.get("/global", response_model=GlobalDashboardResponse)
 async def get_global_dashboard(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -78,7 +84,7 @@ async def get_global_dashboard(
 
 @router.get("/overview")
 async def get_dashboard_overview(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -109,7 +115,7 @@ async def get_dashboard_overview(
 @router.get("/activity")
 async def get_recent_activity(
     days: int = 7,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -133,7 +139,7 @@ async def get_recent_activity(
 
 @router.get("/analytics")
 async def get_paper_analytics(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -154,7 +160,7 @@ async def get_paper_analytics(
 
 @router.get("/search-spaces")
 async def get_search_spaces_breakdown(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -181,7 +187,7 @@ async def get_search_spaces_breakdown(
 
 @router.get("/storage-stats")
 async def get_storage_statistics(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -200,7 +206,7 @@ async def get_storage_statistics(
 
 @router.get("/stats", response_model=DashboardStatsResponse)
 async def get_dashboard_stats(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -220,7 +226,7 @@ async def get_dashboard_stats(
 @router.get("/activity-feed")
 async def get_activity_feed(
     limit: int = Query(20, le=50),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -246,24 +252,25 @@ async def get_activity_feed(
 
 @router.get("/papers-by-topic")
 async def get_papers_by_topic(
-    literature_type: str = Query(None, description="Filter by literature type: PEER_REVIEWED, GREY_LITERATURE, NEWS"),
-    user: User = Depends(current_active_user),
+    literature_type: str = Query(
+        None,
+        description="Filter by literature type: PEER_REVIEWED, GREY_LITERATURE, NEWS",
+    ),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get count of papers grouped by topic/tag, optionally filtered by literature type.
     Returns data suitable for bar/pie charts.
     """
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
+
     from app.db import ScientificPaper, Tag, paper_tags
 
     try:
         # Build query to count papers per tag
         query = (
-            select(
-                Tag.name,
-                func.count(ScientificPaper.id).label('count')
-            )
+            select(Tag.name, func.count(ScientificPaper.id).label("count"))
             .join(paper_tags, Tag.id == paper_tags.c.tag_id)
             .join(ScientificPaper, ScientificPaper.id == paper_tags.c.paper_id)
         )
@@ -273,7 +280,11 @@ async def get_papers_by_topic(
             query = query.where(ScientificPaper.literature_type == literature_type)
 
         # Group by tag name and order by count descending
-        query = query.group_by(Tag.name).order_by(func.count(ScientificPaper.id).desc()).limit(10)
+        query = (
+            query.group_by(Tag.name)
+            .order_by(func.count(ScientificPaper.id).desc())
+            .limit(10)
+        )
 
         result = await session.execute(query)
         data = [{"name": row[0], "value": row[1]} for row in result.all()]
@@ -281,7 +292,7 @@ async def get_papers_by_topic(
         return {
             "literature_type": literature_type or "ALL",
             "data": data,
-            "total": sum(item["value"] for item in data)
+            "total": sum(item["value"] for item in data),
         }
 
     except Exception as e:
@@ -291,27 +302,30 @@ async def get_papers_by_topic(
 @router.get("/growth-over-time")
 async def get_growth_over_time(
     days: int = Query(90, le=365, description="Number of days to look back"),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
     Get cumulative growth of papers over time.
     Returns data suitable for line/area charts.
     """
-    from sqlalchemy import select, func
-    from app.db import ScientificPaper
     from datetime import datetime, timedelta
+
     import pytz
+    from sqlalchemy import func, select
+
+    from app.db import ScientificPaper
 
     try:
         # Get all papers ordered by creation date
         query = (
             select(
-                func.date(ScientificPaper.created_at).label('date'),
-                func.count(ScientificPaper.id).label('count')
+                func.date(ScientificPaper.created_at).label("date"),
+                func.count(ScientificPaper.id).label("count"),
             )
             .where(
-                ScientificPaper.created_at >= datetime.now(pytz.UTC) - timedelta(days=days)
+                ScientificPaper.created_at
+                >= datetime.now(pytz.UTC) - timedelta(days=days)
             )
             .group_by(func.date(ScientificPaper.created_at))
             .order_by(func.date(ScientificPaper.created_at))
@@ -325,10 +339,14 @@ async def get_growth_over_time(
         total = 0
         for date, count in daily_counts:
             total += count
-            cumulative_data.append({
-                "date": date.isoformat() if hasattr(date, 'isoformat') else str(date),
-                "count": total
-            })
+            cumulative_data.append(
+                {
+                    "date": date.isoformat()
+                    if hasattr(date, "isoformat")
+                    else str(date),
+                    "count": total,
+                }
+            )
 
         # If no data for recent days, get the total count
         if not cumulative_data:
@@ -337,16 +355,20 @@ async def get_growth_over_time(
             total_count = total_result.scalar() or 0
 
             # Return single data point for today
-            cumulative_data = [{
-                "date": datetime.now(pytz.UTC).date().isoformat(),
-                "count": total_count
-            }]
+            cumulative_data = [
+                {
+                    "date": datetime.now(pytz.UTC).date().isoformat(),
+                    "count": total_count,
+                }
+            ]
 
         return {
             "days": days,
             "data": cumulative_data,
-            "total": cumulative_data[-1]["count"] if cumulative_data else 0
+            "total": cumulative_data[-1]["count"] if cumulative_data else 0,
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Growth over time failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Growth over time failed: {str(e)}"
+        )
