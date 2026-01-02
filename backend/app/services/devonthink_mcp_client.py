@@ -1,11 +1,7 @@
-import asyncio
-import json
 import logging
 import os
-import subprocess
-import tempfile
-from typing import Dict, Any, List, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,97 +73,87 @@ class DevonthinkMCPClient:
             from .devonthink_mcp_client_real_v2 import DevonthinkMCPClientRealV2
 
             # Reuse the same real MCP client instance for persistent connection
-            if not hasattr(self, '_real_client') or self._real_client is None:
+            if not hasattr(self, "_real_client") or self._real_client is None:
                 self._real_client = DevonthinkMCPClientRealV2()
-            
+
             real_client = self._real_client
 
             # Map our tool calls to the real client methods
-            try:
-                if tool_name == "is_running":
-                    result = await real_client.is_devonthink_running()
-                    return {"isRunning": result}
+            if tool_name == "is_running":
+                result = await real_client.is_devonthink_running()
+                return {"isRunning": result}
 
-                elif tool_name == "get_open_databases":
-                    databases = await real_client.get_open_databases()
-                    return {
-                        "success": True,
-                        "databases": databases,
-                        "totalCount": len(databases),
-                    }
+            elif tool_name == "get_open_databases":
+                databases = await real_client.get_open_databases()
+                return {
+                    "success": True,
+                    "databases": databases,
+                    "totalCount": len(databases),
+                }
 
-                elif tool_name == "search":
-                    query = parameters.get("query", "")
-                    database_name = parameters.get("databaseName")
-                    limit = parameters.get(
-                        "limit", None
-                    )  # Remove limit to allow all records
-                    results = await real_client.search_records(
-                        query, database_name, limit
-                    )
-                    return {
-                        "success": True,
-                        "results": results,
-                        "totalCount": len(results),
-                    }
+            elif tool_name == "search":
+                query = parameters.get("query", "")
+                database_name = parameters.get("databaseName")
+                limit = parameters.get(
+                    "limit", None
+                )  # Remove limit to allow all records
+                results = await real_client.search_records(query, database_name, limit)
+                return {
+                    "success": True,
+                    "results": results,
+                    "totalCount": len(results),
+                }
 
-                elif tool_name == "list_group_content":
-                    group_uuid = parameters.get("uuid")
-                    group_path = parameters.get("groupPath")
-                    database_name = parameters.get("databaseName")
-                    results = await real_client.list_group_content(
-                        group_uuid, group_path, database_name
-                    )
-                    return {"success": True, "results": results}
+            elif tool_name == "list_group_content":
+                group_uuid = parameters.get("uuid")
+                group_path = parameters.get("groupPath")
+                database_name = parameters.get("databaseName")
+                results = await real_client.list_group_content(
+                    group_uuid, group_path, database_name
+                )
+                return {"success": True, "results": results}
 
-                elif tool_name == "get_record_properties":
-                    record_uuid = parameters.get("uuid")
-                    record_id = parameters.get("recordId")
-                    result = await real_client.get_record_properties(
-                        record_uuid, record_id
-                    )
-                    if result:
-                        return {"success": True, **result}
-                    else:
-                        return {"success": False, "error": "Record not found"}
-
-                elif tool_name == "get_record_content":
-                    record_uuid = parameters.get("uuid")
-                    record_id = parameters.get("recordId")
-                    content = await real_client.get_record_content(
-                        record_uuid, record_id
-                    )
-                    if content:
-                        import base64
-
-                        return {
-                            "success": True,
-                            "content": base64.b64encode(content).decode("utf-8"),
-                            "contentType": "application/pdf",
-                        }
-                    else:
-                        return {"success": False, "error": "Content not found"}
-
-                elif tool_name == "copy_record_to_path":
-                    record_uuid = parameters.get("uuid")
-                    destination_path = parameters.get("destinationPath")
-                    database_name = parameters.get("databaseName")
-                    result = await real_client.copy_record_to_path(
-                        record_uuid, destination_path, database_name
-                    )
-                    if result:
-                        return result
-                    else:
-                        return {"success": False, "error": "Failed to copy record"}
-
+            elif tool_name == "get_record_properties":
+                record_uuid = parameters.get("uuid")
+                record_id = parameters.get("recordId")
+                result = await real_client.get_record_properties(record_uuid, record_id)
+                if result:
+                    return {"success": True, **result}
                 else:
-                    logger.warning(
-                        f"Tool {tool_name} not implemented in real MCP mode, using simulation"
-                    )
-                    return await self._simulate_tool_call(tool_name, parameters)
+                    return {"success": False, "error": "Record not found"}
 
-            # Don't close the client here - keep it persistent for reuse
-            # It will be closed when DevonthinkSyncService.close() is called
+            elif tool_name == "get_record_content":
+                record_uuid = parameters.get("uuid")
+                record_id = parameters.get("recordId")
+                content = await real_client.get_record_content(record_uuid, record_id)
+                if content:
+                    import base64
+
+                    return {
+                        "success": True,
+                        "content": base64.b64encode(content).decode("utf-8"),
+                        "contentType": "application/pdf",
+                    }
+                else:
+                    return {"success": False, "error": "Content not found"}
+
+            elif tool_name == "copy_record_to_path":
+                record_uuid = parameters.get("uuid")
+                destination_path = parameters.get("destinationPath")
+                database_name = parameters.get("databaseName")
+                result = await real_client.copy_record_to_path(
+                    record_uuid, destination_path, database_name
+                )
+                if result:
+                    return result
+                else:
+                    return {"success": False, "error": "Failed to copy record"}
+
+            else:
+                logger.warning(
+                    f"Tool {tool_name} not implemented in real MCP mode, using simulation"
+                )
+                return await self._simulate_tool_call(tool_name, parameters)
 
         except Exception as e:
             logger.error(f"Error calling real MCP for {tool_name}: {str(e)}")
@@ -435,10 +421,13 @@ class DevonthinkMCPClient:
 
     async def close(self):
         """Clean up any resources and close persistent MCP connection"""
-        if hasattr(self, '_real_client') and self._real_client is not None:
+        if hasattr(self, "_real_client") and self._real_client is not None:
             try:
                 await self._real_client.close()
             except Exception as e:
                 logger.debug(f"Error closing real MCP client: {e}")
             finally:
+                self._real_client = None
+                self._real_client = None
+                self._real_client = None
                 self._real_client = None
