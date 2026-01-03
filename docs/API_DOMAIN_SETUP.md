@@ -80,6 +80,8 @@ cd ~/production/hero-evidence-library/frontend/nextjs-app
 cat > .env.local << 'EOF'
 # Use dedicated API domain in production
 NEXT_PUBLIC_API_URL=https://api.counterforce-hero.tech
+# BACKEND_URL is only for Next.js server-side rewrites (optional, not used with dedicated API domain)
+# If kept, should be http://localhost:8400 (server-to-server communication, no HTTPS needed)
 BACKEND_URL=http://localhost:8400
 EOF
 ```

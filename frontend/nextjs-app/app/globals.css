@@ -1,7 +1,6 @@
+/* @import rules must be at the very top, before any other CSS rules */
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
+/* Note: Inter, Merriweather, and Material Symbols fonts are loaded via Next.js in layout.tsx */
 
 @theme {
   /* Brand Color Palette */
@@ -19,9 +18,10 @@
   --color-background-dark: #101922;
   --color-accent: #27ae60;
 
-  /* Font Families */
-  --font-family-display: Inter, sans-serif;
-  --font-family-body: Merriweather, serif;
+  /* Font Families - Use Next.js font variables from layout.tsx */
+  /* Next.js sets --font-inter and --font-merriweather via font optimization */
+  --font-family-display: var(--font-inter), Inter, sans-serif;
+  --font-family-body: var(--font-merriweather), Merriweather, serif;
 
   /* Border Radius */
   --radius: 0.25rem;
