@@ -12,6 +12,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // Start with 'light' to match server render, then update on mount
   const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
@@ -20,7 +21,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Get theme from localStorage or system preference
     const savedTheme = localStorage.getItem('theme') as Theme;
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    setTheme(savedTheme || systemTheme);
+    const initialTheme = savedTheme || systemTheme;
+    setTheme(initialTheme);
+    
+    // Apply theme class immediately
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(initialTheme);
   }, []);
 
   useEffect(() => {
@@ -36,11 +43,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
   };
 
-  // Prevent flash of wrong theme
-  if (!mounted) {
-    return null;
-  }
-
+  // Always render children - server and client both render with 'light' initially
+  // This prevents hydration mismatch
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
