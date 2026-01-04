@@ -759,6 +759,9 @@ if config.AUTH_TYPE == "GOOGLE":
         openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
         elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
         
+        # LLM preferences
+        default_openrouter_model = Column(String(100), nullable=True, default='anthropic/claude-sonnet-4-20250514')  # User's preferred model
+        
         # TTS optimization settings
         tts_optimization_mode = Column(String(50), nullable=True, default='auto')  # auto|prefer_openai|prefer_elevenlabs|kokoro_only
 
@@ -806,6 +809,9 @@ else:
         openrouter_api_key = Column(String, nullable=True)  # LLM access via OpenRouter
         openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
         elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
+        
+        # LLM preferences
+        default_openrouter_model = Column(String(100), nullable=True, default='anthropic/claude-sonnet-4-20250514')  # User's preferred model
         
         # TTS optimization settings
         tts_optimization_mode = Column(String(50), nullable=True, default='auto')  # auto|prefer_openai|prefer_elevenlabs|kokoro_only
