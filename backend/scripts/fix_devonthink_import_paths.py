@@ -213,8 +213,16 @@ async def main():
     storage_root = Path(get_pdf_storage_root())
     print(f"📁 Storage root: {storage_root}")
 
-    # Build search paths
-    search_paths = [storage_root]
+    # Build search paths - check if storage_root is accessible
+    search_paths = []
+    try:
+        if storage_root.exists():
+            search_paths.append(storage_root)
+        else:
+            print(f"⚠️  WARNING: Storage root does not exist: {storage_root}")
+    except (OSError, PermissionError) as e:
+        print(f"⚠️  WARNING: Storage root is not accessible: {storage_root} ({e})")
+    
     if args.search_paths:
         search_paths.extend([Path(p) for p in args.search_paths])
 
@@ -238,6 +246,8 @@ async def main():
     if len(search_paths) == 0:
         print("⚠️  WARNING: No accessible search paths found!")
         print("   Make sure PDF_STORAGE_ROOT is set or provide --search-paths")
+        print("   Exiting because there are no paths to search.")
+        return
     print()
 
     async with get_async_session_context() as session:
