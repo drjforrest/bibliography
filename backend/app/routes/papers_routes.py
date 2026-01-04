@@ -304,13 +304,16 @@ async def get_paper_thumbnail(
     if not thumbnail_full_path.exists():
         raise HTTPException(status_code=404, detail="Thumbnail file not found")
 
-    # Return thumbnail image
+    # Return thumbnail image with CORS headers for cross-origin requests
     return FileResponse(
         path=str(thumbnail_full_path),
         media_type="image/jpeg",
         headers={
             "Cache-Control": "public, max-age=86400",  # Cache for 1 day
             "Content-Disposition": "inline",
+            "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
         },
     )
 
