@@ -70,18 +70,17 @@ async def generate_infographic(
             detail="User not found"
         )
     
-    # Check for Gemini API key
-    gemini_key = db_user.gemini_api_key or None  # TODO: Add to User model
-    if not gemini_key:
+    # Check for OpenRouter API key
+    if not db_user.openrouter_api_key:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Gemini API key not configured. Please add it in your profile settings."
+            detail="OpenRouter API key not configured. Please add it in your profile settings."
         )
     
     # Initialize service
     infographic_service = InfographicGenerationService(
         db=db,
-        gemini_api_key=gemini_key
+        openrouter_api_key=db_user.openrouter_api_key
     )
     
     # Generate infographic
