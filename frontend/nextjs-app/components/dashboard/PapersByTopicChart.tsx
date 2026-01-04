@@ -21,7 +21,7 @@ export default function PapersByTopicChart() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const result = await api.getPapersByTopic(activeTab);
+        const result = await api.getPapersByTopicChart(activeTab);
         setData(result.data);
         setTotal(result.total);
       } catch (error) {
