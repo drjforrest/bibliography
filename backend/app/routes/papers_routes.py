@@ -95,7 +95,14 @@ async def _get_paper_file_path(
                 logger.error(
                     f"Tried fallback paths: {[str(p) for p in fallback_paths]}"
                 )
-                raise HTTPException(status_code=404, detail="PDF file not found")
+                logger.warning(
+                    f"Paper {paper_id} has legacy devonthink_import/ path but file not found. "
+                    f"This may need to be re-imported. DT UUID: {dt_uuid}"
+                )
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"PDF file not found. This paper may need to be re-imported (DT UUID: {dt_uuid})."
+                )
         else:
             logger.error(
                 f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})"
