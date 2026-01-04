@@ -36,7 +36,12 @@ class InfographicGenerationService:
     ):
         self.db = db
         self.openrouter_api_key = openrouter_api_key
-        self.output_dir = output_dir or Path("/tmp/hero_infographics")
+        # Use project-relative generated directory
+        if output_dir is None:
+            base_dir = Path(__file__).parent.parent / "generated" / "infographics"
+        else:
+            base_dir = output_dir
+        self.output_dir = base_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.openrouter_base_url = "https://openrouter.ai/api/v1"
     

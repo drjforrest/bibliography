@@ -42,7 +42,12 @@ class TTSService:
         self.openai_api_key = openai_api_key
         self.elevenlabs_api_key = elevenlabs_api_key
         self.optimization_mode = optimization_mode
-        self.output_dir = output_dir or Path("/tmp/hero_tts")
+        # Use project-relative generated directory
+        if output_dir is None:
+            base_dir = Path(__file__).parent.parent / "generated" / "podcasts"
+        else:
+            base_dir = output_dir
+        self.output_dir = base_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
     async def generate_speech(

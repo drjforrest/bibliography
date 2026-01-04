@@ -1,8 +1,45 @@
-.env
-.venv
-venv/
-data/
+# Python
 __pycache__/
-.flashrank_cache
-surf_new_backend.egg-info/
-podcasts/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated content (30-day retention)
+generated/
+
+# User data (persistent but not in git)
+data/
+avatars/
+pdfs/
+thumbnails/
+
+# ML model caches
+.flashrank_cache/
+__MACOSX/
+
+# Logs
+*.log
+logs/
