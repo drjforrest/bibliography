@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # v2.0 Database Migration Script
-# Run this to create the v2 tables in your database
+# Creates v2 tables using SQLAlchemy metadata (same as v1)
 
 set -e  # Exit on error
 
@@ -17,22 +17,16 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 # Check Python version
-PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-REQUIRED_VERSION="3.12"
-
 echo -e "${BLUE}Step 1: Checking Python version${NC}"
+PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 echo "  Current: Python $PYTHON_VERSION"
-echo "  Required: Python >= $REQUIRED_VERSION"
+echo "  Required: Python >= 3.12"
 
 if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 12) else 1)"; then
     echo -e "${RED}  ❌ Python 3.12+ required${NC}"
     echo ""
     echo "Install Python 3.12:"
     echo "  brew install python@3.12"
-    echo ""
-    echo "Or create venv with python3.12:"
-    echo "  python3.12 -m venv venv"
-    echo "  source venv/bin/activate"
     exit 1
 fi
 echo -e "${GREEN}  ✅ Python version OK${NC}"
@@ -62,81 +56,94 @@ pip install -e . > /dev/null 2>&1
 echo -e "${GREEN}  ✅ Dependencies installed${NC}"
 echo ""
 
-# Check database connection
-echo -e "${BLUE}Step 5: Checking database connection${NC}"
-if [ -z "$DATABASE_URL" ]; then
-    echo -e "${YELLOW}  ⚠️  DATABASE_URL not set in environment${NC}"
-    echo "  Checking .env file..."
-    if [ -f ".env" ]; then
-        export $(cat .env | grep DATABASE_URL | xargs)
-        echo -e "${GREEN}  ✅ Loaded from .env${NC}"
-    else
-        echo -e "${RED}  ❌ No .env file found${NC}"
-        echo ""
-        echo "Create backend/.env with:"
-        echo "  DATABASE_URL=postgresql+asyncpg://user:pass@localhost/hero_evidence_library"
-        exit 1
-    fi
+# Check database connection and load ALL env vars
+echo -e "${BLUE}Step 5: Loading environment variables${NC}"
+
+# Try .env first, then .env.production
+if [ -f ".env" ]; then
+    echo "  Loading from .env..."
+    set -a
+    source .env
+    set +a
+    echo -e "${GREEN}  ✅ Loaded from .env${NC}"
+elif [ -f ".env.production" ]; then
+    echo "  Loading from .env.production..."
+    set -a
+    source .env.production
+    set +a
+    echo -e "${GREEN}  ✅ Loaded from .env.production${NC}"
 else
-    echo -e "${GREEN}  ✅ DATABASE_URL configured${NC}"
+    echo -e "${RED}  ❌ No .env or .env.production file found${NC}"
+    echo ""
+    echo "Create backend/.env with required variables"
+    exit 1
 fi
+
+# Verify DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo -e "${RED}  ❌ DATABASE_URL not found in env file${NC}"
+    exit 1
+fi
+
+echo "  Database: ${DATABASE_URL##*@}"
 echo ""
 
-# Generate migration
-echo -e "${BLUE}Step 6: Generating Alembic migration${NC}"
-alembic revision --autogenerate -m "Add v2.0 content generation tables (podcasts, summaries, infographics, slide_decks)"
-echo -e "${GREEN}  ✅ Migration generated${NC}"
+# Preview what will be created
+echo -e "${BLUE}Step 6: What will be created${NC}"
+echo "  New tables:"
+echo "    - podcasts (audio discussions of papers)"
+echo "    - summaries (lay, technical, executive summaries)"
+echo "    - infographics (visual content generation)"
+echo "    - slide_decks (presentation export)"
 echo ""
-
-# Preview migration
-echo -e "${BLUE}Step 7: Migration preview${NC}"
-echo "  Generating SQL preview..."
-alembic upgrade head --sql > migration_preview.sql
+echo "  New enum type:"
+echo "    - summarytype (lay, technical, executive, comparative, visual)"
 echo ""
-echo "  Preview saved to: migration_preview.sql"
-echo "  Review this file to see what will be created"
+echo "  NOTE: All v1 tables remain unchanged"
 echo ""
 
 # Confirm before applying
-read -p "Apply migration to database? (y/N) " -n 1 -r
+read -p "Create v2 tables in database? (y/N) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Migration not applied. Run this script again when ready."
+    echo "Migration cancelled."
     exit 0
 fi
 
-# Apply migration
+# Run migration using standalone script (bypasses app config)
 echo ""
-echo -e "${BLUE}Step 8: Applying migration${NC}"
-alembic upgrade head
-echo -e "${GREEN}  ✅ Migration applied${NC}"
-echo ""
+echo -e "${BLUE}Step 7: Running migration${NC}"
 
-# Verify tables created
-echo -e "${BLUE}Step 9: Verifying tables${NC}"
-echo "  Checking database..."
+# Export DATABASE_URL for Python script
+export DATABASE_URL
 
-# This requires psycopg2 or direct psql access
-# For now, just inform the user
-echo ""
-echo "  Expected new tables:"
-echo "    - podcasts"
-echo "    - summaries"
-echo "    - infographics"
-echo "    - slide_decks"
-echo ""
-echo "  Verify with:"
-echo "    psql -d hero_evidence_library -c '\\dt'"
-echo ""
+# Run the standalone migration script
+python3 scripts/create_v2_tables.py
 
+if [ $? -eq 0 ]; then
+    echo ""
+    echo -e "${GREEN}🎉 Migration complete!${NC}"
+else
+    echo ""
+    echo -e "${RED}❌ Migration failed${NC}"
+    exit 1
+fi
+
+echo ""
 echo -e "${GREEN}🎉 Migration complete!${NC}"
 echo ""
 echo "Next steps:"
-echo "  1. Verify tables were created"
-echo "  2. Test v1 app still works"
-echo "  3. Test v2 app can access new tables"
-echo "  4. Commit migration file to git"
+echo "  1. Verify tables were created:"
+echo "     psql -d hero_evidence_library -c '\\dt'"
 echo ""
-echo "To rollback (if needed):"
-echo "  alembic downgrade -1"
+echo "  2. Test v1 app still works:"
+echo "     cd ../hero_evidence_library/backend"
+echo "     uvicorn main:app --reload --port 8000"
+echo ""
+echo "  3. Test v2 app can access tables:"
+echo "     cd ../evidence_library_v2/backend"
+echo "     uvicorn main:app --reload --port 8001"
+echo ""
+echo "To verify in database:"
+echo "  psql -d hero_evidence_library -c 'SELECT tablename FROM pg_tables WHERE schemaname = '\"'\"'public'\"'\"' ORDER BY tablename;'"
 echo ""
