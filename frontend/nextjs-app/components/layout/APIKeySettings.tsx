@@ -21,7 +21,7 @@ export default function APIKeySettings() {
 
  const fetchStatus = useCallback(async () => {
    try {
-     const token = await getToken();
+     const token = await getToken({ template: "hero-library-jwt" });
      if (!token) {
        console.error('No auth token available');
        return;
@@ -48,7 +48,7 @@ export default function APIKeySettings() {
  }, [isLoaded, isSignedIn, isOpen, fetchStatus]);
 
   const updateKeys = async () => {
-    const token = await getToken();
+    const token = await getToken({ template: "hero-library-jwt" });
     if (!token) {
       alert('Please sign in to update API keys');
       return;

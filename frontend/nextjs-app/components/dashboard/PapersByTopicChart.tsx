@@ -1,7 +1,8 @@
 'use client';
 
-import { api } from '@/lib/api';
-import { useEffect, useState } from 'react';
+import { createAuthenticatedClient } from '@/lib/api';
+import { useAuth } from '@clerk/nextjs';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type LiteratureTypeTab = 'PEER_REVIEWED' | 'GREY_LITERATURE' | 'NEWS';
@@ -12,16 +13,25 @@ interface PapersByTopicData {
 }
 
 export default function PapersByTopicChart() {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [activeTab, setActiveTab] = useState<LiteratureTypeTab>('PEER_REVIEWED');
   const [data, setData] = useState<PapersByTopicData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
+  // Create authenticated API client
+  const authenticatedApi = useMemo(() => createAuthenticatedClient(getToken), [getToken]);
+
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const result = await api.getPapersByTopic(activeTab);
+        const result = await authenticatedApi.get('/api/v1/dashboard/papers-by-topic', { params: { literature_type: activeTab } }).then(r => r.data);
         setData(result.data);
         setTotal(result.total);
       } catch (error) {
@@ -32,7 +42,7 @@ export default function PapersByTopicChart() {
     };
 
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, isLoaded, isSignedIn, authenticatedApi]);
 
   const tabs: { key: LiteratureTypeTab; label: string; color: string }[] = [
     { key: 'PEER_REVIEWED', label: 'Peer-Reviewed', color: 'bg-[#4e989e]' }, // Trust Green

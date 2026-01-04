@@ -768,6 +768,9 @@ if config.AUTH_TYPE == "GOOGLE":
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
 
+        # Clerk integration
+        clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
+
         # Profile information
         display_name = Column(String(100), nullable=True)
         bio = Column(Text, nullable=True)
@@ -815,6 +818,9 @@ else:
         
         # TTS optimization settings
         tts_optimization_mode = Column(String(50), nullable=True, default='auto')  # auto|prefer_openai|prefer_elevenlabs|kokoro_only
+
+        # Clerk integration
+        clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)

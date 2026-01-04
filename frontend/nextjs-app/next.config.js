@@ -14,25 +14,104 @@ const nextConfig = {
     ],
   },
   async headers() {
+    // CSP directives organized for maintainability and security auditing
+    const cspDirectives = {
+      'default-src': ["'self'"],
+      'script-src': [
+        "'self'",
+        "'unsafe-inline'", // Required for Next.js
+        "'unsafe-eval'", // Required for Next.js dev mode and some libraries
+        // Application domains
+        'https://*.counterforce-hero.tech',
+        // CDN - jsDelivr (for specific libraries if needed)
+        'https://cdn.jsdelivr.net',
+        // Sentry error tracking
+        'https://js.sentry-cdn.com',
+        'https://browser.sentry-cdn.com',
+        'https://*.sentry.io',
+        // Cloudflare
+        'https://challenges.cloudflare.com',
+        'https://static.cloudflareinsights.com',
+        // Clerk authentication
+        'https://scdn.clerk.com',
+        'https://segapi.clerk.com',
+        'https://*.protect.clerk.com',
+        'https://*.client.protect.clerk.com',
+        'https://clerk-telemetry.com',
+        'https://clerk.com',
+        // Stripe payments
+        'https://api.stripe.com',
+        'https://*.js.stripe.com',
+        'https://js.stripe.com',
+        // Google Maps
+        'https://maps.googleapis.com',
+      ],
+      'worker-src': [
+        "'self'",
+        'blob:', // Required for PDF.js and other blob workers
+        // Clerk workers
+        'https://*.clerk.com',
+        // Note: cdnjs.cloudflare.com removed - PDF.js worker now self-hosted
+      ],
+      'style-src': [
+        "'self'",
+        "'unsafe-inline'", // Required for styled-components, Tailwind, etc.
+        // Google Fonts
+        'https://fonts.googleapis.com',
+        // CDN - jsDelivr (for specific CSS libraries if needed)
+        'https://cdn.jsdelivr.net',
+      ],
+      'font-src': [
+        "'self'",
+        // Google Fonts
+        'https://fonts.gstatic.com',
+        // Scite.ai fonts
+        'https://cdn.scite.ai',
+      ],
+      'img-src': [
+        "'self'",
+        'data:', // For inline images and data URIs
+        'https:', // Allow all HTTPS images (may need to restrict further)
+        'blob:', // For blob URLs
+      ],
+      'connect-src': [
+        "'self'",
+        // Application API
+        'https://*.counterforce-hero.tech',
+        // Sentry
+        'https://*.sentry.io',
+        // Clerk
+        'https://*.clerk.com',
+        'https://clerk-telemetry.com',
+        // Cloudflare
+        'https://static.cloudflareinsights.com',
+        // Stripe
+        'https://api.stripe.com',
+      ],
+      'frame-src': [
+        "'self'",
+        // Clerk iframes
+        'https://*.clerk.com',
+        // Stripe iframes
+        'https://js.stripe.com',
+      ],
+      'object-src': ["'none'"], // Block all object, embed, and applet elements
+      'base-uri': ["'self'"], // Restrict base tag URLs
+      'form-action': ["'self'"], // Restrict form submissions
+    };
+
+    // Build CSP string from directives object
+    const cspString = Object.entries(cspDirectives)
+      .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
+      .join('; ');
+
     return [
       {
         source: '/:path*',
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.counterforce-hero.tech https://cdn.jsdelivr.net https://js.sentry-cdn.com https://browser.sentry-cdn.com https://*.sentry.io https://challenges.cloudflare.com https://static.cloudflareinsights.com https://scdn.clerk.com https://segapi.clerk.com https://*.protect.clerk.com https://*.client.protect.clerk.com https://clerk-telemetry.com https://clerk.com https://api.stripe.com https://maps.googleapis.com https://*.js.stripe.com https://js.stripe.com",
-              "worker-src 'self' blob: https://*.clerk.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-              "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.counterforce-hero.tech https://*.sentry.io https://*.clerk.com https://clerk-telemetry.com https://static.cloudflareinsights.com https://api.stripe.com",
-              "frame-src 'self' https://*.clerk.com https://js.stripe.com",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-            ].join('; '),
+            value: cspString,
           },
         ],
       },

@@ -57,7 +57,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
                 {user?.primaryEmailAddress?.emailAddress || 'user@example.com'}
               </p>
             </div>
-            <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">
+            <span className="material-symbols-outlined text-gray-500 dark:text-gray-400" aria-hidden="true">
               {showUserMenu ? 'expand_less' : 'expand_more'}
             </span>
           </button>
@@ -70,7 +70,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
                 onClick={() => setShowUserMenu(false)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg transition-colors"
               >
-                <span className="material-symbols-outlined">person</span>
+                <span className="material-symbols-outlined" aria-hidden="true">person</span>
                 <span className="text-sm font-medium">Profile Settings</span>
               </Link>
               <button
@@ -80,7 +80,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg transition-colors"
               >
-                <span className="material-symbols-outlined">logout</span>
+                <span className="material-symbols-outlined" aria-hidden="true">logout</span>
                 <span className="text-sm font-medium">Sign out</span>
               </button>
             </div>
@@ -99,7 +99,7 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800'
               }`}
             >
-              <span className="material-symbols-outlined">{item.icon}</span>
+              <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
               <p className="text-sm font-medium leading-normal">{item.label}</p>
             </Link>
           ))}

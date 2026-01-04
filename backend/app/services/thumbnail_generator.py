@@ -1,11 +1,11 @@
-import os
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Tuple
-from PIL import Image
-import fitz  # PyMuPDF
 
+import fitz  # PyMuPDF
 from app.config import config
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,12 @@ class ThumbnailGenerator:
         self.thumbnail_root.mkdir(parents=True, exist_ok=True)
 
         # Default thumbnail settings
-        self.thumbnail_size = (300, 400)  # Width x Height for book-like aspect ratio
-        self.thumbnail_quality = 85
+        # Higher resolution for book card UI - designed for crisp display on modern screens
+        self.thumbnail_size = (
+            600,
+            800,
+        )  # Width x Height for book-like aspect ratio (2x for Retina displays)
+        self.thumbnail_quality = 92  # Higher quality JPEG for better text clarity
         self.thumbnail_format = "JPEG"
 
     def generate_thumbnail(
@@ -57,8 +61,17 @@ class ThumbnailGenerator:
             else:
                 absolute_pdf_path = Path(pdf_path)
 
+            # Normalize the path to handle any path issues
+            absolute_pdf_path = absolute_pdf_path.resolve()
+
             if not absolute_pdf_path.exists():
-                logger.error(f"PDF file not found: {absolute_pdf_path}")
+                logger.error(
+                    f"PDF file not found: {absolute_pdf_path} (resolved from: {pdf_path})"
+                )
+                return None
+
+            if not absolute_pdf_path.is_file():
+                logger.error(f"PDF path is not a file: {absolute_pdf_path}")
                 return None
 
             # Create thumbnail path: thumbnails/YYYY/MM/paper_id.jpg
@@ -66,7 +79,22 @@ class ThumbnailGenerator:
             thumbnail_filename = f"{paper_id}.jpg"
 
             # Get year/month from PDF path if it follows the storage structure
-            parts = Path(pdf_path).parts
+            # Try to extract relative path from absolute path if it's within storage_root
+            try:
+                # Check if absolute path is within storage_root
+                absolute_str = str(absolute_pdf_path)
+                storage_str = str(self.storage_root)
+                if absolute_str.startswith(storage_str):
+                    # Extract relative path from storage root
+                    relative_path = absolute_pdf_path.relative_to(self.storage_root)
+                    parts = relative_path.parts
+                else:
+                    # Use original pdf_path if it was relative
+                    parts = Path(pdf_path).parts
+            except (ValueError, AttributeError):
+                # Fallback: try to extract from original path
+                parts = Path(pdf_path).parts
+
             if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
                 year_dir = self.thumbnail_root / parts[0]
                 month_dir = year_dir / parts[1]
@@ -98,8 +126,9 @@ class ThumbnailGenerator:
             page = doc[0]
 
             # Calculate zoom to match desired thumbnail width
-            # PyMuPDF uses 72 DPI by default, we want higher quality
-            mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
+            # PyMuPDF uses 72 DPI by default, we want higher quality for crisp rendering
+            # 3x zoom provides excellent quality for 600x800 thumbnails
+            mat = fitz.Matrix(3.0, 3.0)  # 3x zoom for high-quality rendering
             pix = page.get_pixmap(matrix=mat)
 
             # Convert to PIL Image

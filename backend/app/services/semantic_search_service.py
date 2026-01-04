@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from app.db import ScientificPaper, Document, SearchSpace, Chunk
 from app.config import config
-from app.retriver.documents_hybrid_search import DocumentHybridSearchRetriever
+from app.retriever.documents_hybrid_search import DocumentHybridSearchRetriever
 
 logger = logging.getLogger(__name__)
 

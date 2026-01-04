@@ -1,19 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from app.db import get_async_session, User
-from app.services.tag_service import TagService
-from app.users import current_active_user
+from app.db import User, get_async_session
+from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas.tags import (
-    TagCreate,
-    TagUpdate,
-    TagResponse,
-    TagWithChildren,
-    TagListResponse,
-    TagHierarchyResponse,
     PaperTagsUpdate,
+    TagCreate,
+    TagHierarchyResponse,
+    TagListResponse,
+    TagResponse,
+    TagUpdate,
+    TagWithChildren,
 )
+from app.services.tag_service import TagService
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 @router.post("/", response_model=TagResponse, status_code=201)
 async def create_tag(
     tag_data: TagCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Create a new tag."""
@@ -45,7 +45,7 @@ async def create_tag(
 async def get_tags(
     parent_id: Optional[int] = Query(None, description="Filter by parent tag ID"),
     flat: bool = Query(False, description="Return flat list of all tags"),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -74,7 +74,7 @@ async def get_tags(
 
 @router.get("/hierarchy", response_model=TagHierarchyResponse)
 async def get_tag_hierarchy(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Get tags in hierarchical tree structure with all children loaded."""
@@ -109,7 +109,7 @@ async def get_tag_hierarchy(
 @router.get("/{tag_id}", response_model=TagResponse)
 async def get_tag(
     tag_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Get a specific tag by ID."""
@@ -129,7 +129,7 @@ async def get_tag(
 async def update_tag(
     tag_id: int,
     update_data: TagUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Update a tag."""
@@ -152,7 +152,7 @@ async def update_tag(
 @router.delete("/{tag_id}")
 async def delete_tag(
     tag_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Delete a tag. Child tags will also be deleted."""
@@ -169,7 +169,7 @@ async def delete_tag(
 async def search_tags(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, le=100),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Search tags by name."""
@@ -193,13 +193,13 @@ async def get_papers_by_tag(
     tag_id: int,
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Get all papers tagged with a specific tag."""
-    from sqlalchemy import select
     from app.db import ScientificPaper, paper_tags
     from app.schemas.papers import PaperResponse
+    from sqlalchemy import select
 
     tag_service = TagService(session)
 
@@ -234,7 +234,7 @@ async def get_papers_by_tag(
 async def add_tag_to_paper(
     paper_id: int,
     tag_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Add a tag to a paper."""
@@ -263,7 +263,7 @@ async def add_tag_to_paper(
 async def remove_tag_from_paper(
     paper_id: int,
     tag_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Remove a tag from a paper."""
@@ -283,7 +283,7 @@ async def remove_tag_from_paper(
 @router.get("/papers/{paper_id}/tags", response_model=TagListResponse)
 async def get_paper_tags(
     paper_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Get all tags for a specific paper."""
@@ -305,7 +305,7 @@ async def get_paper_tags(
 async def set_paper_tags(
     paper_id: int,
     tags_update: PaperTagsUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Set tags for a paper (replaces all existing tags)."""

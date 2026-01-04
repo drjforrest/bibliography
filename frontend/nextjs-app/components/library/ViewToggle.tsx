@@ -17,7 +17,7 @@ export default function ViewToggle({ view, onViewChange }: ViewToggleProps) {
             : 'text-gray-500 dark:text-gray-400'
         } text-sm font-medium leading-normal`}
       >
-        <span className="material-symbols-outlined">grid_view</span>
+        <span className="material-symbols-outlined" aria-hidden="true">grid_view</span>
         <input
           type="radio"
           name="view-toggle"
@@ -35,7 +35,7 @@ export default function ViewToggle({ view, onViewChange }: ViewToggleProps) {
             : 'text-gray-500 dark:text-gray-400'
         } text-sm font-medium leading-normal`}
       >
-        <span className="material-symbols-outlined">view_list</span>
+        <span className="material-symbols-outlined" aria-hidden="true">view_list</span>
         <input
           type="radio"
           name="view-toggle"

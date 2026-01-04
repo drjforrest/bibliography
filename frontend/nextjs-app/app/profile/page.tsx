@@ -32,7 +32,7 @@ export default function ProfilePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchProfile = useCallback(async () => {
-    const token = await getToken();
+    const token = await getToken({ template: "hero-library-jwt" });
     if (!token) return;
 
     setIsLoading(true);
@@ -95,7 +95,7 @@ export default function ProfilePage() {
   };
 
   const uploadAvatar = async () => {
-    const token = await getToken();
+    const token = await getToken({ template: "hero-library-jwt" });
     if (!token || !avatarFile) return;
 
     const formData = new FormData();
@@ -119,7 +119,7 @@ export default function ProfilePage() {
   };
 
   const deleteAvatar = async () => {
-    const token = await getToken();
+    const token = await getToken({ template: "hero-library-jwt" });
     if (!token || !confirm("Are you sure you want to delete your avatar?")) return;
 
     try {
@@ -137,7 +137,7 @@ export default function ProfilePage() {
   };
 
   const handleSaveProfile = async () => {
-    const token = await getToken();
+    const token = await getToken({ template: "hero-library-jwt" });
     if (!token) return;
 
     setIsSaving(true);

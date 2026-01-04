@@ -1,28 +1,80 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
-from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
-import tempfile
-import os
 import io
+import logging
+import os
+import tempfile
+from pathlib import Path
+from typing import List, Optional, Tuple
 
-from app.db import get_async_session, User
-from app.services.paper_manager import PaperManagerService
-from app.services.citation_formatter import CitationFormatter
-from app.services.thumbnail_generator import ThumbnailGenerator
+from app.db import ScientificPaper, User, get_async_session
 from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas.papers import (
-    PaperResponse,
-    PaperListResponse,
-    PaperSearchRequest,
-    PaperUploadResponse,
     CitationRequest,
     CitationResponse,
+    PaperListResponse,
+    PaperResponse,
+    PaperSearchRequest,
+    PaperUploadResponse,
     StorageStatsResponse,
     WatcherStatusResponse,
 )
+from app.services.citation_formatter import CitationFormatter
+from app.services.paper_manager import PaperManagerService
+from app.services.thumbnail_generator import ThumbnailGenerator
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/papers", tags=["papers"])
+
+
+async def _get_paper_file_path(
+    paper_id: int, session: AsyncSession
+) -> Tuple[ScientificPaper, Path]:
+    """
+    Helper function to retrieve a paper and resolve its file path.
+
+    Args:
+        paper_id: The ID of the paper to retrieve
+        session: Database session
+
+    Returns:
+        Tuple of (paper, full_path) where full_path is a Path object
+
+    Raises:
+        HTTPException: If paper not found, has no file_path, path resolution fails,
+                      or file doesn't exist on filesystem
+    """
+    paper_manager = PaperManagerService(session)
+    paper = await paper_manager.get_paper_by_id(paper_id)
+
+    if not paper:
+        logger.error(f"Paper {paper_id} not found")
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    if not paper.file_path:
+        logger.error(f"Paper {paper_id} has no file_path")
+        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+
+    # Get full file path
+    try:
+        full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+    except Exception as e:
+        logger.error(
+            f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Error resolving file path: {str(e)}"
+        )
+
+    if not full_path.exists():
+        logger.error(
+            f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})"
+        )
+        raise HTTPException(status_code=404, detail="PDF file not found")
+
+    return paper, full_path
 
 
 @router.post("/upload", response_model=PaperUploadResponse)
@@ -143,13 +195,20 @@ async def get_paper(
     """
     Get a specific paper by ID.
     """
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
+    try:
+        paper_manager = PaperManagerService(session)
+        paper = await paper_manager.get_paper_by_id(paper_id)
 
-    if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        if not paper:
+            logger.warning(f"Paper {paper_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Paper not found")
 
-    return PaperResponse.from_orm(paper)
+        return PaperResponse.from_orm(paper)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving paper {paper_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving paper: {str(e)}")
 
 
 @router.get("/by-folder")
@@ -185,8 +244,8 @@ async def get_papers_by_folder(
     """
     Get papers in a specific DEVONthink folder path.
     """
-    from sqlalchemy import select
     from app.db import ScientificPaper
+    from sqlalchemy import select
 
     stmt = (
         select(ScientificPaper)
@@ -212,21 +271,15 @@ async def get_paper_pdf(
     Get PDF file for viewing (not download).
     Public endpoint - no authentication required for PDF viewing.
     """
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
-
-    if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
-
-    # Get full file path
-    full_path = paper_manager.file_storage.get_full_path(paper.file_path)
-
-    if not full_path.exists():
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    paper, full_path = await _get_paper_file_path(paper_id, session)
 
     # Return file for inline viewing
-    with open(full_path, "rb") as f:
-        pdf_bytes = f.read()
+    try:
+        with open(full_path, "rb") as f:
+            pdf_bytes = f.read()
+    except Exception as e:
+        logger.error(f"Error reading PDF file for paper {paper_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading PDF file: {str(e)}")
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -244,17 +297,7 @@ async def download_paper(
     """
     Download the PDF file for a paper.
     """
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
-
-    if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
-
-    # Get full file path
-    full_path = paper_manager.file_storage.get_full_path(paper.file_path)
-
-    if not full_path.exists():
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    paper, full_path = await _get_paper_file_path(paper_id, session)
 
     # Generate a nice filename
     filename = f"{paper.title[:50]}.pdf" if paper.title else f"paper_{paper_id}.pdf"
@@ -278,41 +321,59 @@ async def get_paper_thumbnail(
     Get thumbnail image for a paper. Generates it if it doesn't exist.
     Public endpoint - no authentication required for thumbnail access.
     """
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
+    try:
+        # Use helper function to get paper and validate file path
+        paper, pdf_full_path = await _get_paper_file_path(paper_id, session)
 
-    if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        # Initialize thumbnail generator with the same storage root
+        paper_manager = PaperManagerService(session)
+        thumbnail_gen = ThumbnailGenerator(
+            storage_root=str(paper_manager.file_storage.storage_root)
+        )
 
-    if not paper.file_path:
-        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+        # Generate thumbnail using the full PDF path
+        # Pass the full path directly since we've already resolved it
+        thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
+            str(pdf_full_path), paper_id, force_regenerate=regenerate
+        )
 
-    # Initialize thumbnail generator
-    thumbnail_gen = ThumbnailGenerator()
+        if not thumbnail_relative_path:
+            logger.error(
+                f"Thumbnail generation failed for paper {paper_id}, PDF path: {paper.file_path}"
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate thumbnail. Check server logs for details.",
+            )
 
-    # Generate thumbnail (will use cached version if exists and regenerate=False)
-    thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
-        paper.file_path, paper_id, force_regenerate=regenerate
-    )
+        # Get full thumbnail path
+        thumbnail_full_path = thumbnail_gen.get_thumbnail_path(thumbnail_relative_path)
 
-    if not thumbnail_relative_path:
-        raise HTTPException(status_code=500, detail="Failed to generate thumbnail")
+        if not thumbnail_full_path.exists():
+            logger.error(f"Generated thumbnail not found at: {thumbnail_full_path}")
+            raise HTTPException(status_code=404, detail="Thumbnail file not found")
 
-    # Get full thumbnail path
-    thumbnail_full_path = thumbnail_gen.get_thumbnail_path(thumbnail_relative_path)
-
-    if not thumbnail_full_path.exists():
-        raise HTTPException(status_code=404, detail="Thumbnail file not found")
-
-    # Return thumbnail image
-    return FileResponse(
-        path=str(thumbnail_full_path),
-        media_type="image/jpeg",
-        headers={
-            "Cache-Control": "public, max-age=86400",  # Cache for 1 day
-            "Content-Disposition": "inline",
-        },
-    )
+        # Return thumbnail image with CORS headers for cross-origin requests
+        return FileResponse(
+            path=str(thumbnail_full_path),
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+                "Content-Disposition": "inline",
+                "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error generating thumbnail for paper {paper_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500, detail="Unexpected server error while generating thumbnail"
+        )
 
 
 @router.post("/{paper_id}/citation", response_model=CitationResponse)
@@ -449,17 +510,17 @@ async def get_papers_for_devonthink_export(
 ):
     """
     Get papers that were uploaded by users but not yet synced to DEVONthink.
-    
+
     These papers have dt_source_uuid = NULL, meaning they were uploaded directly
     to the library (not imported from DEVONthink). They can be exported back to
     DEVONthink to complete bidirectional syncing.
-    
+
     Returns papers that need to be synced TO DEVONthink.
     """
+    from app.db import Document, ScientificPaper, SearchSpace
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from app.db import ScientificPaper, Document, SearchSpace
-    
+
     # Query papers without dt_source_uuid (uploaded by users, not from DEVONthink)
     # and belonging to the current user's search spaces
     stmt = (
@@ -469,19 +530,19 @@ async def get_papers_for_devonthink_export(
         .join(SearchSpace)
         .where(
             ScientificPaper.dt_source_uuid.is_(None),  # Not from DEVONthink
-            SearchSpace.user_id == user.id  # Belongs to current user
+            SearchSpace.user_id == user.id,  # Belongs to current user
         )
         .order_by(ScientificPaper.created_at.desc())
         .limit(limit)
     )
-    
+
     result = await session.execute(stmt)
     papers = result.scalars().all()
-    
+
     return {
         "papers": [PaperResponse.from_orm(paper) for paper in papers],
         "total": len(papers),
-        "message": f"Found {len(papers)} paper(s) ready for DEVONthink export"
+        "message": f"Found {len(papers)} paper(s) ready for DEVONthink export",
     }
 
 
@@ -493,8 +554,8 @@ async def get_papers_by_room(
     """
     Get paper counts by literature type (room).
     """
-    from sqlalchemy import select, func
-    from app.db import ScientificPaper, Document, SearchSpace
+    from app.db import Document, ScientificPaper, SearchSpace
+    from sqlalchemy import func, select
 
     # Count papers by literature type for user's search spaces
     stmt = (
@@ -532,8 +593,8 @@ async def generate_thumbnails_batch(
     Generate thumbnails for multiple papers in batch.
     Useful for initial setup or regenerating thumbnails.
     """
+    from app.db import Document, ScientificPaper, SearchSpace
     from sqlalchemy import select
-    from app.db import ScientificPaper, Document, SearchSpace
 
     # Build query to get papers
     stmt = (
@@ -559,8 +620,11 @@ async def generate_thumbnails_batch(
             "total": 0,
         }
 
-    # Generate thumbnails
-    thumbnail_gen = ThumbnailGenerator()
+    # Initialize thumbnail generator with the same storage root
+    paper_manager = PaperManagerService(session)
+    thumbnail_gen = ThumbnailGenerator(
+        storage_root=str(paper_manager.file_storage.storage_root)
+    )
     success_count, failure_count = thumbnail_gen.batch_generate_thumbnails(
         papers, force_regenerate=force_regenerate
     )
@@ -582,8 +646,8 @@ async def add_favorite(
     """
     Add a paper to the user's favorites.
     """
-    from sqlalchemy import select, insert
     from app.db import ScientificPaper, user_favorites
+    from sqlalchemy import insert, select
 
     # Check if paper exists
     paper_stmt = select(ScientificPaper).where(ScientificPaper.id == paper_id)
@@ -622,8 +686,8 @@ async def remove_favorite(
     """
     Remove a paper from the user's favorites.
     """
-    from sqlalchemy import delete
     from app.db import user_favorites
+    from sqlalchemy import delete
 
     # Remove from favorites
     delete_stmt = delete(user_favorites).where(
@@ -648,8 +712,8 @@ async def is_favorited(
     """
     Check if a paper is in the user's favorites.
     """
-    from sqlalchemy import select
     from app.db import user_favorites
+    from sqlalchemy import select
 
     check_stmt = select(user_favorites).where(
         user_favorites.c.user_id == user.id,
@@ -671,8 +735,8 @@ async def get_favorites(
     """
     Get all papers in the user's favorites.
     """
-    from sqlalchemy import select
     from app.db import ScientificPaper, user_favorites
+    from sqlalchemy import select
 
     # Get favorited papers
     stmt = (

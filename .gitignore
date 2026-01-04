@@ -300,3 +300,8 @@ cython_debug/
 .DS_Store
 frontend/nextjs-app/.env.production
 CLERK_SETUP_CHECKLIST.md
+*.production
+.DS_Store
+backend/.DS_Store
+backend/app/agents/.DS_Store
+backend/app/rag_pipeline/.DS_Store
