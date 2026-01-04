@@ -7,6 +7,7 @@ for each entry, linking to thumbnails and preserving DEVONthink metadata.
 
 import asyncio
 import csv
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -14,17 +15,17 @@ from typing import Optional
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db import (
-    get_async_session_context,
-    ScientificPaper,
     Document,
+    DocumentType,
+    ScientificPaper,
     SearchSpace,
     User,
+    get_async_session_context,
 )
-from app.db import DocumentType
+from app.services.file_storage import FileStorageService
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_or_create_search_space(
@@ -62,6 +63,8 @@ async def import_record(
     row: dict,
     search_space_id: int,
     thumbnail_base_path: Path,
+    file_storage: FileStorageService,
+    pdf_base_path: Optional[Path] = None,
     dry_run: bool = False,
 ) -> Optional[ScientificPaper]:
     """Import a single record from the CSV."""
@@ -69,6 +72,7 @@ async def import_record(
     name = row["Name"].strip()
     description = row["Single Sentence Description"].strip()
     thumbnail_path = row.get("Thumbnail Path", "").strip()
+    pdf_path = row.get("PDF Path", "").strip()
 
     # Skip if already exists
     if await paper_exists(session, dt_uuid):
@@ -85,8 +89,39 @@ async def import_record(
             print(f"  ⚠️  Thumbnail not found: {full_thumbnail_path}")
             thumbnail_rel_path = None
 
+    # Try to find and store PDF if available
+    pdf_file_path = None
+    if pdf_path and os.path.exists(pdf_path):
+        # PDF path provided and exists - store it properly
+        try:
+            relative_path, file_uuid = file_storage.store_pdf(pdf_path)
+            pdf_file_path = relative_path
+            print(f"  📄 Stored PDF: {relative_path}")
+        except Exception as e:
+            print(f"  ⚠️  Failed to store PDF: {e}")
+    elif pdf_base_path:
+        # Try to find PDF in base path using UUID
+        potential_paths = [
+            pdf_base_path / f"{dt_uuid}.pdf",
+            pdf_base_path / "devonthink_import" / f"{dt_uuid}.pdf",
+            pdf_base_path / "devonthink_import" / f"{dt_uuid}",
+        ]
+        for potential_path in potential_paths:
+            if potential_path.exists() and potential_path.is_file():
+                try:
+                    relative_path, file_uuid = file_storage.store_pdf(
+                        str(potential_path)
+                    )
+                    pdf_file_path = relative_path
+                    print(f"  📄 Found and stored PDF: {relative_path}")
+                    break
+                except Exception as e:
+                    print(f"  ⚠️  Failed to store PDF from {potential_path}: {e}")
+
     if dry_run:
         print(f"  [DRY RUN] Would import: {name[:60]}")
+        if pdf_file_path:
+            print(f"         PDF would be stored at: {pdf_file_path}")
         return None
 
     # Create Document first (required for ScientificPaper)
@@ -97,6 +132,7 @@ async def import_record(
             "source": "devonthink_csv_import",
             "devonthink_uuid": dt_uuid,
             "has_thumbnail": thumbnail_rel_path is not None,
+            "has_pdf": pdf_file_path is not None,
         },
         content=description if description else name,  # Use description as content
         search_space_id=search_space_id,
@@ -109,8 +145,12 @@ async def import_record(
         title=name,
         authors=[],  # Will need to be extracted/added later
         abstract=description if description else None,
-        processing_status="completed",  # Mark as completed since we have the data
-        file_path=f"devonthink_import/{dt_uuid}",  # Placeholder path
+        processing_status="completed"
+        if pdf_file_path
+        else "pending",  # Mark as completed if PDF is available
+        file_path=pdf_file_path
+        if pdf_file_path
+        else None,  # Use actual stored path or None
         dt_source_uuid=dt_uuid,
         dt_source_path=thumbnail_rel_path,  # Store thumbnail path here
         document_id=document.id,
@@ -123,7 +163,8 @@ async def import_record(
     await session.commit()
     await session.refresh(paper)
 
-    print(f"  ✓ Imported: {name[:60]}")
+    status = "✓ Imported" if pdf_file_path else "⚠️  Imported (no PDF)"
+    print(f"  {status}: {name[:60]}")
     return paper
 
 
@@ -138,6 +179,15 @@ async def main():
     thumbnail_base = (
         Path(__file__).parent.parent.parent / "data" / "DEVONthink_Thumbnails"
     )
+    # Optional: PDF base path if PDFs are in a specific directory
+    pdf_base = None
+    if "--pdf-base" in sys.argv:
+        idx = sys.argv.index("--pdf-base")
+        if idx + 1 < len(sys.argv):
+            pdf_base = Path(sys.argv[idx + 1])
+            if not pdf_base.exists():
+                print(f"⚠️  PDF base directory not found: {pdf_base}")
+                pdf_base = None
 
     if not csv_path.exists():
         print(f"❌ CSV file not found: {csv_path}")
@@ -146,6 +196,10 @@ async def main():
     if not thumbnail_base.exists():
         print(f"⚠️  Thumbnail directory not found: {thumbnail_base}")
         print("   Continuing without thumbnails...")
+
+    # Initialize file storage service
+    file_storage = FileStorageService()
+    print(f"📁 PDF Storage: {file_storage.storage_root}")
 
     # Parse command line args
     dry_run = "--dry-run" in sys.argv
@@ -201,7 +255,13 @@ async def main():
         for i, row in enumerate(records, 1):
             try:
                 result = await import_record(
-                    session, row, search_space.id, thumbnail_base, dry_run=dry_run
+                    session,
+                    row,
+                    search_space.id,
+                    thumbnail_base,
+                    file_storage,
+                    pdf_base,
+                    dry_run=dry_run,
                 )
                 if result:
                     imported_count += 1
@@ -236,10 +296,21 @@ async def main():
 
 if __name__ == "__main__":
     print("\nUsage:")
-    print("  python import_devonthink_csv.py              # Import all records")
-    print("  python import_devonthink_csv.py --dry-run    # Test without importing")
-    print("  python import_devonthink_csv.py --limit 10   # Import only first 10")
-    print("  python import_devonthink_csv.py --verbose    # Show detailed errors")
+    print(
+        "  python import_devonthink_csv.py                                    # Import all records"
+    )
+    print(
+        "  python import_devonthink_csv.py --dry-run                          # Test without importing"
+    )
+    print(
+        "  python import_devonthink_csv.py --limit 10                         # Import only first 10"
+    )
+    print(
+        "  python import_devonthink_csv.py --pdf-base /path/to/pdfs           # Specify PDF directory"
+    )
+    print(
+        "  python import_devonthink_csv.py --verbose                          # Show detailed errors"
+    )
     print()
 
     asyncio.run(main())

@@ -68,11 +68,39 @@ async def _get_paper_file_path(
             status_code=500, detail=f"Error resolving file path: {str(e)}"
         )
 
+    # If file doesn't exist, try fallback locations for legacy imports
     if not full_path.exists():
-        logger.error(
-            f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})"
-        )
-        raise HTTPException(status_code=404, detail="PDF file not found")
+        # Check if this is a legacy devonthink_import path
+        if paper.file_path.startswith("devonthink_import/"):
+            # Try to find the file in the devonthink_import subdirectory
+            dt_uuid = paper.file_path.replace("devonthink_import/", "")
+            fallback_paths = [
+                paper_manager.file_storage.storage_root / "devonthink_import" / f"{dt_uuid}.pdf",
+                paper_manager.file_storage.storage_root / "devonthink_import" / dt_uuid,
+                # Also check if PDF_STORAGE_ROOT points to a different location
+                Path(paper_manager.file_storage.storage_root) / "devonthink_import" / f"{dt_uuid}.pdf",
+            ]
+            
+            for fallback in fallback_paths:
+                if fallback.exists() and fallback.is_file():
+                    logger.info(
+                        f"Found PDF for paper {paper_id} at fallback location: {fallback}"
+                    )
+                    full_path = fallback
+                    break
+            else:
+                logger.error(
+                    f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})"
+                )
+                logger.error(
+                    f"Tried fallback paths: {[str(p) for p in fallback_paths]}"
+                )
+                raise HTTPException(status_code=404, detail="PDF file not found")
+        else:
+            logger.error(
+                f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})"
+            )
+            raise HTTPException(status_code=404, detail="PDF file not found")
 
     return paper, full_path
 

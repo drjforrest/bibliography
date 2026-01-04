@@ -1,13 +1,23 @@
-import streamlit as st
-import requests
-import pandas as pd
+import os
+from datetime import datetime
 from typing import Dict, List, Optional
 
-# Configuration
-API_BASE_URL = "http://localhost:8000/api/v1"
-AUTH_BASE_URL = "http://localhost:8000"
+import pandas as pd
+import requests
+import streamlit as st
+
+# Configuration from environment variables
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+API_BASE_URL = f"{BACKEND_URL}/api/v1"
+AUTH_BASE_URL = BACKEND_URL
+
+# Basic Auth Configuration
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 # Session state initialization
+if "basic_auth" not in st.session_state:
+    st.session_state.basic_auth = False
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "token" not in st.session_state:
@@ -245,6 +255,27 @@ class BibliographyAPI:
             response.json() if response.status_code == 200 else {"error": response.text}
         )
 
+    def create_user(
+        self,
+        email: str,
+        password: str,
+        is_superuser: bool = False,
+        is_verified: bool = False,
+    ) -> Dict:
+        """Create a new user (admin only)."""
+        data = {
+            "email": email,
+            "password": password,
+            "is_superuser": is_superuser,
+            "is_verified": is_verified,
+        }
+        response = requests.post(
+            f"{self.auth_base_url}/auth/register", json=data, headers=self.headers
+        )
+        return (
+            response.json() if response.status_code == 200 else {"error": response.text}
+        )
+
     def get_folder_hierarchy(self) -> Dict:
         """Get DEVONthink folder hierarchy."""
         response = requests.get(
@@ -476,8 +507,41 @@ def show_room_interface(api: BibliographyAPI):
         admin_tab(api)
 
 
+def basic_auth_page():
+    """Display basic authentication page."""
+    st.title("🔐 Admin Access")
+    st.markdown("### Enter credentials to access the admin panel")
+
+    # Check if basic auth is disabled (empty password)
+    if not ADMIN_PASSWORD:
+        st.warning(
+            "⚠️ Basic authentication is not configured. Set ADMIN_PASSWORD environment variable."
+        )
+        if st.button("Continue Anyway (Not Recommended)"):
+            st.session_state.basic_auth = True
+            st.rerun()
+        return
+
+    with st.form("basic_auth_form"):
+        username = st.text_input("Username", placeholder="Enter username")
+        password = st.text_input(
+            "Password", type="password", placeholder="Enter password"
+        )
+        submit = st.form_submit_button(
+            "Authenticate", type="primary", use_container_width=True
+        )
+
+        if submit:
+            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+                st.session_state.basic_auth = True
+                st.success("✅ Authentication successful!")
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password")
+
+
 def login_page():
-    """Display login page."""
+    """Display login page for JWT authentication."""
     st.title("📚 Bibliography Manager")
     st.markdown("### Please log in to continue")
 
@@ -1490,56 +1554,135 @@ def user_management_panel(api: BibliographyAPI):
     """User management panel for admins."""
     st.subheader("👥 User Management")
 
-    if st.button("🔄 Refresh Users", key="refresh_users"):
-        st.rerun()
+    # Create tabs for different user management functions
+    create_tab, list_tab = st.tabs(["➕ Create User", "📋 User List"])
 
-    # Get user stats
-    stats_result = api.get_user_stats()
+    with create_tab:
+        st.markdown("### ➕ Create New User")
+        st.markdown("Create a new user account in the system.")
 
-    if "error" not in stats_result:
-        st.markdown("### 📊 User Statistics")
-        col1, col2, col3, col4, col5 = st.columns(5)
+        with st.form("create_user_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
 
-        with col1:
-            st.metric("Total Users", stats_result.get("total_users", 0))
-        with col2:
-            st.metric("Active", stats_result.get("active_users", 0))
-        with col3:
-            st.metric("Verified", stats_result.get("verified_users", 0))
-        with col4:
-            st.metric("Superusers", stats_result.get("superusers", 0))
-        with col5:
-            st.metric("Inactive", stats_result.get("inactive_users", 0))
+            with col1:
+                email = st.text_input(
+                    "Email *",
+                    placeholder="user@example.com",
+                    help="User's email address (required)",
+                )
+                password = st.text_input(
+                    "Password *",
+                    type="password",
+                    placeholder="Enter password",
+                    help="User's password (required, minimum 8 characters)",
+                )
 
-    # Get users list
-    users_result = api.get_users()
+            with col2:
+                is_superuser = st.checkbox(
+                    "Superuser",
+                    value=False,
+                    help="Grant superuser/admin privileges",
+                )
+                is_verified = st.checkbox(
+                    "Verified",
+                    value=True,
+                    help="Mark user as verified (skip email verification)",
+                )
 
-    if "error" in users_result:
-        st.error(f"Error loading users: {users_result.get('error', 'Unknown error')}")
-        st.info("Make sure you are logged in as a superuser")
-    elif isinstance(users_result, list):
-        users = users_result
-
-        if users:
-            st.markdown(f"### 👥 All Users ({len(users)})")
-
-            # Create user table
-            user_df = pd.DataFrame(
-                [
-                    {
-                        "Email": u.get("email", ""),
-                        "Status": "✅ Active" if u.get("is_active") else "❌ Inactive",
-                        "Verified": "✅" if u.get("is_verified") else "❌",
-                        "Superuser": "🔑" if u.get("is_superuser") else "-",
-                        "ID": str(u.get("id", ""))[:8] + "...",
-                    }
-                    for u in users
-                ]
+            submit_button = st.form_submit_button(
+                "👤 Create User", type="primary", use_container_width=True
             )
 
-            st.dataframe(user_df, use_container_width=True)
-        else:
-            st.info("No users found")
+            if submit_button:
+                # Validation
+                if not email:
+                    st.error("❌ Email is required")
+                elif not password:
+                    st.error("❌ Password is required")
+                elif len(password) < 8:
+                    st.error("❌ Password must be at least 8 characters long")
+                elif "@" not in email:
+                    st.error("❌ Please enter a valid email address")
+                else:
+                    with st.spinner("Creating user..."):
+                        result = api.create_user(
+                            email=email,
+                            password=password,
+                            is_superuser=is_superuser,
+                            is_verified=is_verified,
+                        )
+
+                    if "error" in result or "detail" in result:
+                        error_msg = result.get("error") or result.get("detail")
+                        if isinstance(error_msg, dict):
+                            error_msg = str(error_msg)
+                        st.error(f"❌ Failed to create user: {error_msg}")
+                    elif "id" in result:
+                        st.success(f"✅ User created successfully!")
+                        st.info(
+                            f"**Email:** {email}\n\n**User ID:** {result.get('id')}"
+                        )
+                        # Auto-refresh after a moment
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ Unexpected response from server")
+                        st.json(result)
+
+    with list_tab:
+        if st.button("🔄 Refresh Users", key="refresh_users"):
+            st.rerun()
+
+        # Get user stats
+        stats_result = api.get_user_stats()
+
+        if "error" not in stats_result:
+            st.markdown("### 📊 User Statistics")
+            col1, col2, col3, col4, col5 = st.columns(5)
+
+            with col1:
+                st.metric("Total Users", stats_result.get("total_users", 0))
+            with col2:
+                st.metric("Active", stats_result.get("active_users", 0))
+            with col3:
+                st.metric("Verified", stats_result.get("verified_users", 0))
+            with col4:
+                st.metric("Superusers", stats_result.get("superusers", 0))
+            with col5:
+                st.metric("Inactive", stats_result.get("inactive_users", 0))
+
+        # Get users list
+        users_result = api.get_users()
+
+        if "error" in users_result:
+            st.error(
+                f"Error loading users: {users_result.get('error', 'Unknown error')}"
+            )
+            st.info("Make sure you are logged in as a superuser")
+        elif isinstance(users_result, list):
+            users = users_result
+
+            if users:
+                st.markdown(f"### 👥 All Users ({len(users)})")
+
+                # Create user table
+                user_df = pd.DataFrame(
+                    [
+                        {
+                            "Email": u.get("email", ""),
+                            "Status": "✅ Active"
+                            if u.get("is_active")
+                            else "❌ Inactive",
+                            "Verified": "✅" if u.get("is_verified") else "❌",
+                            "Superuser": "🔑" if u.get("is_superuser") else "-",
+                            "ID": str(u.get("id", ""))[:8] + "...",
+                        }
+                        for u in users
+                    ]
+                )
+
+                st.dataframe(user_df, use_container_width=True)
+            else:
+                st.info("No users found")
 
 
 def system_stats_panel(api: BibliographyAPI):
@@ -1605,6 +1748,12 @@ def main():
     """Main application entry point."""
     st.set_page_config(page_title="Bibliography Manager", page_icon="📚", layout="wide")
 
+    # Basic authentication check (first layer)
+    if not st.session_state.basic_auth:
+        basic_auth_page()
+        return
+
+    # JWT authentication check (second layer)
     if not st.session_state.authenticated:
         login_page()
     else:
