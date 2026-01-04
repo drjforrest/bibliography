@@ -305,3 +305,5 @@ CLERK_SETUP_CHECKLIST.md
 backend/.DS_Store
 backend/app/agents/.DS_Store
 backend/app/rag_pipeline/.DS_Store
+.env.production
+frontend/nextjs-app/.env.production
