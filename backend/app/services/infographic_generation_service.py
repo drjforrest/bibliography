@@ -210,7 +210,7 @@ Create ONE comprehensive, visually appealing infographic that captures the essen
                     "X-Title": "HERO Evidence Library"
                 },
                 json={
-                    "model": "google/imagen-3-fast",  # or "google/imagen-3" for higher quality
+                    "model": "google/imagen-4.0-generate-001",  # Latest Imagen 4.0
                     "prompt": prompt,
                     "n": 1,
                     "size": "1024x1024",  # OpenRouter standard size
