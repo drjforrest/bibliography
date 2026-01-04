@@ -1,17 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from app.db import get_async_session, User
-from app.services.annotation_service import AnnotationService
-from app.services.notification_service import NotificationService
-from app.users import current_active_user
+from app.db import User, get_async_session
+from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas.papers import (
     AnnotationCreate,
-    AnnotationUpdate,
-    AnnotationResponse,
     AnnotationListResponse,
+    AnnotationResponse,
+    AnnotationUpdate,
 )
+from app.services.annotation_service import AnnotationService
+from app.services.notification_service import NotificationService
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/annotations", tags=["annotations"])
 async def create_annotation(
     annotation_data: AnnotationCreate,
     paper_id: int = Query(...),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -50,7 +50,7 @@ async def create_annotation(
 @router.get("/{annotation_id}", response_model=AnnotationResponse)
 async def get_annotation(
     annotation_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -71,7 +71,7 @@ async def get_annotation(
 async def get_paper_annotations(
     paper_id: int,
     include_private: bool = Query(True),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -93,7 +93,7 @@ async def get_my_annotations(
     paper_id: Optional[int] = Query(None),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -114,7 +114,7 @@ async def get_my_annotations(
 async def update_annotation(
     annotation_id: int,
     update_data: AnnotationUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -136,7 +136,7 @@ async def update_annotation(
 @router.delete("/{annotation_id}")
 async def delete_annotation(
     annotation_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -164,7 +164,7 @@ async def search_annotations(
     paper_id: Optional[int] = Query(None),
     annotation_type: Optional[str] = Query(None),
     limit: int = Query(20, le=100),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -188,7 +188,7 @@ async def search_annotations(
 @router.post("/{annotation_id}/toggle-privacy", response_model=AnnotationResponse)
 async def toggle_annotation_privacy(
     annotation_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -209,7 +209,7 @@ async def toggle_annotation_privacy(
 
 @router.get("/stats/me")
 async def get_my_annotation_stats(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -222,7 +222,7 @@ async def get_my_annotation_stats(
 
 @router.get("/stats/global")
 async def get_global_annotation_stats(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """

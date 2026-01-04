@@ -143,13 +143,23 @@ async def get_paper(
     """
     Get a specific paper by ID.
     """
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        paper_manager = PaperManagerService(session)
+        paper = await paper_manager.get_paper_by_id(paper_id)
 
-    if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        if not paper:
+            logger.warning(f"Paper {paper_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Paper not found")
 
-    return PaperResponse.from_orm(paper)
+        return PaperResponse.from_orm(paper)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving paper {paper_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving paper: {str(e)}")
 
 
 @router.get("/by-folder")
@@ -212,21 +222,38 @@ async def get_paper_pdf(
     Get PDF file for viewing (not download).
     Public endpoint - no authentication required for PDF viewing.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)
 
     if not paper:
+        logger.error(f"Paper {paper_id} not found")
         raise HTTPException(status_code=404, detail="Paper not found")
 
+    if not paper.file_path:
+        logger.error(f"Paper {paper_id} has no file_path")
+        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+
     # Get full file path
-    full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+    try:
+        full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+    except Exception as e:
+        logger.error(f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}")
+        raise HTTPException(status_code=500, detail=f"Error resolving file path: {str(e)}")
 
     if not full_path.exists():
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+        logger.error(f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})")
+        raise HTTPException(status_code=404, detail=f"PDF file not found on disk: {paper.file_path}")
 
     # Return file for inline viewing
-    with open(full_path, "rb") as f:
-        pdf_bytes = f.read()
+    try:
+        with open(full_path, "rb") as f:
+            pdf_bytes = f.read()
+    except Exception as e:
+        logger.error(f"Error reading PDF file for paper {paper_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading PDF file: {str(e)}")
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -244,17 +271,30 @@ async def download_paper(
     """
     Download the PDF file for a paper.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     paper_manager = PaperManagerService(session)
     paper = await paper_manager.get_paper_by_id(paper_id)
 
     if not paper:
+        logger.error(f"Paper {paper_id} not found for download")
         raise HTTPException(status_code=404, detail="Paper not found")
 
+    if not paper.file_path:
+        logger.error(f"Paper {paper_id} has no file_path for download")
+        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+
     # Get full file path
-    full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+    try:
+        full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+    except Exception as e:
+        logger.error(f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}")
+        raise HTTPException(status_code=500, detail=f"Error resolving file path: {str(e)}")
 
     if not full_path.exists():
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+        logger.error(f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})")
+        raise HTTPException(status_code=404, detail=f"PDF file not found on disk: {paper.file_path}")
 
     # Generate a nice filename
     filename = f"{paper.title[:50]}.pdf" if paper.title else f"paper_{paper_id}.pdf"
