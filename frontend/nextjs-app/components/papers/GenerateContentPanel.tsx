@@ -54,6 +54,35 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
           status: 'complete',
           result: podcast,
         });
+      } else if (type === 'infographic') {
+        setGeneration(prev => ({ ...prev, progress: 'Creating visual infographic...' }));
+        
+        // TODO: Create infographicAPI similar to podcastAPI
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v2/infographics/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ 
+            paper_id: paperId,
+            style: 'modern',
+            focus: 'all'
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to generate infographic');
+        }
+        
+        const infographic = await response.json();
+        
+        setGeneration({
+          type,
+          status: 'complete',
+          result: infographic,
+        });
       } else {
         // TODO: Implement other generation types
         throw new Error(`${type} generation not yet implemented`);
@@ -176,13 +205,14 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
           </div>
         )}
 
-        {/* Success Message with Podcast Player */}
+        {/* Success Message with Content Display */}
         {generation.status === 'complete' && generation.result && (
           <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
             <div className="text-green-700 text-sm font-medium">
               ✓ {generation.type} created successfully!
             </div>
             
+            {/* Podcast Player */}
             {generation.type === 'podcast' && generation.result && (
               <div className="bg-white rounded-lg p-4 border border-gray-200 space-y-3">
                 <div className="flex items-center justify-between">
@@ -216,6 +246,40 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
                     {generation.result.podcast_transcript}
                   </div>
                 </details>
+              </div>
+            )}
+            
+            {/* Infographic Display */}
+            {generation.type === 'infographic' && generation.result && (
+              <div className="bg-white rounded-lg p-4 border border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900 text-sm">
+                      {generation.result.title}
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {generation.result.style} style • {generation.result.focus_area}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Image Display */}
+                <div className="relative">
+                  <img 
+                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v2/infographics/${generation.result.id}/download`}
+                    alt={generation.result.title}
+                    className="w-full rounded-lg border border-gray-200"
+                  />
+                </div>
+                
+                {/* Download Button */}
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v2/infographics/${generation.result.id}/download`}
+                  download={`infographic_${generation.result.id}.png`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                >
+                  Download PNG
+                </a>
               </div>
             )}
           </div>

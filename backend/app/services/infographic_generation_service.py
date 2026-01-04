@@ -1,0 +1,242 @@
+"""
+Infographic Generation Service for HERO Evidence Library v2.0
+
+Generates visual infographics from research papers using Gemini's imagen capability.
+Adapted from SciGram's PDF infographic generation.
+"""
+
+import asyncio
+from typing import Optional, Dict, Any, Literal
+from datetime import datetime
+from pathlib import Path
+import base64
+import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.db import Infographic, Paper, User
+
+
+InfographicStyle = Literal["minimal", "detailed", "modern", "classic"]
+InfographicFocus = Literal["statistics", "messages", "recommendations", "all"]
+
+
+class InfographicGenerationService:
+    """
+    Service for generating visual infographics from research papers.
+    
+    Uses Google Gemini's imagen-3.0-generate-001 model to create
+    full-page professional infographics.
+    """
+    
+    def __init__(
+        self,
+        db: AsyncSession,
+        gemini_api_key: str,
+        output_dir: Optional[Path] = None
+    ):
+        self.db = db
+        self.gemini_api_key = gemini_api_key
+        self.output_dir = output_dir or Path("/tmp/hero_infographics")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.gemini_base_url = "https://generativelanguage.googleapis.com/v1beta"
+    
+    async def generate_infographic(
+        self,
+        paper_id: int,
+        user_id: int,
+        style: InfographicStyle = "modern",
+        focus: InfographicFocus = "all",
+        color_scheme: str = "professional",
+        custom_description: Optional[str] = None
+    ) -> Infographic:
+        """
+        Generate an infographic from a research paper.
+        
+        Args:
+            paper_id: ID of the paper
+            user_id: ID of the user
+            style: Visual style (minimal, detailed, modern, classic)
+            focus: Content focus (statistics, messages, recommendations, all)
+            color_scheme: Color palette
+            custom_description: Optional user description
+            
+        Returns:
+            Infographic database object
+        """
+        # Fetch paper
+        paper = await self._get_paper(paper_id)
+        if not paper:
+            raise ValueError(f"Paper {paper_id} not found")
+        
+        # Build prompt
+        prompt = self._build_infographic_prompt(
+            paper=paper,
+            style=style,
+            focus=focus,
+            color_scheme=color_scheme,
+            custom_description=custom_description
+        )
+        
+        # Generate image with Gemini
+        image_data = await self._generate_with_gemini(prompt)
+        
+        # Save image file
+        image_filename = f"infographic_{paper_id}_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        image_path = self.output_dir / image_filename
+        image_path.write_bytes(image_data)
+        
+        # Create infographic record
+        infographic = Infographic(
+            user_id=user_id,
+            source_paper_id=paper_id,
+            title=f"Infographic: {paper.title[:80]}",
+            image_url=str(image_path),
+            style=style,
+            focus_area=focus,
+            generation_prompt=prompt,
+            created_at=datetime.utcnow()
+        )
+        
+        self.db.add(infographic)
+        await self.db.commit()
+        await self.db.refresh(infographic)
+        
+        return infographic
+    
+    def _build_infographic_prompt(
+        self,
+        paper: Paper,
+        style: InfographicStyle,
+        focus: InfographicFocus,
+        color_scheme: str,
+        custom_description: Optional[str] = None
+    ) -> str:
+        """
+        Build a prompt for Gemini to generate an infographic.
+        """
+        # Sanitize custom description
+        sanitized_desc = self._sanitize_description(custom_description) if custom_description else ""
+        user_request = f"\n\nUser's specific request: {sanitized_desc}\n" if sanitized_desc else ""
+        
+        # Build content sections based on focus
+        content_sections = []
+        
+        if focus in ["all", "messages"] and paper.summary:
+            content_sections.append(f"Key Findings:\n{paper.summary}")
+        
+        if focus in ["all", "messages"] and paper.lay_summary:
+            content_sections.append(f"Plain Language Summary:\n{paper.lay_summary}")
+        
+        if focus in ["all", "recommendations"] and paper.insights:
+            insights_list = "\n".join([f"• {insight}" for insight in paper.insights[:5]])
+            content_sections.append(f"Key Insights:\n{insights_list}")
+        
+        content_text = "\n\n".join(content_sections)
+        
+        prompt = f"""Create a full-page professional infographic summarizing this research paper:{user_request}
+
+Paper Information:
+- Title: {paper.title}
+- Authors: {paper.authors if hasattr(paper, 'authors') else 'Not specified'}
+- Year: {paper.year if hasattr(paper, 'year') else 'Not specified'}
+- Type: {paper.literature_type if hasattr(paper, 'literature_type') else 'Research'}
+
+{content_text}
+
+Infographic Requirements:
+- Full-page 16:9 widescreen layout (standard presentation format)
+- {style} design style
+- {color_scheme} color scheme
+- Clear visual hierarchy with prominent title
+- Professional typography (minimum 12pt body text, 24pt+ headers)
+- Icons and visual elements to support key points
+- Statistics highlighted prominently with charts or large numbers
+- Balanced layout with effective use of white space
+- Easy to scan and understand at a glance
+- Publication-ready quality
+- High contrast and legibility (WCAG AA compliant - 4.5:1 minimum contrast)
+- Suitable for scientific/academic use
+- Grid-based layout with consistent spacing
+
+Create ONE comprehensive, visually appealing infographic that captures the essence of this research in a single 16:9 slide format. Use visual elements, icons, charts, and typography to make the information engaging and accessible."""
+
+        return prompt
+    
+    def _sanitize_description(self, description: str) -> str:
+        """
+        Sanitize user description to prevent prompt injection.
+        """
+        if not description:
+            return ""
+        
+        # Trim and limit length
+        sanitized = description.strip()[:500]
+        
+        # Replace newlines
+        sanitized = sanitized.replace("\n", " ").replace("\r", " ")
+        
+        # Remove injection patterns
+        injection_patterns = [
+            "ignore previous instructions",
+            "ignore all instructions",
+            "forget previous",
+            "system:",
+            "assistant:",
+            "user:",
+        ]
+        
+        for pattern in injection_patterns:
+            sanitized = sanitized.replace(pattern, "")
+            sanitized = sanitized.replace(pattern.upper(), "")
+        
+        # Collapse multiple spaces
+        sanitized = " ".join(sanitized.split())
+        
+        return sanitized
+    
+    async def _generate_with_gemini(self, prompt: str) -> bytes:
+        """
+        Call Google Gemini imagen API to generate infographic image.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.gemini_base_url}/models/imagen-3.0-generate-001:predict",
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self.gemini_api_key
+                },
+                json={
+                    "instances": [
+                        {
+                            "prompt": prompt
+                        }
+                    ],
+                    "parameters": {
+                        "sampleCount": 1,
+                        "aspectRatio": "16:9",
+                        "safetyFilterLevel": "block_some",
+                        "personGeneration": "dont_allow"
+                    }
+                },
+                timeout=60.0
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract image from response
+            # Gemini returns base64-encoded image in predictions[0].bytesBase64Encoded
+            if "predictions" in data and len(data["predictions"]) > 0:
+                image_base64 = data["predictions"][0].get("bytesBase64Encoded", "")
+                image_data = base64.b64decode(image_base64)
+                return image_data
+            else:
+                raise ValueError("No image generated by Gemini")
+    
+    async def _get_paper(self, paper_id: int) -> Optional[Paper]:
+        """Fetch paper from database."""
+        result = await self.db.execute(
+            select(Paper).where(Paper.id == paper_id)
+        )
+        return result.scalar_one_or_none()
