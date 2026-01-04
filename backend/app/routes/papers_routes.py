@@ -278,44 +278,73 @@ async def get_paper_thumbnail(
     Get thumbnail image for a paper. Generates it if it doesn't exist.
     Public endpoint - no authentication required for thumbnail access.
     """
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        paper_manager = PaperManagerService(session)
+        paper = await paper_manager.get_paper_by_id(paper_id)
 
-    if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
 
-    if not paper.file_path:
-        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+        if not paper.file_path:
+            raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
 
-    # Initialize thumbnail generator
-    thumbnail_gen = ThumbnailGenerator()
+        # Get full PDF path using the same storage service
+        pdf_full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+        if not pdf_full_path.exists():
+            logger.error(f"PDF file not found for paper {paper_id}: {pdf_full_path}")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"PDF file not found: {paper.file_path}"
+            )
 
-    # Generate thumbnail (will use cached version if exists and regenerate=False)
-    thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
-        paper.file_path, paper_id, force_regenerate=regenerate
-    )
+        # Initialize thumbnail generator with the same storage root
+        thumbnail_gen = ThumbnailGenerator(
+            storage_root=str(paper_manager.file_storage.storage_root)
+        )
 
-    if not thumbnail_relative_path:
-        raise HTTPException(status_code=500, detail="Failed to generate thumbnail")
+        # Generate thumbnail using the full PDF path
+        # Pass the full path directly since we've already resolved it
+        thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
+            str(pdf_full_path), paper_id, force_regenerate=regenerate
+        )
 
-    # Get full thumbnail path
-    thumbnail_full_path = thumbnail_gen.get_thumbnail_path(thumbnail_relative_path)
+        if not thumbnail_relative_path:
+            logger.error(f"Thumbnail generation failed for paper {paper_id}, PDF path: {paper.file_path}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Failed to generate thumbnail. Check server logs for details."
+            )
 
-    if not thumbnail_full_path.exists():
-        raise HTTPException(status_code=404, detail="Thumbnail file not found")
+        # Get full thumbnail path
+        thumbnail_full_path = thumbnail_gen.get_thumbnail_path(thumbnail_relative_path)
 
-    # Return thumbnail image with CORS headers for cross-origin requests
-    return FileResponse(
-        path=str(thumbnail_full_path),
-        media_type="image/jpeg",
-        headers={
-            "Cache-Control": "public, max-age=86400",  # Cache for 1 day
-            "Content-Disposition": "inline",
-            "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        },
-    )
+        if not thumbnail_full_path.exists():
+            logger.error(f"Generated thumbnail not found at: {thumbnail_full_path}")
+            raise HTTPException(status_code=404, detail="Thumbnail file not found")
+
+        # Return thumbnail image with CORS headers for cross-origin requests
+        return FileResponse(
+            path=str(thumbnail_full_path),
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+                "Content-Disposition": "inline",
+                "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error generating thumbnail for paper {paper_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
 
 
 @router.post("/{paper_id}/citation", response_model=CitationResponse)
