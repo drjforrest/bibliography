@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from enum import Enum
 
 from app.config import config
-from app.retriver.chunks_hybrid_search import ChucksHybridSearchRetriever
-from app.retriver.documents_hybrid_search import DocumentHybridSearchRetriever
+from app.retriever.chunks_hybrid_search import ChunksHybridSearchRetriever
+from app.retriever.documents_hybrid_search import DocumentHybridSearchRetriever
 from fastapi import Depends
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import ARRAY, JSON, TIMESTAMP, Boolean, Column, Date
@@ -60,6 +60,15 @@ class ChatType(str, Enum):
     DEEP = "DEEP"
     DEEPER = "DEEPER"
     DEEPEST = "DEEPEST"
+
+
+class SummaryType(str, Enum):
+    """Types of summaries that can be generated"""
+    LAY = "lay"  # Accessible to general audiences
+    TECHNICAL = "technical"  # For peer researchers
+    EXECUTIVE = "executive"  # Decision-maker focused
+    COMPARATIVE = "comparative"  # Multi-paper synthesis
+    VISUAL = "visual"  # Structured for infographic generation
 
 
 class Base(DeclarativeBase):
@@ -333,16 +342,160 @@ class Tag(BaseModel, TimestampMixin):
 
 
 class Podcast(BaseModel, TimestampMixin):
+    """
+    Generated podcasts from selected papers (v2.0 feature).
+    
+    Podcasts are audio conversations between AI hosts discussing research papers.
+    """
     __tablename__ = "podcasts"
-
-    title = Column(String, nullable=False, index=True)
-    podcast_transcript = Column(JSON, nullable=False, default={})
-    file_location = Column(String(500), nullable=False, default="")
-
+    
+    # Metadata
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    
+    # Content
+    podcast_transcript = Column(JSON, nullable=True)
+    file_location = Column(Text, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    
+    # Source tracking
+    source_paper_ids = Column(ARRAY(Integer), nullable=False, default=[])
+    user_prompt = Column(Text, nullable=True)
+    
+    # Generation metadata
+    generation_status = Column(
+        String(50), 
+        nullable=False, 
+        default="pending",
+        index=True
+    )
+    generation_error = Column(Text, nullable=True)
+    task_id = Column(String(255), nullable=True, index=True)
+    
+    # Relations
     search_space_id = Column(
         Integer, ForeignKey("searchspaces.id", ondelete="CASCADE"), nullable=False
     )
     search_space = relationship("SearchSpace", back_populates="podcasts")
+    
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    user = relationship("User", back_populates="podcasts")
+
+
+class Summary(BaseModel, TimestampMixin):
+    """
+    AI-generated summaries of research papers (v2.0 feature).
+    """
+    __tablename__ = "summaries"
+    
+    # Metadata
+    title = Column(String(500), nullable=False)
+    summary_type = Column(
+        SQLAlchemyEnum(SummaryType), 
+        nullable=False,
+        index=True
+    )
+    
+    # Content
+    content = Column(Text, nullable=False)
+    key_findings = Column(JSON, nullable=True)
+    
+    # Source tracking
+    source_paper_ids = Column(ARRAY(Integer), nullable=False, default=[])
+    user_prompt = Column(Text, nullable=True)
+    
+    # Generation metadata
+    generation_status = Column(String(50), nullable=False, default="pending")
+    generation_error = Column(Text, nullable=True)
+    task_id = Column(String(255), nullable=True, index=True)
+    
+    # Relations
+    search_space_id = Column(
+        Integer, ForeignKey("searchspaces.id", ondelete="CASCADE"), nullable=True
+    )
+    search_space = relationship("SearchSpace", back_populates="summaries")
+    
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    user = relationship("User", back_populates="summaries")
+
+
+class Infographic(BaseModel, TimestampMixin):
+    """
+    Generated visual content from research papers (v2.0 feature).
+    """
+    __tablename__ = "infographics"
+    
+    # Metadata
+    title = Column(String(500), nullable=False)
+    infographic_type = Column(String(50), nullable=False)
+    
+    # Content
+    file_location = Column(Text, nullable=True)
+    file_format = Column(String(10), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    data_json = Column(JSON, nullable=True)
+    
+    # Source tracking
+    source_paper_ids = Column(ARRAY(Integer), nullable=False, default=[])
+    user_prompt = Column(Text, nullable=True)
+    
+    # Generation metadata
+    generation_status = Column(String(50), nullable=False, default="pending")
+    generation_error = Column(Text, nullable=True)
+    task_id = Column(String(255), nullable=True, index=True)
+    
+    # Relations
+    search_space_id = Column(
+        Integer, ForeignKey("searchspaces.id", ondelete="CASCADE"), nullable=True
+    )
+    search_space = relationship("SearchSpace", back_populates="infographics")
+    
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    user = relationship("User", back_populates="infographics")
+
+
+class SlideDeck(BaseModel, TimestampMixin):
+    """
+    Generated presentation slide decks from research papers (v2.0 feature).
+    """
+    __tablename__ = "slide_decks"
+    
+    # Metadata
+    title = Column(String(500), nullable=False)
+    slide_count = Column(Integer, nullable=True)
+    
+    # Content
+    file_location = Column(Text, nullable=True)
+    file_format = Column(String(10), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    slides_json = Column(JSON, nullable=True)
+    
+    # Source tracking
+    source_paper_ids = Column(ARRAY(Integer), nullable=False, default=[])
+    user_prompt = Column(Text, nullable=True)
+    
+    # Generation metadata
+    generation_status = Column(String(50), nullable=False, default="pending")
+    generation_error = Column(Text, nullable=True)
+    task_id = Column(String(255), nullable=True, index=True)
+    
+    # Relations
+    search_space_id = Column(
+        Integer, ForeignKey("searchspaces.id", ondelete="CASCADE"), nullable=True
+    )
+    search_space = relationship("SearchSpace", back_populates="slide_decks")
+    
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    user = relationship("User", back_populates="slide_decks")
 
 
 class SearchSpace(BaseModel, TimestampMixin):
@@ -365,7 +518,25 @@ class SearchSpace(BaseModel, TimestampMixin):
     podcasts = relationship(
         "Podcast",
         back_populates="search_space",
-        order_by="Podcast.id",
+        order_by="Podcast.created_at.desc()",
+        cascade="all, delete-orphan",
+    )
+    summaries = relationship(
+        "Summary",
+        back_populates="search_space",
+        order_by="Summary.created_at.desc()",
+        cascade="all, delete-orphan",
+    )
+    infographics = relationship(
+        "Infographic",
+        back_populates="search_space",
+        order_by="Infographic.created_at.desc()",
+        cascade="all, delete-orphan",
+    )
+    slide_decks = relationship(
+        "SlideDeck",
+        back_populates="search_space",
+        order_by="SlideDeck.created_at.desc()",
         cascade="all, delete-orphan",
     )
     chats = relationship(
@@ -586,6 +757,9 @@ if config.AUTH_TYPE == "GOOGLE":
         # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
         openrouter_api_key = Column(String, nullable=True)
 
+        # Clerk integration
+        clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
+
         # Profile information
         display_name = Column(String(100), nullable=True)
         bio = Column(Text, nullable=True)
@@ -626,6 +800,9 @@ else:
         # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
         openrouter_api_key = Column(String, nullable=True)
 
+        # Clerk integration
+        clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
+
         # Profile information
         display_name = Column(String(100), nullable=True)
         bio = Column(Text, nullable=True)
@@ -656,6 +833,12 @@ else:
             foreign_keys="UserNotification.user_id",
             cascade="all, delete-orphan",
         )
+        
+        # v2.0 relationships
+        podcasts = relationship("Podcast", back_populates="user")
+        summaries = relationship("Summary", back_populates="user")
+        infographics = relationship("Infographic", back_populates="user")
+        slide_decks = relationship("SlideDeck", back_populates="user")
 
 
 engine = create_async_engine(DATABASE_URL)
@@ -718,10 +901,10 @@ else:
         yield SQLAlchemyUserDatabase(session, User)
 
 
-async def get_chucks_hybrid_search_retriever(
+async def get_chunks_hybrid_search_retriever(
     session: AsyncSession = Depends(get_async_session),
 ):
-    return ChucksHybridSearchRetriever(session)
+    return ChunksHybridSearchRetriever(session)
 
 
 async def get_documents_hybrid_search_retriever(
