@@ -253,4 +253,3 @@ class ThumbnailGenerator:
             f"Batch thumbnail generation: {success_count} succeeded, {failure_count} failed"
         )
         return success_count, failure_count
-        return success_count, failure_count

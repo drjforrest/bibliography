@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -51,6 +52,44 @@ class DevonthinkSyncService:
         self.thumbnail_gen = ThumbnailGenerator(
             storage_root=str(self.file_storage.storage_root)
         )
+
+    async def _generate_and_log_thumbnail(
+        self, paper: ScientificPaper, force_regenerate: bool = False
+    ) -> None:
+        """
+        Generate thumbnail for a paper in a non-blocking way.
+
+        This helper method wraps thumbnail generation with error handling and logging,
+        offloading the CPU/I/O-bound synchronous work to a thread pool to avoid
+        blocking the async event loop.
+
+        Args:
+            paper: The ScientificPaper instance to generate thumbnail for
+            force_regenerate: If True, regenerate even if thumbnail exists
+        """
+        if not paper.file_path:
+            return
+
+        try:
+            logger.debug(f"   🖼️  Generating thumbnail for paper {paper.id}")
+            # Offload synchronous thumbnail generation to thread pool
+            thumbnail_path = await asyncio.to_thread(
+                self.thumbnail_gen.generate_thumbnail,
+                paper.file_path,
+                paper.id,
+                force_regenerate=force_regenerate,
+            )
+            if thumbnail_path:
+                logger.debug(f"   ✓ Thumbnail generated: {thumbnail_path}")
+            else:
+                logger.warning(
+                    f"   ⚠️  Thumbnail generation returned None for paper {paper.id}"
+                )
+        except Exception as thumb_error:
+            # Don't fail sync if thumbnail generation fails
+            logger.warning(
+                f"   ⚠️  Thumbnail generation failed for paper {paper.id}: {str(thumb_error)}"
+            )
 
     async def sync_database(
         self, request: DevonthinkSyncRequest, user_id: UUID
@@ -477,23 +516,7 @@ class DevonthinkSyncService:
                 await self._process_for_search(paper, search_space_id)
 
             # Generate thumbnail if file_path exists
-            if paper.file_path:
-                try:
-                    logger.debug(f"   🖼️  Generating thumbnail for paper {paper.id}")
-                    thumbnail_path = self.thumbnail_gen.generate_thumbnail(
-                        paper.file_path, paper.id, force_regenerate=False
-                    )
-                    if thumbnail_path:
-                        logger.debug(f"   ✓ Thumbnail generated: {thumbnail_path}")
-                    else:
-                        logger.warning(
-                            f"   ⚠️  Thumbnail generation returned None for paper {paper.id}"
-                        )
-                except Exception as thumb_error:
-                    # Don't fail sync if thumbnail generation fails
-                    logger.warning(
-                        f"   ⚠️  Thumbnail generation failed for paper {paper.id}: {str(thumb_error)}"
-                    )
+            await self._generate_and_log_thumbnail(paper, force_regenerate=False)
 
             # Update sync status
             sync_record.sync_status = DevonthinkSyncStatus.SYNCED
@@ -1035,25 +1058,8 @@ class DevonthinkSyncService:
             updated = True
 
         # Generate thumbnail if file_path was just added
-        if file_path_was_added and paper.file_path:
-            try:
-                logger.debug(
-                    f"   🖼️  Generating thumbnail for existing paper {paper.id} (file_path just added)"
-                )
-                thumbnail_path = self.thumbnail_gen.generate_thumbnail(
-                    paper.file_path, paper.id, force_regenerate=False
-                )
-                if thumbnail_path:
-                    logger.debug(f"   ✓ Thumbnail generated: {thumbnail_path}")
-                else:
-                    logger.warning(
-                        f"   ⚠️  Thumbnail generation returned None for paper {paper.id}"
-                    )
-            except Exception as thumb_error:
-                # Don't fail sync if thumbnail generation fails
-                logger.warning(
-                    f"   ⚠️  Thumbnail generation failed for paper {paper.id}: {str(thumb_error)}"
-                )
+        if file_path_was_added:
+            await self._generate_and_log_thumbnail(paper, force_regenerate=False)
 
         # Update DEVONthink source info
         if not paper.dt_source_uuid:
