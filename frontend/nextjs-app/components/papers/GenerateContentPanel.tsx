@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Mic, FileText, BarChart3, Presentation, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mic, FileText, BarChart3, Presentation, Loader2, DollarSign } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { podcastAPI, type Podcast } from '@/lib/podcast-api';
 
@@ -21,12 +21,52 @@ interface GenerationState {
   error?: string;
 }
 
+interface Balance {
+  balance: number;
+  usage: number;
+  limit: number;
+  is_free_tier: boolean;
+}
+
 export default function GenerateContentPanel({ paperId, paperTitle }: GenerateContentPanelProps) {
   const { getToken } = useAuth();
   const [generation, setGeneration] = useState<GenerationState>({
     type: null,
     status: 'idle',
   });
+  const [balance, setBalance] = useState<Balance | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+
+  // Fetch balance on mount
+  useEffect(() => {
+    fetchBalance();
+  }, []);
+
+  const fetchBalance = async () => {
+    try {
+      setLoadingBalance(true);
+      const token = await getToken();
+      if (!token) return;
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v2/openrouter/balance`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setBalance(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
 
   const handleGenerate = async (type: GenerationType) => {
     setGeneration({
@@ -295,12 +335,42 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
         )}
       </div>
 
-      {/* Info Footer */}
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+      {/* Info Footer with Balance */}
+      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg space-y-2">
+        {/* Balance Display */}
+        {balance && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-600 flex items-center gap-1">
+              <DollarSign className="w-3 h-3" />
+              OpenRouter Balance
+            </span>
+            <span className="font-medium text-gray-900">
+              ${balance.balance.toFixed(2)} remaining
+            </span>
+          </div>
+        )}
+        
+        {loadingBalance && (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Checking balance...
+          </div>
+        )}
+        
+        {/* Settings Link */}
         <p className="text-xs text-gray-500">
-          Generations use your configured AI models. Settings in{' '}
+          Generations use your OpenRouter API key.{' '}
           <a href="/profile" className="text-blue-600 hover:text-blue-700 underline">
-            Profile
+            Settings
+          </a>
+          {' • '}
+          <a 
+            href="https://openrouter.ai/credits" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-700 underline"
+          >
+            Add Credits
           </a>
         </p>
       </div>
