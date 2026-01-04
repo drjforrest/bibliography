@@ -2,9 +2,10 @@
 
 import TagDialog from '@/components/library/TagDialog';
 import ContextMenu, { ContextMenuItem } from '@/components/shared/ContextMenu';
-import { api } from '@/lib/api';
+import { useApi } from '@/lib/api';
 import type { Paper } from '@/types';
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS } from '@/types';
+import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -23,30 +24,35 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const { isLoaded, isSignedIn } = useAuth();
+  const api = useApi();
 
   // Reset image error state when paper changes
   useEffect(() => {
     setImageError(false);
   }, [paper.id]);
 
-  // Check if paper is favorited on mount
+  // Check if paper is favorited on mount (only when authenticated)
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    
     const checkFavorited = async () => {
       try {
         const result = await api.isFavorited(paper.id);
         setIsFavorited(result.is_favorited);
       } catch (error) {
-        console.error('Failed to check favorite status:', error);
+        // Silently fail - user might not be authenticated or paper might not exist
+        // Don't spam console with errors
       }
     };
     checkFavorited();
-  }, [paper.id]);
+  }, [paper.id, isLoaded, isSignedIn, api]);
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (isTogglingFavorite) return;
+    if (isTogglingFavorite || !isLoaded || !isSignedIn) return;
 
     setIsTogglingFavorite(true);
     try {
@@ -76,6 +82,11 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
 
   const handleDelete = async () => {
     if (!confirm(`Are you sure you want to delete "${paper.title}"?`)) return;
+
+    if (!isLoaded || !isSignedIn) {
+      alert('Please sign in to delete papers.');
+      return;
+    }
 
     try {
       await api.deletePaper(paper.id);
@@ -123,7 +134,7 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
     if (thumbnailUrl && !imageError) {
       return `url(${thumbnailUrl})`;
     }
-    return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    return 'linear-gradient(135deg, #4e989e 0%, #94d2bd 100%)';
   };
 
   const showFallbackText = !paper.coverImage && (!thumbnailUrl || imageError);
@@ -154,12 +165,11 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
               alt=""
               className="hidden"
               onError={(e) => {
-                console.warn(`Failed to load thumbnail for paper ${paper.id}:`, thumbnailUrl);
+                // Silently handle missing thumbnails - don't spam console
                 setImageError(true);
               }}
               onLoad={() => {
-                // Image loaded successfully
-                console.debug(`Thumbnail loaded successfully for paper ${paper.id}`);
+                // Image loaded successfully - no need to log
               }}
             />
           )}
