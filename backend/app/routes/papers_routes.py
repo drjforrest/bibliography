@@ -1,28 +1,75 @@
 import io
+import logging
 import os
 import tempfile
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Tuple
 
-from app.db import User, get_async_session
+from app.db import ScientificPaper, User, get_async_session
 from app.middleware.clerk_auth import require_clerk_auth
-from app.schemas.papers import (
-    CitationRequest,
-    CitationResponse,
-    PaperListResponse,
-    PaperResponse,
-    PaperSearchRequest,
-    PaperUploadResponse,
-    StorageStatsResponse,
-    WatcherStatusResponse,
-)
+from app.schemas.papers import (CitationRequest, CitationResponse,
+                                PaperListResponse, PaperResponse,
+                                PaperSearchRequest, PaperUploadResponse,
+                                StorageStatsResponse, WatcherStatusResponse)
 from app.services.citation_formatter import CitationFormatter
 from app.services.paper_manager import PaperManagerService
 from app.services.thumbnail_generator import ThumbnailGenerator
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query,
+                     UploadFile)
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/papers", tags=["papers"])
+
+
+async def _get_paper_file_path(
+    paper_id: int, session: AsyncSession
+) -> Tuple[ScientificPaper, Path]:
+    """
+    Helper function to retrieve a paper and resolve its file path.
+    
+    Args:
+        paper_id: The ID of the paper to retrieve
+        session: Database session
+        
+    Returns:
+        Tuple of (paper, full_path) where full_path is a Path object
+        
+    Raises:
+        HTTPException: If paper not found, has no file_path, path resolution fails,
+                      or file doesn't exist on filesystem
+    """
+    paper_manager = PaperManagerService(session)
+    paper = await paper_manager.get_paper_by_id(paper_id)
+
+    if not paper:
+        logger.error(f"Paper {paper_id} not found")
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    if not paper.file_path:
+        logger.error(f"Paper {paper_id} has no file_path")
+        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+
+    # Get full file path
+    try:
+        full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+    except Exception as e:
+        logger.error(
+            f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Error resolving file path: {str(e)}"
+        )
+
+    if not full_path.exists():
+        logger.error(
+            f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})"
+        )
+        raise HTTPException(status_code=404, detail="PDF file not found")
+
+    return paper, full_path
 
 
 @router.post("/upload", response_model=PaperUploadResponse)
@@ -143,9 +190,6 @@ async def get_paper(
     """
     Get a specific paper by ID.
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     try:
         paper_manager = PaperManagerService(session)
         paper = await paper_manager.get_paper_by_id(paper_id)
@@ -222,30 +266,7 @@ async def get_paper_pdf(
     Get PDF file for viewing (not download).
     Public endpoint - no authentication required for PDF viewing.
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
-
-    if not paper:
-        logger.error(f"Paper {paper_id} not found")
-        raise HTTPException(status_code=404, detail="Paper not found")
-
-    if not paper.file_path:
-        logger.error(f"Paper {paper_id} has no file_path")
-        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
-
-    # Get full file path
-    try:
-        full_path = paper_manager.file_storage.get_full_path(paper.file_path)
-    except Exception as e:
-        logger.error(f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}")
-        raise HTTPException(status_code=500, detail=f"Error resolving file path: {str(e)}")
-
-    if not full_path.exists():
-        logger.error(f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})")
-        raise HTTPException(status_code=404, detail=f"PDF file not found on disk: {paper.file_path}")
+    paper, full_path = await _get_paper_file_path(paper_id, session)
 
     # Return file for inline viewing
     try:
@@ -271,30 +292,7 @@ async def download_paper(
     """
     Download the PDF file for a paper.
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    paper_manager = PaperManagerService(session)
-    paper = await paper_manager.get_paper_by_id(paper_id)
-
-    if not paper:
-        logger.error(f"Paper {paper_id} not found for download")
-        raise HTTPException(status_code=404, detail="Paper not found")
-
-    if not paper.file_path:
-        logger.error(f"Paper {paper_id} has no file_path for download")
-        raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
-
-    # Get full file path
-    try:
-        full_path = paper_manager.file_storage.get_full_path(paper.file_path)
-    except Exception as e:
-        logger.error(f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}")
-        raise HTTPException(status_code=500, detail=f"Error resolving file path: {str(e)}")
-
-    if not full_path.exists():
-        logger.error(f"PDF file not found for paper {paper_id}: {full_path} (resolved from: {paper.file_path})")
-        raise HTTPException(status_code=404, detail=f"PDF file not found on disk: {paper.file_path}")
+    paper, full_path = await _get_paper_file_path(paper_id, session)
 
     # Generate a nice filename
     filename = f"{paper.title[:50]}.pdf" if paper.title else f"paper_{paper_id}.pdf"
@@ -318,10 +316,6 @@ async def get_paper_thumbnail(
     Get thumbnail image for a paper. Generates it if it doesn't exist.
     Public endpoint - no authentication required for thumbnail access.
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     try:
         paper_manager = PaperManagerService(session)
         paper = await paper_manager.get_paper_by_id(paper_id)
@@ -769,6 +763,10 @@ async def get_favorites(
 
     return PaperListResponse(
         papers=[PaperResponse.from_orm(paper) for paper in papers],
+        total=len(papers),
+        limit=limit,
+        offset=offset,
+    )
         total=len(papers),
         limit=limit,
         offset=offset,
