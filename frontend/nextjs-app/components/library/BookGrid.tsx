@@ -1,5 +1,6 @@
 "use client";
 
+import { getApiBaseUrl } from "@/lib/api";
 import type { Paper, ViewMode } from "@/types";
 import BookCard from "./BookCard";
 
@@ -32,9 +33,10 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
     return (
       <div className="space-y-4">
         {papers.map((paper) => {
-          // Generate thumbnail URL - use relative path via Next.js rewrites
+          // Generate thumbnail URL
+          // Use full API URL in production (client-side image requests don't use Next.js rewrites)
           const thumbnailUrl = paper.id
-            ? `/api/v1/papers/${paper.id}/thumbnail`
+            ? `${getApiBaseUrl()}/api/v1/papers/${paper.id}/thumbnail`
             : null;
 
           return (

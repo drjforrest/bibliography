@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import AnnotationSidebar from '@/components/annotations/AnnotationSidebar';
 import GenerateContentPanel from '@/components/papers/GenerateContentPanel';
 import Header from '@/components/layout/Header';
-import { useApi } from '@/lib/api';
+import { getApiBaseUrl, useApi } from '@/lib/api';
 import type { Annotation, AnnotationType, Paper } from '@/types';
 import { useAuth } from '@clerk/nextjs';
 import dynamic from 'next/dynamic';
@@ -110,7 +110,7 @@ export default function PaperAnnotationPage() {
               </div>
             ) : (
               <InteractivePDFViewer
-                pdfUrl={`/api/v1/papers/${paperId}/pdf`}
+                pdfUrl={`${getApiBaseUrl()}/api/v1/papers/${paperId}/pdf`}
                 activeTool={activeTool}
                 onToolSelect={handleToolSelect}
                 onAnnotationCreate={handleAnnotationCreate}
