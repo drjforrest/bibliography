@@ -754,8 +754,13 @@ if config.AUTH_TYPE == "GOOGLE":
         pass
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
-        # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
-        openrouter_api_key = Column(String, nullable=True)
+        # AI API Keys for BYOK (Bring Your Own Key) functionality
+        openrouter_api_key = Column(String, nullable=True)  # LLM access via OpenRouter
+        openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
+        elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
+        
+        # TTS optimization settings
+        tts_optimization_mode = Column(String(50), nullable=True, default='auto')  # auto|prefer_openai|prefer_elevenlabs|kokoro_only
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
@@ -797,8 +802,13 @@ if config.AUTH_TYPE == "GOOGLE":
 else:
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
-        # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
-        openrouter_api_key = Column(String, nullable=True)
+        # AI API Keys for BYOK (Bring Your Own Key) functionality
+        openrouter_api_key = Column(String, nullable=True)  # LLM access via OpenRouter
+        openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
+        elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
+        
+        # TTS optimization settings
+        tts_optimization_mode = Column(String(50), nullable=True, default='auto')  # auto|prefer_openai|prefer_elevenlabs|kokoro_only
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
