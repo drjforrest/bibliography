@@ -222,7 +222,7 @@ async def main():
             print(f"⚠️  WARNING: Storage root does not exist: {storage_root}")
     except (OSError, PermissionError) as e:
         print(f"⚠️  WARNING: Storage root is not accessible: {storage_root} ({e})")
-    
+
     if args.search_paths:
         search_paths.extend([Path(p) for p in args.search_paths])
 
