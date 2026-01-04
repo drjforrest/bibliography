@@ -109,7 +109,7 @@ export default function PaperAnnotationPage() {
               </div>
             ) : (
               <InteractivePDFViewer
-                pdfUrl={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/papers/${paperId}/pdf`}
+                pdfUrl={`/api/v1/papers/${paperId}/pdf`}
                 activeTool={activeTool}
                 onToolSelect={handleToolSelect}
                 onAnnotationCreate={handleAnnotationCreate}

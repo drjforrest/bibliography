@@ -11,8 +11,6 @@ interface BookGridProps {
   onDelete?: () => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteChange, onDelete }: BookGridProps) {
   if (papers.length === 0) {
     return (
@@ -34,9 +32,9 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
     return (
       <div className="space-y-4">
         {papers.map((paper) => {
-          // Generate thumbnail URL
+          // Generate thumbnail URL - use relative path via Next.js rewrites
           const thumbnailUrl = paper.id
-            ? `${API_URL}/api/v1/papers/${paper.id}/thumbnail`
+            ? `/api/v1/papers/${paper.id}/thumbnail`
             : null;
 
           return (
