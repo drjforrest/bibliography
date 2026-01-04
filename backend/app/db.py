@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from enum import Enum
 
 from app.config import config
-from app.retriver.chunks_hybrid_search import ChucksHybridSearchRetriever
-from app.retriver.documents_hybrid_search import DocumentHybridSearchRetriever
+from app.retriever.chunks_hybrid_search import ChunksHybridSearchRetriever
+from app.retriever.documents_hybrid_search import DocumentHybridSearchRetriever
 from fastapi import Depends
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import ARRAY, JSON, TIMESTAMP, Boolean, Column, Date
@@ -586,6 +586,9 @@ if config.AUTH_TYPE == "GOOGLE":
         # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
         openrouter_api_key = Column(String, nullable=True)
 
+        # Clerk integration
+        clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
+
         # Profile information
         display_name = Column(String(100), nullable=True)
         bio = Column(Text, nullable=True)
@@ -625,6 +628,9 @@ else:
     class User(SQLAlchemyBaseUserTableUUID, Base):
         # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
         openrouter_api_key = Column(String, nullable=True)
+
+        # Clerk integration
+        clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
 
         # Profile information
         display_name = Column(String(100), nullable=True)
@@ -718,10 +724,10 @@ else:
         yield SQLAlchemyUserDatabase(session, User)
 
 
-async def get_chucks_hybrid_search_retriever(
+async def get_chunks_hybrid_search_retriever(
     session: AsyncSession = Depends(get_async_session),
 ):
-    return ChucksHybridSearchRetriever(session)
+    return ChunksHybridSearchRetriever(session)
 
 
 async def get_documents_hybrid_search_retriever(

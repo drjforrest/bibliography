@@ -255,13 +255,16 @@ EOF
         echo '✓ Using existing .env.local'
     fi
     
-    # Verify NEXT_PUBLIC_API_URL is set correctly
+    # Ensure NEXT_PUBLIC_API_URL is set correctly (update if wrong)
     if grep -q "NEXT_PUBLIC_API_URL=https://api.counterforce-hero.tech" .env.local 2>/dev/null; then
         echo '✓ NEXT_PUBLIC_API_URL is correctly set to api.counterforce-hero.tech'
-    elif grep -q "NEXT_PUBLIC_API_URL=" .env.local 2>/dev/null; then
-        echo '⚠ WARNING: NEXT_PUBLIC_API_URL in .env.local does not point to api.counterforce-hero.tech'
-        echo '   Current value:'
-        grep "NEXT_PUBLIC_API_URL=" .env.local || echo '   (not found)'
+    else
+        echo '⚠ Fixing NEXT_PUBLIC_API_URL in .env.local...'
+        # Remove any existing NEXT_PUBLIC_API_URL line
+        sed -i.bak '/^NEXT_PUBLIC_API_URL=/d' .env.local 2>/dev/null || sed -i '' '/^NEXT_PUBLIC_API_URL=/d' .env.local 2>/dev/null
+        # Add the correct value
+        echo "NEXT_PUBLIC_API_URL=https://api.counterforce-hero.tech" >> .env.local
+        echo '✓ Updated NEXT_PUBLIC_API_URL to https://api.counterforce-hero.tech'
     fi
 
     npm install

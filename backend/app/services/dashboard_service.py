@@ -1,22 +1,23 @@
 import logging
-from typing import Dict, List, Any
-from datetime import datetime, timedelta
-from sqlalchemy import select, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List
+from uuid import UUID
 
 from app.db import (
-    ScientificPaper,
     Document,
+    LiteratureType,
+    PaperAnnotation,
+    ScientificPaper,
     SearchSpace,
     User,
-    PaperAnnotation,
-    LiteratureType,
 )
 from app.schemas.dashboard import (
     DashboardStatsResponse,
     LiteratureTypeStats,
     RecentPaperResponse,
 )
+from sqlalchemy import desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +117,19 @@ class DashboardService:
 
     async def _get_user_basic_stats(self, user_id: str) -> Dict[str, Any]:
         """Get basic statistics for a user."""
+        # Convert user_id to UUID for consistency
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format in _get_user_basic_stats: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+        
         # Total papers
         total_papers_stmt = (
             select(func.count(ScientificPaper.id))
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
-            .where(SearchSpace.user_id == user_id)
+            .where(SearchSpace.user_id == user_uuid)
         )
 
         total_papers_result = await self.session.execute(total_papers_stmt)
@@ -129,14 +137,14 @@ class DashboardService:
 
         # Total search spaces
         total_spaces_stmt = select(func.count(SearchSpace.id)).where(
-            SearchSpace.user_id == user_id
+            SearchSpace.user_id == user_uuid
         )
         total_spaces_result = await self.session.execute(total_spaces_stmt)
         total_spaces = total_spaces_result.scalar() or 0
 
         # Total annotations
         total_annotations_stmt = select(func.count(PaperAnnotation.id)).where(
-            PaperAnnotation.user_id == user_id
+            PaperAnnotation.user_id == user_uuid
         )
         total_annotations_result = await self.session.execute(total_annotations_stmt)
         total_annotations = total_annotations_result.scalar() or 0
@@ -148,7 +156,7 @@ class DashboardService:
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
             .where(
-                SearchSpace.user_id == user_id, ScientificPaper.created_at >= week_ago
+                SearchSpace.user_id == user_uuid, ScientificPaper.created_at >= week_ago
             )
         )
 
@@ -169,20 +177,22 @@ class DashboardService:
         self, user_id: str, days: int = 7
     ) -> List[Dict[str, Any]]:
         """Get recent user activity."""
+        # Convert user_id to UUID for consistency
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format in _get_recent_activity: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+        
         cutoff_date = datetime.utcnow() - timedelta(days=days)
 
-        # Recent papers
+        # Recent papers - select full objects for easier access
         recent_papers_stmt = (
-            select(
-                ScientificPaper.id,
-                ScientificPaper.title,
-                ScientificPaper.created_at,
-                func.literal("paper_added").label("activity_type"),
-            )
+            select(ScientificPaper)
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
             .where(
-                SearchSpace.user_id == user_id,
+                SearchSpace.user_id == user_uuid,
                 ScientificPaper.created_at >= cutoff_date,
             )
             .order_by(desc(ScientificPaper.created_at))
@@ -190,18 +200,13 @@ class DashboardService:
         )
 
         recent_papers_result = await self.session.execute(recent_papers_stmt)
-        recent_papers = recent_papers_result.fetchall()
+        recent_papers = recent_papers_result.scalars().all()
 
-        # Recent annotations
+        # Recent annotations - select full objects for easier access
         recent_annotations_stmt = (
-            select(
-                PaperAnnotation.id,
-                PaperAnnotation.content,
-                PaperAnnotation.created_at,
-                func.literal("annotation_added").label("activity_type"),
-            )
+            select(PaperAnnotation)
             .where(
-                PaperAnnotation.user_id == user_id,
+                PaperAnnotation.user_id == user_uuid,
                 PaperAnnotation.created_at >= cutoff_date,
             )
             .order_by(desc(PaperAnnotation.created_at))
@@ -209,7 +214,7 @@ class DashboardService:
         )
 
         recent_annotations_result = await self.session.execute(recent_annotations_stmt)
-        recent_annotations = recent_annotations_result.fetchall()
+        recent_annotations = recent_annotations_result.scalars().all()
 
         # Combine and sort activities
         activities = []
@@ -220,7 +225,7 @@ class DashboardService:
                     "id": paper.id,
                     "type": "paper_added",
                     "title": paper.title or "Untitled Paper",
-                    "timestamp": paper.created_at.isoformat(),
+                    "timestamp": paper.created_at.isoformat() if paper.created_at else datetime.utcnow().isoformat(),
                     "description": f"Added paper: {paper.title or 'Untitled'}",
                 }
             )
@@ -231,12 +236,12 @@ class DashboardService:
                     "id": annotation.id,
                     "type": "annotation_added",
                     "title": (
-                        annotation.content[:50] + "..."
-                        if len(annotation.content) > 50
-                        else annotation.content
+                        (annotation.content[:50] + "...")
+                        if annotation.content and len(annotation.content) > 50
+                        else (annotation.content or "")
                     ),
-                    "timestamp": annotation.created_at.isoformat(),
-                    "description": f"Added annotation: {annotation.content[:100]}...",
+                    "timestamp": annotation.created_at.isoformat() if annotation.created_at else datetime.utcnow().isoformat(),
+                    "description": f"Added annotation: {(annotation.content[:100] + '...') if annotation.content and len(annotation.content) > 100 else (annotation.content or '')}",
                 }
             )
 
@@ -247,6 +252,13 @@ class DashboardService:
 
     async def _get_paper_analytics(self, user_id: str) -> Dict[str, Any]:
         """Get paper analytics for a user."""
+        # Convert user_id to UUID for consistency
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format in _get_paper_analytics: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+        
         # Papers by publication year
         year_distribution_stmt = (
             select(
@@ -256,7 +268,7 @@ class DashboardService:
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
             .where(
-                SearchSpace.user_id == user_id,
+                SearchSpace.user_id == user_uuid,
                 ScientificPaper.publication_year.isnot(None),
             )
             .group_by(ScientificPaper.publication_year)
@@ -276,7 +288,7 @@ class DashboardService:
             )
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
-            .where(SearchSpace.user_id == user_id, ScientificPaper.journal.isnot(None))
+            .where(SearchSpace.user_id == user_uuid, ScientificPaper.journal.isnot(None))
             .group_by(ScientificPaper.journal)
             .order_by(desc(func.count(ScientificPaper.id)))
             .limit(10)
@@ -296,7 +308,7 @@ class DashboardService:
             )
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
-            .where(SearchSpace.user_id == user_id)
+            .where(SearchSpace.user_id == user_uuid)
             .group_by(ScientificPaper.processing_status)
         )
 
@@ -316,7 +328,7 @@ class DashboardService:
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
             .where(
-                SearchSpace.user_id == user_id,
+                SearchSpace.user_id == user_uuid,
                 ScientificPaper.created_at >= thirty_days_ago,
             )
             .group_by(func.date(ScientificPaper.created_at))
@@ -338,6 +350,13 @@ class DashboardService:
 
     async def _get_search_space_breakdown(self, user_id: str) -> List[Dict[str, Any]]:
         """Get search space breakdown for a user."""
+        # Convert user_id to UUID for consistency
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format in _get_search_space_breakdown: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+        
         spaces_stmt = (
             select(
                 SearchSpace.id,
@@ -348,7 +367,7 @@ class DashboardService:
             )
             .outerjoin(Document, SearchSpace.id == Document.search_space_id)
             .outerjoin(ScientificPaper, Document.id == ScientificPaper.document_id)
-            .where(SearchSpace.user_id == user_id)
+            .where(SearchSpace.user_id == user_uuid)
             .group_by(
                 SearchSpace.id,
                 SearchSpace.name,
@@ -376,9 +395,16 @@ class DashboardService:
 
     async def _get_user_annotation_stats(self, user_id: str) -> Dict[str, Any]:
         """Get annotation statistics for a user."""
+        # Convert user_id to UUID for consistency
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format in _get_user_annotation_stats: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+        
         # Total annotations
         total_annotations_stmt = select(func.count(PaperAnnotation.id)).where(
-            PaperAnnotation.user_id == user_id
+            PaperAnnotation.user_id == user_uuid
         )
         total_result = await self.session.execute(total_annotations_stmt)
         total_annotations = total_result.scalar() or 0
@@ -389,7 +415,7 @@ class DashboardService:
                 PaperAnnotation.annotation_type,
                 func.count(PaperAnnotation.id).label("count"),
             )
-            .where(PaperAnnotation.user_id == user_id)
+            .where(PaperAnnotation.user_id == user_uuid)
             .group_by(PaperAnnotation.annotation_type)
         )
 
@@ -405,7 +431,7 @@ class DashboardService:
                 PaperAnnotation.is_private,
                 func.count(PaperAnnotation.id).label("count"),
             )
-            .where(PaperAnnotation.user_id == user_id)
+            .where(PaperAnnotation.user_id == user_uuid)
             .group_by(PaperAnnotation.is_private)
         )
 
@@ -422,13 +448,20 @@ class DashboardService:
 
     async def _get_quality_metrics(self, user_id: str) -> Dict[str, Any]:
         """Get quality metrics for user's papers."""
+        # Convert user_id to UUID for consistency
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format in _get_quality_metrics: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+        
         # Average confidence score
         avg_confidence_stmt = (
             select(func.avg(ScientificPaper.confidence_score))
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
             .where(
-                SearchSpace.user_id == user_id,
+                SearchSpace.user_id == user_uuid,
                 ScientificPaper.confidence_score.isnot(None),
             )
         )
@@ -441,7 +474,7 @@ class DashboardService:
             select(func.count(ScientificPaper.id))
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
-            .where(SearchSpace.user_id == user_id, ScientificPaper.doi.isnot(None))
+            .where(SearchSpace.user_id == user_uuid, ScientificPaper.doi.isnot(None))
         )
 
         papers_with_doi_result = await self.session.execute(papers_with_doi_stmt)
@@ -452,7 +485,7 @@ class DashboardService:
             select(func.count(ScientificPaper.id))
             .join(Document, ScientificPaper.document_id == Document.id)
             .join(SearchSpace, Document.search_space_id == SearchSpace.id)
-            .where(SearchSpace.user_id == user_id)
+            .where(SearchSpace.user_id == user_uuid)
         )
 
         total_papers_result = await self.session.execute(total_papers_stmt)
@@ -603,24 +636,55 @@ class DashboardService:
             DashboardStatsResponse with total counts, breakdown by type, and recent papers
         """
         # Get user's last login time
-        user_stmt = select(User).where(User.id == user_id)
+        # Convert user_id string to UUID if needed (SQLAlchemy handles this automatically, but explicit is clearer)
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format: {user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid user_id format: {user_id}")
+
+        user_stmt = select(User).where(User.id == user_uuid)
         user_result = await self.session.execute(user_stmt)
         user = user_result.scalar_one_or_none()
-        last_login = user.last_login if user else None
 
-        # Get total paper count
-        total_stmt = select(func.count(ScientificPaper.id))
+        # Handle case where user doesn't exist (shouldn't happen for authenticated users, but be safe)
+        if not user:
+            logger.warning(f"User not found for user_id: {user_id}")
+            # Return empty stats instead of crashing - this handles edge cases gracefully
+            return DashboardStatsResponse(
+                total_papers=0,
+                by_literature_type=[],
+                new_since_last_login=[],
+                new_since_last_login_count=0,
+                last_login=None,
+            )
+
+        last_login = user.last_login
+
+        # Get total paper count for this user (filter by user's search spaces)
+        total_stmt = (
+            select(func.count(ScientificPaper.id))
+            .join(Document, ScientificPaper.document_id == Document.id)
+            .join(SearchSpace, Document.search_space_id == SearchSpace.id)
+            .where(SearchSpace.user_id == user_uuid)
+        )
         total_result = await self.session.execute(total_stmt)
-        total_papers = total_result.scalar_one()
+        total_papers = total_result.scalar() or 0
 
-        # Get counts by literature type
+        # Get counts by literature type for this user
         by_type_stats = []
         for lit_type in LiteratureType:
-            count_stmt = select(func.count(ScientificPaper.id)).where(
-                ScientificPaper.literature_type == lit_type
+            count_stmt = (
+                select(func.count(ScientificPaper.id))
+                .join(Document, ScientificPaper.document_id == Document.id)
+                .join(SearchSpace, Document.search_space_id == SearchSpace.id)
+                .where(
+                    SearchSpace.user_id == user_uuid,
+                    ScientificPaper.literature_type == lit_type,
+                )
             )
             result = await self.session.execute(count_stmt)
-            count = result.scalar_one()
+            count = result.scalar() or 0
 
             by_type_stats.append(
                 LiteratureTypeStats(
@@ -630,19 +694,27 @@ class DashboardService:
                 )
             )
 
-        # Get papers added since last login
+        # Get papers added since last login for this user
         if last_login:
             new_papers_stmt = (
                 select(ScientificPaper)
-                .where(ScientificPaper.created_at > last_login)
+                .join(Document, ScientificPaper.document_id == Document.id)
+                .join(SearchSpace, Document.search_space_id == SearchSpace.id)
+                .where(
+                    SearchSpace.user_id == user_uuid,
+                    ScientificPaper.created_at > last_login,
+                )
                 .order_by(ScientificPaper.created_at.desc())
             )
             new_papers_result = await self.session.execute(new_papers_stmt)
             new_papers = new_papers_result.scalars().all()
         else:
-            # If no last login, show recent 10 papers
+            # If no last login, show recent 10 papers for this user
             new_papers_stmt = (
                 select(ScientificPaper)
+                .join(Document, ScientificPaper.document_id == Document.id)
+                .join(SearchSpace, Document.search_space_id == SearchSpace.id)
+                .where(SearchSpace.user_id == user_uuid)
                 .order_by(ScientificPaper.created_at.desc())
                 .limit(10)
             )
@@ -656,15 +728,16 @@ class DashboardService:
                 title=paper.title,
                 authors=paper.authors,
                 created_at=paper.created_at,
-                literature_type=paper.literature_type.value,
+                literature_type=paper.literature_type.value
+                if paper.literature_type
+                else "PEER_REVIEWED",
             )
             for paper in new_papers
         ]
 
         # Update user's last_login to now
-        if user:
-            user.last_login = datetime.utcnow()
-            await self.session.commit()
+        user.last_login = datetime.now(timezone.utc)
+        await self.session.commit()
 
         return DashboardStatsResponse(
             total_papers=total_papers,
@@ -687,13 +760,20 @@ class DashboardService:
         Returns:
             List of activity items with user and annotation information
         """
+        # Convert current_user_id to UUID for consistency
+        try:
+            current_user_uuid = UUID(current_user_id) if isinstance(current_user_id, str) else current_user_id
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid current_user_id format in get_recent_annotation_activity: {current_user_id}, error: {str(e)}")
+            raise ValueError(f"Invalid current_user_id format: {current_user_id}")
+        
         # Get recent public annotations from other users
         stmt = (
             select(PaperAnnotation, User, ScientificPaper)
             .join(User, PaperAnnotation.user_id == User.id)
             .join(ScientificPaper, PaperAnnotation.paper_id == ScientificPaper.id)
             .where(
-                PaperAnnotation.user_id != current_user_id,
+                PaperAnnotation.user_id != current_user_uuid,
                 PaperAnnotation.is_private == False,
             )
             .order_by(desc(PaperAnnotation.created_at))
