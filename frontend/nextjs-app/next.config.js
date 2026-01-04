@@ -65,6 +65,8 @@ const nextConfig = {
         "'self'",
         // Google Fonts
         'https://fonts.gstatic.com',
+        // Scite.ai fonts
+        'https://cdn.scite.ai',
       ],
       'img-src': [
         "'self'",
