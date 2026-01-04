@@ -5,13 +5,14 @@ import Sidebar from "@/components/layout/Sidebar";
 import BookGrid from "@/components/library/BookGrid";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
-import { api } from "@/lib/api";
+import { useApi } from "@/lib/api";
 import type { Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 export default function RecentPage() {
   const { isLoaded, isSignedIn } = useAuth();
+  const api = useApi();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -52,7 +53,7 @@ export default function RecentPage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, api]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

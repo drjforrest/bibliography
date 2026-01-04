@@ -313,7 +313,6 @@ export default function InteractivePDFViewer({
             <button
               onClick={() => {
                 setLoadError(null);
-                window.location.reload();
               }}
               className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
