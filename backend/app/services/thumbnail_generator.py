@@ -57,8 +57,15 @@ class ThumbnailGenerator:
             else:
                 absolute_pdf_path = Path(pdf_path)
 
+            # Normalize the path to handle any path issues
+            absolute_pdf_path = absolute_pdf_path.resolve()
+
             if not absolute_pdf_path.exists():
-                logger.error(f"PDF file not found: {absolute_pdf_path}")
+                logger.error(f"PDF file not found: {absolute_pdf_path} (resolved from: {pdf_path})")
+                return None
+
+            if not absolute_pdf_path.is_file():
+                logger.error(f"PDF path is not a file: {absolute_pdf_path}")
                 return None
 
             # Create thumbnail path: thumbnails/YYYY/MM/paper_id.jpg
@@ -66,7 +73,22 @@ class ThumbnailGenerator:
             thumbnail_filename = f"{paper_id}.jpg"
 
             # Get year/month from PDF path if it follows the storage structure
-            parts = Path(pdf_path).parts
+            # Try to extract relative path from absolute path if it's within storage_root
+            try:
+                # Check if absolute path is within storage_root
+                absolute_str = str(absolute_pdf_path)
+                storage_str = str(self.storage_root)
+                if absolute_str.startswith(storage_str):
+                    # Extract relative path from storage root
+                    relative_path = absolute_pdf_path.relative_to(self.storage_root)
+                    parts = relative_path.parts
+                else:
+                    # Use original pdf_path if it was relative
+                    parts = Path(pdf_path).parts
+            except (ValueError, AttributeError):
+                # Fallback: try to extract from original path
+                parts = Path(pdf_path).parts
+            
             if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
                 year_dir = self.thumbnail_root / parts[0]
                 month_dir = year_dir / parts[1]
