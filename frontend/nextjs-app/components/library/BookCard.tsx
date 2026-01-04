@@ -23,7 +23,6 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showTagDialog, setShowTagDialog] = useState(false);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const { isLoaded, isSignedIn } = useAuth();
   const api = useApi();
 
@@ -121,9 +120,9 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
     },
   ];
 
-  // Generate thumbnail URL if paper has an ID
+  // Generate thumbnail URL if paper has an ID - use relative path via Next.js rewrites
   const thumbnailUrl = paper.id
-    ? `${API_URL}/api/v1/papers/${paper.id}/thumbnail`
+    ? `/api/v1/papers/${paper.id}/thumbnail`
     : null;
 
   // Determine background image source

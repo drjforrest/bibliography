@@ -120,7 +120,9 @@ const nextConfig = {
   async rewrites() {
     // For server-side rewrites, always use localhost backend
     // Client-side calls will use NEXT_PUBLIC_API_URL directly
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8400';
+    // Default to 8000 for development, 8400 for production
+    const backendUrl = process.env.BACKEND_URL || 
+      (process.env.NODE_ENV === 'production' ? 'http://localhost:8400' : 'http://localhost:8000');
     return [
       {
         source: '/api/:path*',

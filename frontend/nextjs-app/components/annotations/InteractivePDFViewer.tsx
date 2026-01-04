@@ -51,6 +51,7 @@ export default function InteractivePDFViewer({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [activeToolLocal, setActiveToolLocal] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -61,6 +62,12 @@ export default function InteractivePDFViewer({
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+    setLoadError(null);
+  };
+
+  const onDocumentLoadError = (error: Error) => {
+    console.error('PDF load error:', error);
+    setLoadError(`Failed to load PDF file: ${error.message || 'Unknown error'}`);
   };
 
   const handleZoom = (direction: 'in' | 'out') => {
@@ -296,15 +303,52 @@ export default function InteractivePDFViewer({
 
       {/* PDF Document */}
       <div className="flex-1 overflow-auto flex items-center justify-center p-8">
-        <div
-          ref={pageRef}
-          className="relative"
-          onMouseDown={handleMouseDown}
-          style={{ cursor: activeTool === 'comment' ? 'crosshair' : 'default' }}
-        >
-          <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess} loading={<LoadingSpinner />}>
-            <Page pageNumber={pageNumber} scale={scale} renderTextLayer={true} renderAnnotationLayer={false} />
-          </Document>
+        {loadError ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <span className="material-symbols-outlined text-5xl text-red-400 dark:text-red-600 mb-4">
+              error_outline
+            </span>
+            <p className="text-red-600 dark:text-red-400 text-lg font-medium mb-2">{loadError}</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">Please check the console for more details.</p>
+            <button
+              onClick={() => {
+                setLoadError(null);
+                window.location.reload();
+              }}
+              className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div
+            ref={pageRef}
+            className="relative"
+            onMouseDown={handleMouseDown}
+            style={{ cursor: activeTool === 'comment' ? 'crosshair' : 'default' }}
+          >
+            <Document 
+              file={pdfUrl}
+              onLoadSuccess={onDocumentLoadSuccess} 
+              onLoadError={onDocumentLoadError}
+              loading={<LoadingSpinner />}
+              options={{
+                httpHeaders: {
+                  'Accept': 'application/pdf',
+                },
+                withCredentials: false,
+              }}
+              error={
+                <div className="flex flex-col items-center justify-center h-96">
+                  <span className="material-symbols-outlined text-5xl text-red-400 dark:text-red-600 mb-4">
+                    error_outline
+                  </span>
+                  <p className="text-red-600 dark:text-red-400">Failed to load PDF file</p>
+                </div>
+              }
+            >
+              <Page pageNumber={pageNumber} scale={scale} renderTextLayer={true} renderAnnotationLayer={false} />
+            </Document>
 
           {/* Render annotation overlays */}
           <svg
@@ -353,7 +397,8 @@ export default function InteractivePDFViewer({
                 </g>
               ))}
           </svg>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -46,14 +46,14 @@ export default function PapersByTopicChart() {
 
   const tabs: { key: LiteratureTypeTab; label: string; color: string }[] = [
     { key: 'PEER_REVIEWED', label: 'Peer-Reviewed', color: 'bg-[#4e989e]' }, // Trust Green
-    { key: 'GREY_LITERATURE', label: 'Grey Literature', color: 'bg-[#4e989e]' }, // Trust Green
+    { key: 'GREY_LITERATURE', label: 'Grey Literature', color: 'bg-[#e86530]' }, // Deep Orange
     { key: 'NEWS', label: 'News', color: 'bg-[#cc9900]' }, // College Gold
   ];
 
   const getBarColor = () => {
     switch (activeTab) {
       case 'PEER_REVIEWED': return '#4e989e'; // Trust Green
-      case 'GREY_LITERATURE': return '#4e989e'; // Trust Green
+      case 'GREY_LITERATURE': return '#e86530'; // Deep Orange
       case 'NEWS': return '#cc9900'; // College Gold
     }
   };
