@@ -1,40 +1,72 @@
 [project]
-name = "bibliography"
-version = "0.0.1"
-description = "Bibliography Backend"
+name = "hero-evidence-library"
+version = "2.0.0"
+description = "HERO Evidence Library v2 - Dynamic Learning Platform"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    # Core Framework
     "alembic>=1.13.0",
     "asyncpg>=0.30.0",
-    "chonkie[all]>=1.0.6",
     "fastapi>=0.115.8",
-    "fastapi-users[oauth,sqlalchemy]>=14.0.1",
-    "firecrawl-py>=1.12.0",
-    "github3.py==4.0.1",
-    "langchain-community>=0.3.17",
-    "langchain-unstructured>=0.1.6",
-    "langgraph>=0.3.29",
-    "linkup-sdk>=0.2.4",
-    "litellm>=1.61.4",
-    "markdownify>=0.14.1",
-    "notion-client>=2.3.0",
-    "pgvector>=0.3.6",
-    "playwright>=1.50.0",
+    "fastapi-users[oauth,sqlalchemy]>=15.0.3",
+    "uvicorn[standard]>=0.34.0",
+    
+    # v2.0 Features - Background Processing
+    "celery[redis]>=5.5.3",
+    "flower>=2.0.1",
+    "redis>=5.2.1",
+    
+    # v2.0 Features - Document Processing
+    "docling>=2.15.0",
+    "datasets>=2.21.0",
+    "pyarrow>=15.0.0,<19.0.0",
+    
+    # v2.0 Features - Audio/Podcast Generation
+    "kokoro>=0.9.4",
+    "soundfile>=0.13.1",
     "python-ffmpeg>=2.0.12",
-    "rerankers[flashrank]>=0.7.1",
-    "sentence-transformers>=3.4.1",
-    "slack-sdk>=3.34.0",
     "static-ffmpeg>=2.13",
+    
+    # LLM & AI
+    "langchain-community>=0.3.31",
+    "langchain-unstructured>=1.0.0",
+    "langgraph>=1.0.5",
+    "langgraph-checkpoint-postgres>=3.0.2",
+    "psycopg[binary,pool]>=3.3.2",
+    "litellm>=1.80.10",
+    "langchain-litellm>=0.3.5",
+    
+    # Text Processing
+    "chonkie[all]>=1.5.0",
+    "markdownify>=0.14.1",
+    "sentence-transformers>=3.4.1",
+    "rerankers[flashrank]>=0.7.1",
+    
+    # Database
+    "pgvector>=0.3.6",
+    
+    # Integrations
+    "firecrawl-py>=4.9.0",
+    "github3.py==4.0.1",
+    "linkup-sdk>=0.2.4",
+    "notion-client>=2.3.0",
+    "playwright>=1.50.0",
+    "slack-sdk>=3.34.0",
     "tavily-python>=0.3.2",
+    "youtube-transcript-api>=1.0.3",
+    
+    # Document Processing
     "unstructured-client>=0.30.0",
     "unstructured[all-docs]>=0.16.25",
-    "uvicorn[standard]>=0.34.0",
-    "validators>=0.34.0",
-    "youtube-transcript-api>=1.0.3",
     "pymupdf>=1.25.0",
+    
+    # Utilities
+    "validators>=0.34.0",
     "watchdog>=6.0.0",
     "python-magic>=0.4.27",
+    
+    # Academic/Scientific
     "bibtexparser>=1.4.0",
     "scholarly>=1.7.11",
     "crossref-commons>=0.0.7",
