@@ -162,7 +162,7 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-900">Generate Podcast</div>
             <div className="text-sm text-gray-500">
-              AI discussion explaining this paper
+              AI discussion • ~$0.14
             </div>
           </div>
         </button>
@@ -183,7 +183,7 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-900">Generate Summary</div>
             <div className="text-sm text-gray-500">
-              Key findings and takeaways
+              Key findings • ~$0.03
             </div>
           </div>
         </button>
@@ -204,7 +204,7 @@ export default function GenerateContentPanel({ paperId, paperTitle }: GenerateCo
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-900">Create Infographic</div>
             <div className="text-sm text-gray-500">
-              Visual summary of key data
+              16:9 visual • ~$0.04
             </div>
           </div>
         </button>

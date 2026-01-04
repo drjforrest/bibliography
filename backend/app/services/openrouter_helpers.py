@@ -105,13 +105,13 @@ async def estimate_generation_cost(
             "min_cost": 0.12,
             "typical_cost": 0.14,
             "max_cost": 0.20,
-            "details": "~20k input + 750 output tokens (Claude Sonnet 4)"
+            "details": "~20k input + 750 output tokens (Claude Sonnet 4) + TTS"
         },
         "infographic": {
-            "min_cost": 0.03,
-            "typical_cost": 0.04,
-            "max_cost": 0.08,
-            "details": "Single 1024x1024 image (Imagen 3 Fast)"
+            "min_cost": 0.042,
+            "typical_cost": 0.045,
+            "max_cost": 0.050,
+            "details": "Paper input (~15k tokens @ $0.30/1M) + text output (~150 tokens @ $2.50/1M) + image (1290 tokens @ $30/1M)"
         },
         "summary": {
             "min_cost": 0.01,
