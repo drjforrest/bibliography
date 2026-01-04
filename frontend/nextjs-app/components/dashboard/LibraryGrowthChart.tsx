@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { api } from '@/lib/api';
+import { createAuthenticatedClient } from '@/lib/api';
+import { useAuth } from '@clerk/nextjs';
+import { useEffect, useMemo, useState } from 'react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface GrowthData {
   date: string;
@@ -10,16 +11,25 @@ interface GrowthData {
 }
 
 export default function LibraryGrowthChart() {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [data, setData] = useState<GrowthData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [days, setDays] = useState(90);
 
+  // Create authenticated API client
+  const authenticatedApi = useMemo(() => createAuthenticatedClient(getToken), [getToken]);
+
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const result = await api.getGrowthOverTime(days);
+        const result = await authenticatedApi.get('/api/v1/dashboard/growth-over-time', { params: { days } }).then(r => r.data);
         setData(result.data);
         setTotal(result.total);
       } catch (error) {
@@ -30,7 +40,7 @@ export default function LibraryGrowthChart() {
     };
 
     fetchData();
-  }, [days]);
+  }, [days, isLoaded, isSignedIn, authenticatedApi]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
