@@ -224,27 +224,42 @@ async def get_paper_pdf(
     Get PDF file for viewing (not download).
     Public endpoint - no authentication required for PDF viewing.
     """
-    paper, full_path = await _get_paper_file_path(paper_id, session)
-
-    # Return file for inline viewing
+    logger.info(f"PDF request received for paper_id: {paper_id}")
     try:
-        with open(full_path, "rb") as f:
-            pdf_bytes = f.read()
-    except Exception as e:
-        logger.error(f"Error reading PDF file for paper {paper_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading PDF file: {str(e)}")
+        paper, full_path = await _get_paper_file_path(paper_id, session)
+        logger.info(f"PDF file found for paper {paper_id} at: {full_path}")
 
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": "inline",
-            "Cache-Control": "public, max-age=86400",  # Cache for 1 day
-            "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        },
-    )
+        # Return file for inline viewing
+        try:
+            with open(full_path, "rb") as f:
+                pdf_bytes = f.read()
+            logger.info(
+                f"Successfully read {len(pdf_bytes)} bytes for paper {paper_id}"
+            )
+        except Exception as e:
+            logger.error(f"Error reading PDF file for paper {paper_id}: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error reading PDF file: {str(e)}"
+            )
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "inline",
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+                "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error serving PDF for paper {paper_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Unexpected server error: {str(e)}"
+        )
 
 
 @router.get("/{paper_id}/download")
