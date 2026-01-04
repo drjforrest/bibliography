@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.db import get_async_session, User
 from app.services.notification_service import NotificationService
-from app.users import current_active_user
+from app.middleware.clerk_auth import require_clerk_auth
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -44,7 +44,7 @@ async def get_notifications(
     unread_only: bool = Query(False),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -96,7 +96,7 @@ async def get_notifications(
 
 @router.get("/unread-count", response_model=UnreadCountResponse)
 async def get_unread_count(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -111,7 +111,7 @@ async def get_unread_count(
 @router.post("/{notification_id}/read")
 async def mark_notification_as_read(
     notification_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -131,7 +131,7 @@ async def mark_notification_as_read(
 
 @router.post("/mark-all-read")
 async def mark_all_notifications_as_read(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """

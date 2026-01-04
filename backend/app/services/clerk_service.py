@@ -213,7 +213,11 @@ class ClerkService:
         profile_image_url: Optional[str] = None,
     ) -> User:
         """
-        Get or create a user based on Clerk user ID.
+        Get an existing user based on Clerk user ID.
+        
+        Note: This is an invite-only application. New users are NOT automatically created.
+        Users must be manually created/invited before they can access the application.
+        If a user doesn't exist, raises HTTPException with 403 Forbidden.
 
         Args:
             session: Database session
@@ -225,6 +229,9 @@ class ClerkService:
 
         Returns:
             User: The user object
+            
+        Raises:
+            HTTPException: 403 Forbidden if user doesn't exist (invite-only)
         """
         # Try to find existing user by clerk_user_id
         result = await session.execute(
@@ -279,6 +286,9 @@ class ClerkService:
 
         if user:
             # Link existing user to Clerk
+            logger.info(
+                f"Found existing user by email {email}, linking to Clerk user {clerk_user_id}"
+            )
             user.clerk_user_id = clerk_user_id
             if profile_image_url:
                 user.avatar_url = profile_image_url
@@ -287,7 +297,13 @@ class ClerkService:
             user.last_login = datetime.now(timezone.utc)
             try:
                 await session.commit()
-            except IntegrityError:
+                logger.info(
+                    f"Successfully linked user {email} to Clerk user {clerk_user_id}"
+                )
+            except IntegrityError as e:
+                logger.warning(
+                    f"IntegrityError when linking user {email} to {clerk_user_id}: {str(e)}"
+                )
                 # Another transaction may have linked this email to the
                 # clerk_user_id concurrently. Rollback and attempt to fetch
                 # the authoritative record by clerk_user_id.
@@ -297,80 +313,29 @@ class ClerkService:
                 )
                 linked_user = result.scalar_one_or_none()
                 if linked_user:
+                    logger.info(
+                        f"Found user by clerk_user_id after rollback: {linked_user.email}"
+                    )
                     await session.refresh(linked_user)
                     return linked_user
                 # If not found, re-raise to let caller handle it
+                logger.error(
+                    f"Could not find user after IntegrityError - user_id: {user.id}, email: {email}, clerk_user_id: {clerk_user_id}"
+                )
                 raise
 
             await session.refresh(user)
             return user
 
-        # Create new user
-        # Email should always be present in Clerk JWT tokens (configured in JWT template)
-        # If missing, this indicates a configuration issue that should be fixed
-        if not email:
-            logger.error(
-                f"Email missing from Clerk token for user {clerk_user_id}. "
-                f"This indicates the JWT template is not configured correctly. "
-                f"Please ensure the JWT template includes: {{'email': '{{{{user.primary_email_address}}}}'}}"
-            )
-            raise ValueError(
-                f"Email is required but missing from Clerk token for user {clerk_user_id}. "
-                f"Please configure the Clerk JWT template to include the email field. "
-                f"See docs/CLERK_JWT_TEMPLATE_REQUIREMENTS.md for details."
-            )
-
-        display_name = (
-            f"{first_name or ''} {last_name or ''}".strip() or email.split("@")[0]
+        # User not found - this is an invite-only app, so don't create new users
+        # Return 403 Forbidden to indicate the user needs to be invited first
+        logger.warning(
+            f"Authentication attempt by uninvited user. Clerk ID: {clerk_user_id}, Email: {email or 'not provided'}"
         )
-
-        new_user = User(
-            email=email,
-            clerk_user_id=clerk_user_id,
-            display_name=display_name,
-            avatar_url=profile_image_url,
-            is_active=True,
-            is_verified=True,  # Clerk handles verification
-            is_superuser=False,
-            last_login=datetime.now(timezone.utc),
-            # Note: hashed_password is NOT set - auth is handled by Clerk
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. This is an invite-only application. Please contact an administrator to request access.",
         )
-
-        try:
-            session.add(new_user)
-            await session.commit()
-            await session.refresh(new_user)
-            return new_user
-        except IntegrityError:
-            # Another transaction may have created a user with the same
-            # clerk_user_id or email concurrently. Rollback and attempt to
-            # fetch the existing record.
-            await session.rollback()
-
-            # Try to find by clerk_user_id first (primary identifier)
-            result = await session.execute(
-                select(User).where(User.clerk_user_id == clerk_user_id)
-            )
-            existing_user = result.scalar_one_or_none()
-
-            if existing_user:
-                await session.refresh(existing_user)
-                return existing_user
-
-            # If not found by clerk_user_id, try by email
-            result = await session.execute(select(User).where(User.email == email))
-            existing_user = result.scalar_one_or_none()
-
-            if existing_user:
-                await session.refresh(existing_user)
-                return existing_user
-
-            # If still not found, raise HTTP conflict error
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"User creation failed due to constraint violation. "
-                f"Unable to locate existing user with clerk_user_id={clerk_user_id} or email={email}",
-            )
 
     async def sync_user_from_webhook(
         self, session: AsyncSession, event_type: str, user_data: dict

@@ -149,8 +149,16 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
 
     # Clerk Authentication
+    # Note: Clerk exports CLERK_SECRET_KEY, which we use for backend API calls
     CLERK_API_KEY = os.getenv("CLERK_SECRET_KEY")  # Clerk API key for backend
-    CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY")
+
+    # Clerk exports NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY for frontend, but backend also needs it
+    # Support both CLERK_PUBLISHABLE_KEY (explicit) and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (Clerk export)
+    CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY") or os.getenv(
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+    )
+
+    # Webhook signing key (not in Clerk's export, must be set from webhook settings)
     CLERK_WEBHOOK_SIGNING_KEY = os.getenv("CLERK_WEBHOOK_SECRET")  # Webhook signing key
 
     # Environment-aware defaults for Clerk issuer and JWKS URL
@@ -168,11 +176,17 @@ class Config:
         _default_clerk_issuer = None
         _default_clerk_jwks_url = None
 
-    CLERK_ISSUER = os.getenv("CLERK_ISSUER", _default_clerk_issuer)
+    # Clerk exports CLERK_FRONTEND_API_URL, which is the same as CLERK_ISSUER
+    # Support both CLERK_ISSUER (explicit) and CLERK_FRONTEND_API_URL (Clerk export)
+    CLERK_ISSUER = (
+        os.getenv("CLERK_ISSUER")
+        or os.getenv("CLERK_FRONTEND_API_URL")
+        or _default_clerk_issuer
+    )
     if not CLERK_ISSUER:
         raise ValueError(
-            "CLERK_ISSUER environment variable is required. "
-            f"Set APP_ENV=production to use production defaults, or set CLERK_ISSUER explicitly."
+            "CLERK_ISSUER or CLERK_FRONTEND_API_URL environment variable is required. "
+            f"Set APP_ENV=production to use production defaults, or set CLERK_ISSUER/CLERK_FRONTEND_API_URL explicitly."
         )
 
     CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", _default_clerk_jwks_url)

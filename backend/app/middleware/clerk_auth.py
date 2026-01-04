@@ -106,6 +106,11 @@ async def require_clerk_auth(
         clerk_user_id = token_claims.get("sub")  # Subject is the user ID
         email = token_claims.get("email")  # Email may not always be in token
 
+        # Debug: Log all claim keys to diagnose template issues
+        claim_keys = list(token_claims.keys())
+        logger.info(
+            f"Token claims keys: {claim_keys}, Email present: {email is not None}"
+        )
         logger.debug(
             f"Token verified. User ID: {clerk_user_id}, Email: {email or '(not in token)'}"
         )
