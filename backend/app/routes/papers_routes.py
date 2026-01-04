@@ -29,14 +29,14 @@ async def _get_paper_file_path(
 ) -> Tuple[ScientificPaper, Path]:
     """
     Helper function to retrieve a paper and resolve its file path.
-    
+
     Args:
         paper_id: The ID of the paper to retrieve
         session: Database session
-        
+
     Returns:
         Tuple of (paper, full_path) where full_path is a Path object
-        
+
     Raises:
         HTTPException: If paper not found, has no file_path, path resolution fails,
                       or file doesn't exist on filesystem
@@ -317,26 +317,11 @@ async def get_paper_thumbnail(
     Public endpoint - no authentication required for thumbnail access.
     """
     try:
-        paper_manager = PaperManagerService(session)
-        paper = await paper_manager.get_paper_by_id(paper_id)
-
-        if not paper:
-            raise HTTPException(status_code=404, detail="Paper not found")
-
-        if not paper.file_path:
-            raise HTTPException(
-                status_code=404, detail="Paper has no associated PDF file"
-            )
-
-        # Get full PDF path using the same storage service
-        pdf_full_path = paper_manager.file_storage.get_full_path(paper.file_path)
-        if not pdf_full_path.exists():
-            logger.error(f"PDF file not found for paper {paper_id}: {pdf_full_path}")
-            raise HTTPException(
-                status_code=404, detail=f"PDF file not found: {paper.file_path}"
-            )
+        # Use helper function to get paper and validate file path
+        paper, pdf_full_path = await _get_paper_file_path(paper_id, session)
 
         # Initialize thumbnail generator with the same storage root
+        paper_manager = PaperManagerService(session)
         thumbnail_gen = ThumbnailGenerator(
             storage_root=str(paper_manager.file_storage.storage_root)
         )

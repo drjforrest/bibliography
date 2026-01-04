@@ -1,11 +1,11 @@
-import os
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Tuple
-from PIL import Image
-import fitz  # PyMuPDF
 
+import fitz  # PyMuPDF
 from app.config import config
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,12 @@ class ThumbnailGenerator:
         self.thumbnail_root.mkdir(parents=True, exist_ok=True)
 
         # Default thumbnail settings
-        self.thumbnail_size = (300, 400)  # Width x Height for book-like aspect ratio
-        self.thumbnail_quality = 85
+        # Higher resolution for book card UI - designed for crisp display on modern screens
+        self.thumbnail_size = (
+            600,
+            800,
+        )  # Width x Height for book-like aspect ratio (2x for Retina displays)
+        self.thumbnail_quality = 92  # Higher quality JPEG for better text clarity
         self.thumbnail_format = "JPEG"
 
     def generate_thumbnail(
@@ -61,7 +65,9 @@ class ThumbnailGenerator:
             absolute_pdf_path = absolute_pdf_path.resolve()
 
             if not absolute_pdf_path.exists():
-                logger.error(f"PDF file not found: {absolute_pdf_path} (resolved from: {pdf_path})")
+                logger.error(
+                    f"PDF file not found: {absolute_pdf_path} (resolved from: {pdf_path})"
+                )
                 return None
 
             if not absolute_pdf_path.is_file():
@@ -88,7 +94,7 @@ class ThumbnailGenerator:
             except (ValueError, AttributeError):
                 # Fallback: try to extract from original path
                 parts = Path(pdf_path).parts
-            
+
             if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
                 year_dir = self.thumbnail_root / parts[0]
                 month_dir = year_dir / parts[1]
@@ -120,8 +126,9 @@ class ThumbnailGenerator:
             page = doc[0]
 
             # Calculate zoom to match desired thumbnail width
-            # PyMuPDF uses 72 DPI by default, we want higher quality
-            mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
+            # PyMuPDF uses 72 DPI by default, we want higher quality for crisp rendering
+            # 3x zoom provides excellent quality for 600x800 thumbnails
+            mat = fitz.Matrix(3.0, 3.0)  # 3x zoom for high-quality rendering
             pix = page.get_pixmap(matrix=mat)
 
             # Convert to PIL Image
@@ -245,4 +252,5 @@ class ThumbnailGenerator:
         logger.info(
             f"Batch thumbnail generation: {success_count} succeeded, {failure_count} failed"
         )
+        return success_count, failure_count
         return success_count, failure_count
