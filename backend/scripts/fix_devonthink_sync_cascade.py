@@ -26,11 +26,9 @@ elif root_env.exists():
 
 # Set minimal environment variables if not already set
 # This allows the migration to run without full config setup
+# Note: CLERK_ISSUER and CLERK_JWKS_URL are only needed if the script imports app.config
+# Since this script only uses DATABASE_URL, we don't need to set Clerk URLs here
 os.environ.setdefault("APP_ENV", "production")
-os.environ.setdefault("CLERK_ISSUER", "https://clerk.counterforce-hero.tech")
-os.environ.setdefault(
-    "CLERK_JWKS_URL", "https://clerk.counterforce-hero.tech/.well-known/jwks.json"
-)
 
 # Get DATABASE_URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -153,6 +151,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-    asyncio.run(main())
     asyncio.run(main())

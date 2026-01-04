@@ -25,7 +25,7 @@ import asyncio
 import secrets
 import string
 
-from app.db import User, SearchSpace, get_async_session_context
+from app.db import SearchSpace, User, get_async_session_context
 from sqlalchemy import select
 
 
@@ -58,7 +58,9 @@ async def invite_user(
             if existing_by_email:
                 print(f"❌ User with email {email} already exists")
                 print(f"   User ID: {existing_by_email.id}")
-                print(f"   Clerk User ID: {existing_by_email.clerk_user_id or 'Not linked'}")
+                print(
+                    f"   Clerk User ID: {existing_by_email.clerk_user_id or 'Not linked'}"
+                )
                 return False
 
             # Check if user already exists by Clerk ID
@@ -74,7 +76,7 @@ async def invite_user(
                 return False
 
             # Generate a random password to satisfy database schema requirements
-            # 
+            #
             # NOTE: This password is NEVER used or checked. Clerk handles all authentication.
             # The fastapi-users library's SQLAlchemyBaseUserTableUUID base table requires
             # a hashed_password field (NOT NULL), so we must provide a value even though
@@ -82,7 +84,9 @@ async def invite_user(
             # never be validated or used.
             password_length = 64
             alphabet = string.ascii_letters + string.digits + string.punctuation
-            random_password = "".join(secrets.choice(alphabet) for _ in range(password_length))
+            random_password = "".join(
+                secrets.choice(alphabet) for _ in range(password_length)
+            )
 
             # Create display name from first/last name if provided
             display_name = None
@@ -90,10 +94,16 @@ async def invite_user(
                 display_name = f"{first_name or ''} {last_name or ''}".strip()
 
             # Create user using the user manager (handles password hashing)
-            from app.users import get_user_manager
+            # Note: get_user_manager() is an async generator for FastAPI dependency injection.
+            # We need to manually instantiate UserManager with SQLAlchemyUserDatabase.
             from app.schemas import UserCreate
+            from app.users import UserManager
+            from fastapi_users.db import SQLAlchemyUserDatabase
 
-            user_manager = get_user_manager()
+            # Manually create user_db and user_manager (bypassing FastAPI dependency injection)
+            user_db = SQLAlchemyUserDatabase(session, User)
+            user_manager = UserManager(user_db)
+
             user_create = UserCreate(
                 email=email,
                 password=random_password,  # Placeholder - never used (Clerk handles auth)
@@ -132,7 +142,9 @@ async def invite_user(
             session.add(search_space)
             await session.commit()
 
-            print(f"✅ Created default search space: '{search_space.name}' (ID: {search_space.id})")
+            print(
+                f"✅ Created default search space: '{search_space.name}' (ID: {search_space.id})"
+            )
             print(f"\n🚀 User can now sign in via Clerk with email: {email}")
 
             return True
@@ -171,9 +183,7 @@ async def list_users():
                 status = "✅ Active" if user.is_active else "❌ Inactive"
                 clerk_id = user.clerk_user_id or "Not linked"
                 display_name = user.display_name or "-"
-                print(
-                    f"{user.email:<40} {clerk_id:<30} {display_name:<25} {status}"
-                )
+                print(f"{user.email:<40} {clerk_id:<30} {display_name:<25} {status}")
 
         except Exception as e:
             print(f"❌ Error listing users: {str(e)}")
@@ -222,4 +232,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
