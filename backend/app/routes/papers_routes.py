@@ -7,15 +7,20 @@ from typing import List, Optional, Tuple
 
 from app.db import ScientificPaper, User, get_async_session
 from app.middleware.clerk_auth import require_clerk_auth
-from app.schemas.papers import (CitationRequest, CitationResponse,
-                                PaperListResponse, PaperResponse,
-                                PaperSearchRequest, PaperUploadResponse,
-                                StorageStatsResponse, WatcherStatusResponse)
+from app.schemas.papers import (
+    CitationRequest,
+    CitationResponse,
+    PaperListResponse,
+    PaperResponse,
+    PaperSearchRequest,
+    PaperUploadResponse,
+    StorageStatsResponse,
+    WatcherStatusResponse,
+)
 from app.services.citation_formatter import CitationFormatter
 from app.services.paper_manager import PaperManagerService
 from app.services.thumbnail_generator import ThumbnailGenerator
-from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query,
-                     UploadFile)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -748,10 +753,6 @@ async def get_favorites(
 
     return PaperListResponse(
         papers=[PaperResponse.from_orm(paper) for paper in papers],
-        total=len(papers),
-        limit=limit,
-        offset=offset,
-    )
         total=len(papers),
         limit=limit,
         offset=offset,

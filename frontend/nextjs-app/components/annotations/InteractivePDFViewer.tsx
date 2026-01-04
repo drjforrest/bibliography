@@ -9,9 +9,9 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 // @ts-ignore
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker
+// Configure PDF.js worker - use self-hosted worker instead of CDN for security
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
 interface Annotation {
