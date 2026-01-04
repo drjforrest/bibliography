@@ -9,8 +9,10 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 // @ts-ignore
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker - use self-hosted worker instead of CDN for security
+// Configure PDF.js worker - use version that matches react-pdf's pdfjs-dist (5.4.296)
+// The postinstall script copies the worker from react-pdf's bundled pdfjs-dist
 if (typeof window !== 'undefined') {
+  // Use the worker from public folder (copied from react-pdf's pdfjs-dist during postinstall)
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 

@@ -2,7 +2,7 @@
 
 import TagDialog from '@/components/library/TagDialog';
 import ContextMenu, { ContextMenuItem } from '@/components/shared/ContextMenu';
-import { useApi } from '@/lib/api';
+import { getApiBaseUrl, useApi } from '@/lib/api';
 import type { Paper } from '@/types';
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS } from '@/types';
 import { useAuth } from '@clerk/nextjs';
@@ -120,9 +120,10 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
     },
   ];
 
-  // Generate thumbnail URL if paper has an ID - use relative path via Next.js rewrites
+  // Generate thumbnail URL if paper has an ID
+  // Use full API URL in production (client-side image requests don't use Next.js rewrites)
   const thumbnailUrl = paper.id
-    ? `/api/v1/papers/${paper.id}/thumbnail`
+    ? `${getApiBaseUrl()}/api/v1/papers/${paper.id}/thumbnail`
     : null;
 
   // Determine background image source

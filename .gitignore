@@ -90,6 +90,9 @@ web_modules/
 .next
 out
 
+# PDF.js worker (generated file, should not be committed)
+frontend/nextjs-app/public/pdf.worker.min.mjs
+
 # Nuxt.js build / generate output
 .nuxt
 dist
