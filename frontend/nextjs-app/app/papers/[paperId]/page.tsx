@@ -3,8 +3,9 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AnnotationSidebar from '@/components/annotations/AnnotationSidebar';
 import Header from '@/components/layout/Header';
-import { api } from '@/lib/api';
+import { useApi } from '@/lib/api';
 import type { Annotation, AnnotationType, Paper } from '@/types';
+import { useAuth } from '@clerk/nextjs';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -18,6 +19,8 @@ const InteractivePDFViewer = dynamic(
 export default function PaperAnnotationPage() {
   const params = useParams();
   const paperId = params.paperId as string;
+  const { isLoaded, isSignedIn } = useAuth();
+  const api = useApi();
   const [paper, setPaper] = useState<Paper | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [activeTool, setActiveTool] = useState<AnnotationType | null>(null);
@@ -25,8 +28,16 @@ export default function PaperAnnotationPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Fetch paper and annotations on mount
+  // Fetch paper and annotations on mount (only when authenticated)
   useEffect(() => {
+    if (!isLoaded || !isSignedIn || !paperId) {
+      if (isLoaded && !isSignedIn) {
+        setIsLoading(false);
+        setError('Please sign in to view papers');
+      }
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -47,10 +58,8 @@ export default function PaperAnnotationPage() {
       }
     };
 
-    if (paperId) {
-      fetchData();
-    }
-  }, [paperId]);
+    fetchData();
+  }, [paperId, isLoaded, isSignedIn, api]);
 
   const handleToolSelect = (tool: AnnotationType) => {
     // Set active tool for interactive PDF viewer
@@ -58,6 +67,11 @@ export default function PaperAnnotationPage() {
   };
 
   const handleAnnotationCreate = async (annotation: any) => {
+    if (!isLoaded || !isSignedIn) {
+      console.error('User not authenticated');
+      return;
+    }
+
     try {
       // Save to backend
       await api.createAnnotation(parseInt(paperId), {

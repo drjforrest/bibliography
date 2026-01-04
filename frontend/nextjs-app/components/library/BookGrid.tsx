@@ -52,6 +52,7 @@ export default function BookGrid({ papers, view, onChatWithDocument, onFavoriteC
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     // On error, hide image and show gradient background
+                    // Silently handle missing thumbnails - don't spam console
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
                 />
