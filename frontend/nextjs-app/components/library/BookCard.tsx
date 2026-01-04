@@ -24,6 +24,11 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
   const [showTagDialog, setShowTagDialog] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+  // Reset image error state when paper changes
+  useEffect(() => {
+    setImageError(false);
+  }, [paper.id]);
+
   // Check if paper is favorited on mount
   useEffect(() => {
     const checkFavorited = async () => {
@@ -148,7 +153,14 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
               src={thumbnailUrl}
               alt=""
               className="hidden"
-              onError={() => setImageError(true)}
+              onError={(e) => {
+                console.warn(`Failed to load thumbnail for paper ${paper.id}:`, thumbnailUrl);
+                setImageError(true);
+              }}
+              onLoad={() => {
+                // Image loaded successfully
+                console.debug(`Thumbnail loaded successfully for paper ${paper.id}`);
+              }}
             />
           )}
 
