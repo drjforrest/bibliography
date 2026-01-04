@@ -2,6 +2,7 @@
 
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AnnotationSidebar from '@/components/annotations/AnnotationSidebar';
+import GenerateContentPanel from '@/components/papers/GenerateContentPanel';
 import Header from '@/components/layout/Header';
 import { useApi } from '@/lib/api';
 import type { Annotation, AnnotationType, Paper } from '@/types';
@@ -118,17 +119,27 @@ export default function PaperAnnotationPage() {
             )}
           </div>
 
-          {/* Right Sidebar: Annotations - Collapsible */}
+          {/* Right Sidebar: Annotations + Generate Content - Collapsible */}
           <div className={`relative transition-all duration-300 ${isSidebarOpen ? 'w-96' : 'w-0'}`}>
             {isSidebarOpen && (
-              <AnnotationSidebar
-                annotations={annotations}
-                paperTitle={paper?.title || 'Document'}
-                paperSummary={paper?.summary}
-                shortDescription={paper?.short_description}
-                laySummary={paper?.lay_summary}
-                insights={paper?.insights}
-              />
+              <div className="h-full overflow-y-auto">
+                <AnnotationSidebar
+                  annotations={annotations}
+                  paperTitle={paper?.title || 'Document'}
+                  paperSummary={paper?.summary}
+                  shortDescription={paper?.short_description}
+                  laySummary={paper?.lay_summary}
+                  insights={paper?.insights}
+                />
+                
+                {/* Generate Content Panel */}
+                <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+                  <GenerateContentPanel 
+                    paperId={parseInt(paperId)} 
+                    paperTitle={paper?.title || 'Document'}
+                  />
+                </div>
+              </div>
             )}
             
             {/* Toggle Button */}
