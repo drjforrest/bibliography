@@ -1,26 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
-from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
-import tempfile
-import os
 import io
+import os
+import tempfile
+from typing import List, Optional
 
-from app.db import get_async_session, User
-from app.services.paper_manager import PaperManagerService
-from app.services.citation_formatter import CitationFormatter
-from app.services.thumbnail_generator import ThumbnailGenerator
+from app.db import User, get_async_session
 from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas.papers import (
-    PaperResponse,
-    PaperListResponse,
-    PaperSearchRequest,
-    PaperUploadResponse,
     CitationRequest,
     CitationResponse,
+    PaperListResponse,
+    PaperResponse,
+    PaperSearchRequest,
+    PaperUploadResponse,
     StorageStatsResponse,
     WatcherStatusResponse,
 )
+from app.services.citation_formatter import CitationFormatter
+from app.services.paper_manager import PaperManagerService
+from app.services.thumbnail_generator import ThumbnailGenerator
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -185,8 +185,8 @@ async def get_papers_by_folder(
     """
     Get papers in a specific DEVONthink folder path.
     """
-    from sqlalchemy import select
     from app.db import ScientificPaper
+    from sqlalchemy import select
 
     stmt = (
         select(ScientificPaper)
@@ -279,8 +279,9 @@ async def get_paper_thumbnail(
     Public endpoint - no authentication required for thumbnail access.
     """
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     try:
         paper_manager = PaperManagerService(session)
         paper = await paper_manager.get_paper_by_id(paper_id)
@@ -289,15 +290,16 @@ async def get_paper_thumbnail(
             raise HTTPException(status_code=404, detail="Paper not found")
 
         if not paper.file_path:
-            raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+            raise HTTPException(
+                status_code=404, detail="Paper has no associated PDF file"
+            )
 
         # Get full PDF path using the same storage service
         pdf_full_path = paper_manager.file_storage.get_full_path(paper.file_path)
         if not pdf_full_path.exists():
             logger.error(f"PDF file not found for paper {paper_id}: {pdf_full_path}")
             raise HTTPException(
-                status_code=404, 
-                detail=f"PDF file not found: {paper.file_path}"
+                status_code=404, detail=f"PDF file not found: {paper.file_path}"
             )
 
         # Initialize thumbnail generator with the same storage root
@@ -312,10 +314,12 @@ async def get_paper_thumbnail(
         )
 
         if not thumbnail_relative_path:
-            logger.error(f"Thumbnail generation failed for paper {paper_id}, PDF path: {paper.file_path}")
+            logger.error(
+                f"Thumbnail generation failed for paper {paper_id}, PDF path: {paper.file_path}"
+            )
             raise HTTPException(
-                status_code=500, 
-                detail=f"Failed to generate thumbnail. Check server logs for details."
+                status_code=500,
+                detail=f"Failed to generate thumbnail. Check server logs for details.",
             )
 
         # Get full thumbnail path
@@ -340,10 +344,11 @@ async def get_paper_thumbnail(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception(f"Unexpected error generating thumbnail for paper {paper_id}: {str(e)}")
+        logger.exception(
+            f"Unexpected error generating thumbnail for paper {paper_id}: {str(e)}"
+        )
         raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected error: {str(e)}"
+            status_code=500, detail="Unexpected server error while generating thumbnail"
         )
 
 
@@ -481,17 +486,17 @@ async def get_papers_for_devonthink_export(
 ):
     """
     Get papers that were uploaded by users but not yet synced to DEVONthink.
-    
+
     These papers have dt_source_uuid = NULL, meaning they were uploaded directly
     to the library (not imported from DEVONthink). They can be exported back to
     DEVONthink to complete bidirectional syncing.
-    
+
     Returns papers that need to be synced TO DEVONthink.
     """
+    from app.db import Document, ScientificPaper, SearchSpace
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from app.db import ScientificPaper, Document, SearchSpace
-    
+
     # Query papers without dt_source_uuid (uploaded by users, not from DEVONthink)
     # and belonging to the current user's search spaces
     stmt = (
@@ -501,19 +506,19 @@ async def get_papers_for_devonthink_export(
         .join(SearchSpace)
         .where(
             ScientificPaper.dt_source_uuid.is_(None),  # Not from DEVONthink
-            SearchSpace.user_id == user.id  # Belongs to current user
+            SearchSpace.user_id == user.id,  # Belongs to current user
         )
         .order_by(ScientificPaper.created_at.desc())
         .limit(limit)
     )
-    
+
     result = await session.execute(stmt)
     papers = result.scalars().all()
-    
+
     return {
         "papers": [PaperResponse.from_orm(paper) for paper in papers],
         "total": len(papers),
-        "message": f"Found {len(papers)} paper(s) ready for DEVONthink export"
+        "message": f"Found {len(papers)} paper(s) ready for DEVONthink export",
     }
 
 
@@ -525,8 +530,8 @@ async def get_papers_by_room(
     """
     Get paper counts by literature type (room).
     """
-    from sqlalchemy import select, func
-    from app.db import ScientificPaper, Document, SearchSpace
+    from app.db import Document, ScientificPaper, SearchSpace
+    from sqlalchemy import func, select
 
     # Count papers by literature type for user's search spaces
     stmt = (
@@ -564,8 +569,8 @@ async def generate_thumbnails_batch(
     Generate thumbnails for multiple papers in batch.
     Useful for initial setup or regenerating thumbnails.
     """
+    from app.db import Document, ScientificPaper, SearchSpace
     from sqlalchemy import select
-    from app.db import ScientificPaper, Document, SearchSpace
 
     # Build query to get papers
     stmt = (
@@ -591,8 +596,11 @@ async def generate_thumbnails_batch(
             "total": 0,
         }
 
-    # Generate thumbnails
-    thumbnail_gen = ThumbnailGenerator()
+    # Initialize thumbnail generator with the same storage root
+    paper_manager = PaperManagerService(session)
+    thumbnail_gen = ThumbnailGenerator(
+        storage_root=str(paper_manager.file_storage.storage_root)
+    )
     success_count, failure_count = thumbnail_gen.batch_generate_thumbnails(
         papers, force_regenerate=force_regenerate
     )
@@ -614,8 +622,8 @@ async def add_favorite(
     """
     Add a paper to the user's favorites.
     """
-    from sqlalchemy import select, insert
     from app.db import ScientificPaper, user_favorites
+    from sqlalchemy import insert, select
 
     # Check if paper exists
     paper_stmt = select(ScientificPaper).where(ScientificPaper.id == paper_id)
@@ -654,8 +662,8 @@ async def remove_favorite(
     """
     Remove a paper from the user's favorites.
     """
-    from sqlalchemy import delete
     from app.db import user_favorites
+    from sqlalchemy import delete
 
     # Remove from favorites
     delete_stmt = delete(user_favorites).where(
@@ -680,8 +688,8 @@ async def is_favorited(
     """
     Check if a paper is in the user's favorites.
     """
-    from sqlalchemy import select
     from app.db import user_favorites
+    from sqlalchemy import select
 
     check_stmt = select(user_favorites).where(
         user_favorites.c.user_id == user.id,
@@ -703,8 +711,8 @@ async def get_favorites(
     """
     Get all papers in the user's favorites.
     """
-    from sqlalchemy import select
     from app.db import ScientificPaper, user_favorites
+    from sqlalchemy import select
 
     # Get favorited papers
     stmt = (
