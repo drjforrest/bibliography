@@ -186,55 +186,6 @@ async def get_papers(
     )
 
 
-@router.get("/{paper_id}", response_model=PaperResponse)
-async def get_paper(
-    paper_id: int,
-    user: User = Depends(require_clerk_auth),
-    session: AsyncSession = Depends(get_async_session),
-):
-    """
-    Get a specific paper by ID.
-    """
-    try:
-        paper_manager = PaperManagerService(session)
-        paper = await paper_manager.get_paper_by_id(paper_id)
-
-        if not paper:
-            logger.warning(f"Paper {paper_id} not found for user {user.id}")
-            raise HTTPException(status_code=404, detail="Paper not found")
-
-        return PaperResponse.from_orm(paper)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving paper {paper_id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error retrieving paper: {str(e)}")
-
-
-@router.get("/by-folder")
-async def search_papers(
-    search_request: PaperSearchRequest,
-    user: User = Depends(require_clerk_auth),
-    session: AsyncSession = Depends(get_async_session),
-):
-    """
-    Search papers by query string.
-    """
-    paper_manager = PaperManagerService(session)
-    papers = await paper_manager.search_papers(
-        query=search_request.query,
-        search_space_id=search_request.search_space_id,
-        limit=search_request.limit,
-    )
-
-    return PaperListResponse(
-        papers=[PaperResponse.from_orm(paper) for paper in papers],
-        total=len(papers),
-        limit=search_request.limit,
-        offset=0,
-    )
-
-
 @router.get("/by-folder")
 async def get_papers_by_folder(
     folder_path: str = Query(...),
@@ -263,6 +214,8 @@ async def get_papers_by_folder(
     }
 
 
+# IMPORTANT: More specific routes must come BEFORE the generic /{paper_id} route
+# to ensure proper route matching in FastAPI
 @router.get("/{paper_id}/pdf")
 async def get_paper_pdf(
     paper_id: int, session: AsyncSession = Depends(get_async_session)
@@ -284,7 +237,13 @@ async def get_paper_pdf(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": "inline"},
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+            "Access-Control-Allow-Origin": "*",  # Allow cross-origin requests
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        },
     )
 
 
@@ -374,6 +333,31 @@ async def get_paper_thumbnail(
         raise HTTPException(
             status_code=500, detail="Unexpected server error while generating thumbnail"
         )
+
+
+@router.get("/{paper_id}", response_model=PaperResponse)
+async def get_paper(
+    paper_id: int,
+    user: User = Depends(require_clerk_auth),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Get a specific paper by ID.
+    """
+    try:
+        paper_manager = PaperManagerService(session)
+        paper = await paper_manager.get_paper_by_id(paper_id)
+
+        if not paper:
+            logger.warning(f"Paper {paper_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Paper not found")
+
+        return PaperResponse.from_orm(paper)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving paper {paper_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving paper: {str(e)}")
 
 
 @router.post("/{paper_id}/citation", response_model=CitationResponse)
