@@ -3,6 +3,7 @@
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/layout/Sidebar";
 import BookGrid from "@/components/library/BookGrid";
+import LiteratureFilter, { LiteratureType } from "@/components/library/LiteratureFilter";
 import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
 import { useApi } from "@/lib/api";
@@ -18,6 +19,7 @@ export default function TopicsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [searchQuery, setSearchQuery] = useState("");
+  const [literatureFilter, setLiteratureFilter] = useState<LiteratureType>("all");
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch papers and tags on mount (only when authenticated)
@@ -33,8 +35,9 @@ export default function TopicsPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        const literatureType = literatureFilter === 'all' ? undefined : literatureFilter;
         const [papersData, tagsData] = await Promise.all([
-          api.getPapers({ limit: 100 }),
+          api.getPapers({ limit: 100, literatureType }),
           api.getTagHierarchy(),
         ]);
         setPapers(papersData.papers || []);
@@ -56,7 +59,7 @@ export default function TopicsPage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn, api]);
+  }, [isLoaded, isSignedIn, api, literatureFilter]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -65,7 +68,8 @@ export default function TopicsPage() {
         const result = await api.searchPapers(query);
         setPapers(result.papers || []);
       } else {
-        const result = await api.getPapers({ limit: 100 });
+        const literatureType = literatureFilter === 'all' ? undefined : literatureFilter;
+        const result = await api.getPapers({ limit: 100, literatureType });
         setPapers(result.papers || []);
       }
     } catch (error) {
@@ -113,6 +117,14 @@ export default function TopicsPage() {
                   <SearchBar onSearch={handleSearch} />
                 </div>
                 <ViewToggle view={viewMode} onViewChange={setViewMode} />
+              </div>
+
+              {/* Literature Type Filter */}
+              <div className="mb-4">
+                <LiteratureFilter 
+                  currentFilter={literatureFilter} 
+                  onFilterChange={setLiteratureFilter}
+                />
               </div>
 
               {/* Sort Options */}
