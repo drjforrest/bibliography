@@ -57,12 +57,11 @@ class ThumbnailGenerator:
         try:
             # Convert relative path to absolute if needed
             if not os.path.isabs(pdf_path):
-                absolute_pdf_path = self.storage_root / pdf_path
+                # Relative path - resolve against storage_root
+                absolute_pdf_path = (self.storage_root / pdf_path).resolve()
             else:
-                absolute_pdf_path = Path(pdf_path)
-
-            # Normalize the path to handle any path issues
-            absolute_pdf_path = absolute_pdf_path.resolve()
+                # Absolute path - use as-is
+                absolute_pdf_path = Path(pdf_path).resolve()
 
             if not absolute_pdf_path.exists():
                 logger.error(

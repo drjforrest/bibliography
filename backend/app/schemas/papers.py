@@ -87,7 +87,18 @@ class PaperResponse(BaseModel):
             metadata = obj.extraction_metadata
             if isinstance(metadata, dict):
                 data['short_description'] = metadata.get('short_description')
-                data['insights'] = metadata.get('insights', [])
+                # Ensure insights is always a list of strings
+                insights_raw = metadata.get('insights', [])
+                if isinstance(insights_raw, dict):
+                    # If it's a dict, extract values or convert to list
+                    if 'insights' in insights_raw:
+                        insights_raw = insights_raw['insights']
+                    elif isinstance(insights_raw, dict):
+                        insights_raw = list(insights_raw.values()) if insights_raw else []
+                if not isinstance(insights_raw, list):
+                    insights_raw = []
+                # Ensure all items are strings
+                data['insights'] = [str(item) for item in insights_raw if item]
                 data['citations'] = metadata.get('citations', {})
 
         return cls(**data)

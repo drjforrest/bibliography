@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,15 +29,32 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    redirect_slashes=False,  # Disable automatic trailing slash redirects to preserve CORS headers
+)
 
 # Add CORS middleware
+# Explicitly allow production frontend domain
+allowed_origins = [
+    "https://library.counterforce-hero.tech",
+    "https://api.counterforce-hero.tech",
+    "http://localhost:3000",
+    "http://localhost:8501",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8501",
+]
+
+# Note: Cannot use allow_credentials=True with allow_origins=["*"]
+# So we explicitly list origins instead
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 app.include_router(

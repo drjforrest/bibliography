@@ -188,6 +188,7 @@ async def search_papers(
     )
 
 
+@router.get("", response_model=PaperListResponse)
 @router.get("/", response_model=PaperListResponse)
 async def get_papers(
     search_space_id: Optional[int] = Query(None),
@@ -341,9 +342,10 @@ async def get_paper_thumbnail(
         )
 
         # Generate thumbnail using the full PDF path
-        # Pass the full path directly since we've already resolved it
+        # Pass the absolute path directly since we've already resolved it
+        # The generate_thumbnail method will handle absolute paths correctly
         thumbnail_relative_path = thumbnail_gen.generate_thumbnail(
-            str(pdf_full_path), paper_id, force_regenerate=regenerate
+            str(pdf_full_path.resolve()), paper_id, force_regenerate=regenerate
         )
 
         if not thumbnail_relative_path:
