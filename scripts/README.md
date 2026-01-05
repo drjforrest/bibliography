@@ -273,11 +273,55 @@ To integrate this into your workflow:
 
 ## Key Learnings from v2's Experience
 
+### Database Connection
 1. **IP > Hostname**: Use `192.168.1.69` instead of `mac-mini`
 2. **Password escaping**: Do NOT escape the `$` in connection string
 3. **Driver matters**: Use `asyncpg` not `psycopg2` for async
 4. **Schema types**: Verify `user.id` is UUID type
 5. **Test first**: Always verify connection before migrations
+
+### File Storage Issues (CRITICAL FIX)
+After database connection was working, discovered PDFs weren't loading because:
+
+**Problem:** Database stores relative paths (`2026/01/xxx.pdf`) but `PDF_STORAGE_ROOT` was misconfigured.
+
+**Solution:**
+1. In production `.env`, set `PDF_STORAGE_ROOT` to correct relative path:
+   ```bash
+   PDF_STORAGE_ROOT="./data/pdfs"  # Relative to backend directory
+   ```
+   Or use absolute path:
+   ```bash
+   PDF_STORAGE_ROOT="/full/path/to/backend/data/pdfs"
+   ```
+
+2. Verify files exist:
+   ```bash
+   ls backend/data/pdfs/2026/01/ | head -5
+   # Should show PDF files with UUID names
+   ```
+
+3. Other fixes applied:
+   - **Thumbnails**: Fixed path resolution (relative vs absolute)
+   - **CORS**: Explicitly listed allowed origins
+   - **Routes**: Handle both trailing/non-trailing slash routes
+   - **Schema**: Fixed insights field (dict vs list formats)
+
+**Testing file access:**
+```bash
+# Check if PDFs are in expected location
+cd backend/data/pdfs
+find . -name "*.pdf" | head -5
+
+# Should match database paths
+cd backend
+python3 -c "
+from pathlib import Path
+pdf_root = Path('data/pdfs')
+print(f'PDF root: {pdf_root.absolute()}')
+print(f'Exists: {pdf_root.exists()}')
+"
+```
 
 ## Questions?
 
