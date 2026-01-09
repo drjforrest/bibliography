@@ -50,19 +50,28 @@ async def _get_paper_file_path(
     paper = await paper_manager.get_paper_by_id(paper_id)
 
     if not paper:
-        logger.error(f"Paper {paper_id} not found")
+        logger.error(f"Paper {paper_id} not found in database")
         raise HTTPException(status_code=404, detail="Paper not found")
 
     if not paper.file_path:
-        logger.error(f"Paper {paper_id} has no file_path")
+        logger.error(f"Paper {paper_id} has no file_path in database")
         raise HTTPException(status_code=404, detail="Paper has no associated PDF file")
+
+    # Log storage root for debugging
+    storage_root = paper_manager.file_storage.storage_root
+    logger.info(
+        f"Resolving path for paper {paper_id}: stored_path='{paper.file_path}', "
+        f"storage_root='{storage_root}'"
+    )
 
     # Get full file path
     try:
         full_path = paper_manager.file_storage.get_full_path(paper.file_path)
+        logger.info(f"Resolved full path for paper {paper_id}: {full_path}")
     except Exception as e:
         logger.error(
-            f"Error getting full path for paper {paper_id}: {e}, file_path: {paper.file_path}"
+            f"Error getting full path for paper {paper_id}: {e}, "
+            f"stored_path: {paper.file_path}, storage_root: {storage_root}"
         )
         raise HTTPException(
             status_code=500, detail=f"Error resolving file path: {str(e)}"
@@ -263,7 +272,30 @@ async def get_paper_pdf(
     logger.info(f"PDF request received for paper_id: {paper_id}")
     try:
         paper, full_path = await _get_paper_file_path(paper_id, session)
-        logger.info(f"PDF file found for paper {paper_id} at: {full_path}")
+        logger.info(
+            f"PDF file found for paper {paper_id}: stored_path='{paper.file_path}', "
+            f"resolved_path='{full_path}', exists={full_path.exists()}"
+        )
+
+        # Verify file exists and is readable
+        if not full_path.exists():
+            logger.error(
+                f"PDF file does not exist for paper {paper_id}: {full_path} "
+                f"(resolved from stored path: {paper.file_path})"
+            )
+            raise HTTPException(
+                status_code=404,
+                detail=f"PDF file not found on server. Stored path: {paper.file_path}, "
+                       f"Resolved path: {full_path}"
+            )
+
+        if not full_path.is_file():
+            logger.error(
+                f"PDF path exists but is not a file for paper {paper_id}: {full_path}"
+            )
+            raise HTTPException(
+                status_code=404, detail="PDF path exists but is not a file"
+            )
 
         # Return file for inline viewing
         try:
@@ -271,6 +303,13 @@ async def get_paper_pdf(
                 pdf_bytes = f.read()
             logger.info(
                 f"Successfully read {len(pdf_bytes)} bytes for paper {paper_id}"
+            )
+        except PermissionError as e:
+            logger.error(
+                f"Permission denied reading PDF file for paper {paper_id}: {full_path} - {e}"
+            )
+            raise HTTPException(
+                status_code=403, detail="Permission denied reading PDF file"
             )
         except Exception as e:
             logger.error(f"Error reading PDF file for paper {paper_id}: {e}")
