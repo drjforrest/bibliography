@@ -8,7 +8,8 @@ Documentation: https://api.crossref.org/
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Optional
+from urllib.parse import quote
 
 import httpx
 
@@ -49,14 +50,21 @@ class CrossrefService:
         # Clean DOI - remove any URL prefixes
         clean_doi = doi.strip()
         if clean_doi.startswith("http://") or clean_doi.startswith("https://"):
-            clean_doi = clean_doi.split("doi.org/")[-1] if "doi.org/" in clean_doi else clean_doi
+            clean_doi = (
+                clean_doi.split("doi.org/")[-1]
+                if "doi.org/" in clean_doi
+                else clean_doi
+            )
         if clean_doi.startswith("doi:"):
             clean_doi = clean_doi[4:]
 
-        url = f"{CROSSREF_API_BASE}/{clean_doi}"
+        # URL encode the DOI for the API request
+        url = f"{CROSSREF_API_BASE}/{quote(clean_doi, safe='')}"
 
         try:
-            response = await self.client.get(url, headers={"Accept": "application/json"})
+            response = await self.client.get(
+                url, headers={"Accept": "application/json"}
+            )
             response.raise_for_status()
 
             data = response.json()
@@ -85,7 +93,9 @@ class CrossrefService:
             )
             return None
         except Exception as e:
-            logger.error(f"❌ Unexpected error fetching from Crossref for DOI {doi}: {e}")
+            logger.error(
+                f"❌ Unexpected error fetching from Crossref for DOI {doi}: {e}"
+            )
             return None
 
     def _normalize_crossref_data(self, crossref_data: Dict) -> Dict:
@@ -150,23 +160,55 @@ class CrossrefService:
         elif crossref_data.get("article-number"):
             # Some papers use article-number instead of pages
             pages = f"e{crossref_data['article-number']}"
-        
+
         if pages:
             normalized["pages"] = str(pages)
 
         # Publication year (from published-print or published-online date)
+        # Defensively extract year from date-parts structure
+        def _extract_year_from_date_field(date_field):
+            """Safely extract year from Crossref date field structure."""
+            if not isinstance(date_field, dict):
+                return None
+
+            date_parts = date_field.get("date-parts")
+            if not isinstance(date_parts, list) or len(date_parts) == 0:
+                return None
+
+            first_date_part = date_parts[0]
+            if (
+                not isinstance(first_date_part, (list, tuple))
+                or len(first_date_part) == 0
+            ):
+                return None
+
+            try:
+                year_value = first_date_part[0]
+                # Ensure it's numeric (int or float)
+                if isinstance(year_value, (int, float)):
+                    return int(year_value)
+                elif isinstance(year_value, str) and year_value.isdigit():
+                    return int(year_value)
+            except (ValueError, TypeError, IndexError):
+                pass
+
+            return None
+
+        # Try published-print first
         if crossref_data.get("published-print"):
-            dates = crossref_data["published-print"]["date-parts"][0]
-            if dates and len(dates) > 0:
-                normalized["publication_year"] = int(dates[0])
+            year = _extract_year_from_date_field(crossref_data["published-print"])
+            if year:
+                normalized["publication_year"] = year
+        # Fall back to published-online
         elif crossref_data.get("published-online"):
-            dates = crossref_data["published-online"]["date-parts"][0]
-            if dates and len(dates) > 0:
-                normalized["publication_year"] = int(dates[0])
+            year = _extract_year_from_date_field(crossref_data["published-online"])
+            if year:
+                normalized["publication_year"] = year
+        # Last resort: use created date
         elif crossref_data.get("created"):
-            dates = crossref_data["created"]["date-parts"][0]
-            if dates and len(dates) > 0:
-                normalized["publication_year"] = int(dates[0])
+            year = _extract_year_from_date_field(crossref_data["created"])
+            if year:
+                normalized["publication_year"] = year
 
         # Abstract
         if crossref_data.get("abstract"):
@@ -175,6 +217,7 @@ class CrossrefService:
             if isinstance(abstract, str):
                 # Remove HTML/JATS tags
                 import re
+
                 abstract = re.sub(r"<[^>]+>", "", abstract)
                 abstract = abstract.strip()
                 if abstract:
@@ -198,7 +241,11 @@ class CrossrefService:
         # License information (for open access detection)
         if crossref_data.get("license"):
             # Check if any license indicates open access
-            licenses = crossref_data["license"] if isinstance(crossref_data["license"], list) else [crossref_data["license"]]
+            licenses = (
+                crossref_data["license"]
+                if isinstance(crossref_data["license"], list)
+                else [crossref_data["license"]]
+            )
             for license_info in licenses:
                 if license_info.get("content-version") == "vor":  # Version of Record
                     normalized["is_open_access"] = True
