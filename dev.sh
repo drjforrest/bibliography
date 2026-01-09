@@ -194,7 +194,7 @@ check_prerequisites() {
     # Check frontend node_modules
     if [ ! -d "frontend/nextjs-app/node_modules" ]; then
         print_warning "Frontend dependencies not installed"
-        print_info "Run: cd frontend/nextjs-app && npm install"
+        print_info "Run: cd frontend/nextjs-app && pnpm install"
     else
         print_success "Frontend dependencies installed"
     fi
@@ -273,10 +273,15 @@ start_frontend() {
     print_info "Frontend will start on http://localhost:3000"
     echo ""
 
-    # Start frontend in background with logging
-    echo "Starting frontend in background..."
-    cd frontend/nextjs-app
-    npm run dev > ../../logs/frontend.log 2>&1 &
+    # Use pnpm if available, fallback to npm
+    if command -v pnpm &> /dev/null; then
+        print_info "Using pnpm for faster builds..."
+        pnpm run dev > ../../logs/frontend.log 2>&1 &
+    else
+        print_warning "pnpm not found, installing pnpm for faster builds..."
+        npm install -g pnpm
+        pnpm run dev > ../../logs/frontend.log 2>&1 &
+    fi
     FRONTEND_PID=$!
     cd ../..
 

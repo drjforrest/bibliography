@@ -245,13 +245,21 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
     echo 'Setting up frontend environment...'
     cd ../frontend/nextjs-app
 
-    # Load nvm to ensure npm is available
+    # Load nvm to ensure Node.js is available
     export NVM_DIR=\"\$HOME/.nvm\"
     [ -s \"\$NVM_DIR/nvm.sh\" ] && source \"\$NVM_DIR/nvm.sh\"
     
     # Use Node 22 to match dev environment
     nvm install 22 2>/dev/null || true
     nvm use 22 2>/dev/null || nvm use default
+    
+    # Install pnpm if not available (much faster than npm)
+    if ! command -v pnpm &> /dev/null; then
+        echo 'Installing pnpm for faster frontend dependency management...'
+        npm install -g pnpm
+    else
+        echo '✓ pnpm is available'
+    fi
 
     # Check if .env.local exists (copied from .env.production.local earlier)
     if [ ! -f .env.local ]; then
@@ -287,15 +295,17 @@ EOF
         echo '✓ Updated NEXT_PUBLIC_API_URL to https://api.counterforce-hero.tech'
     fi
 
-    npm install
+    # Use pnpm for faster installs (10x faster than npm)
+    echo 'Installing frontend dependencies with pnpm...'
+    pnpm install
 
     # Build the frontend on the server (to pick up production env vars)
     echo 'Building frontend on production server...'
-    npm run build
+    pnpm run build
 
     # Start frontend service
     echo 'Starting hero-evidence-library frontend on port ${FRONTEND_PORT}...'
-    nohup npm run start -- -p ${FRONTEND_PORT} > ../../hero_evidence_library_frontend.log 2>&1 &
+    nohup pnpm run start -- -p ${FRONTEND_PORT} > ../../hero_evidence_library_frontend.log 2>&1 &
 
     echo 'hero-evidence-library services started:'
     echo '  - Backend: http://localhost:${BACKEND_PORT}'
