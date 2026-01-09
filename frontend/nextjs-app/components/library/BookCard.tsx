@@ -1,7 +1,8 @@
 'use client';
 
 import TagDialog from '@/components/library/TagDialog';
-import ContextMenu, { ContextMenuItem } from '@/components/shared/ContextMenu';
+import ActionButton from '@/components/library/ActionButton';
+import PaperActionPanel from '@/components/library/PaperActionPanel';
 import { getApiBaseUrl, useApi } from '@/lib/api';
 import type { Paper } from '@/types';
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS } from '@/types';
@@ -20,8 +21,7 @@ interface BookCardProps {
 export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, onTagChange, onDelete }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showActionPanel, setShowActionPanel] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const { isLoaded, isSignedIn } = useAuth();
   const api = useApi();
@@ -47,78 +47,31 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
     checkFavorited();
   }, [paper.id, isLoaded, isSignedIn, api]);
 
-  const handleToggleFavorite = async (e: React.MouseEvent) => {
+  const handleActionComplete = (actionId: string) => {
+    switch (actionId) {
+      case 'chat-with-pdf':
+        onChatWithDocument?.(paper.id);
+        break;
+      case 'manage-tags':
+        setShowTagDialog(true);
+        break;
+      case 'toggle-favorite':
+        onFavoriteChange?.();
+        break;
+      case 'delete':
+        onDelete?.();
+        break;
+      case 'find-related':
+        // Recommendations handled by panel itself
+        break;
+    }
+  };
+
+  const handleActionButtonClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (isTogglingFavorite || !isLoaded || !isSignedIn) return;
-
-    setIsTogglingFavorite(true);
-    try {
-      if (isFavorited) {
-        await api.removeFavorite(paper.id);
-        setIsFavorited(false);
-      } else {
-        await api.addFavorite(paper.id);
-        setIsFavorited(true);
-      }
-      // Notify parent component of change
-      onFavoriteChange?.();
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-    } finally {
-      setIsTogglingFavorite(false);
-    }
+    setShowActionPanel(true);
   };
-
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-    });
-  };
-
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete "${paper.title}"?`)) return;
-
-    if (!isLoaded || !isSignedIn) {
-      alert('Please sign in to delete papers.');
-      return;
-    }
-
-    try {
-      await api.deletePaper(paper.id);
-      onDelete?.();
-    } catch (error) {
-      console.error('Failed to delete paper:', error);
-      alert('Failed to delete paper. Please try again.');
-    }
-  };
-
-  const contextMenuItems: ContextMenuItem[] = [
-    {
-      label: 'Chat with PDF',
-      icon: 'chat',
-      onClick: () => onChatWithDocument?.(paper.id),
-    },
-    {
-      label: 'Manage Tags',
-      icon: 'tag',
-      onClick: () => setShowTagDialog(true),
-    },
-    {
-      label: isFavorited ? 'Remove from Favorites' : 'Add to Favorites',
-      icon: isFavorited ? 'star' : 'star_outline',
-      onClick: (e?: any) => handleToggleFavorite(e || {} as React.MouseEvent),
-    },
-    {
-      label: 'Delete',
-      icon: 'delete',
-      onClick: handleDelete,
-      danger: true,
-    },
-  ];
 
   // Generate thumbnail URL if paper has an ID
   // Use full API URL in production (client-side image requests don't use Next.js rewrites)
@@ -140,7 +93,7 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
   const showFallbackText = !paper.coverImage && (!thumbnailUrl || imageError);
 
   return (
-    <div className="group relative" onContextMenu={handleContextMenu}>
+    <div className="group relative">
       <Link href={`/papers/${paper.id}`} className="flex flex-col gap-3">
         <div
           className="w-full bg-center bg-no-repeat aspect-[3/4] bg-cover rounded-lg shadow-md group-hover:shadow-xl transition-shadow cursor-pointer relative"
@@ -149,6 +102,18 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
           }}
           title={`${paper.title}\n\n${paper.short_description || paper.summary || 'No summary available'}`}
         >
+          {/* Action Button - Appears on Hover */}
+          {isLoaded && isSignedIn && (
+            <div 
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+              onClick={handleActionButtonClick}
+            >
+              <ActionButton
+                onClick={handleActionButtonClick}
+                variant="floating"
+              />
+            </div>
+          )}
           {/* Literature Type Badge */}
           {paper.literature_type && paper.literature_type !== 'PEER_REVIEWED' && (
             <div className="absolute top-2 left-2 z-10">
@@ -193,14 +158,13 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
         </div>
       </Link>
 
-
-      {/* Context Menu */}
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
+      {/* Action Panel */}
+      {showActionPanel && (
+        <PaperActionPanel
+          paper={paper}
+          isOpen={showActionPanel}
+          onClose={() => setShowActionPanel(false)}
+          onActionComplete={handleActionComplete}
         />
       )}
 

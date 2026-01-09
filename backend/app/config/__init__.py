@@ -205,6 +205,10 @@ class Config:
     # Firecrawl API Key
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", None)
 
+    # Semantic Scholar API Key (optional, for higher rate limits)
+    # Get free at: https://www.semanticscholar.org/product/api
+    SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY", None)
+
     # Litellm TTS Configuration
     TTS_SERVICE = os.getenv("TTS_SERVICE")
     TTS_SERVICE_API_BASE = os.getenv("TTS_SERVICE_API_BASE")

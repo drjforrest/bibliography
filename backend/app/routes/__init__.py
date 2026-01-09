@@ -11,6 +11,7 @@ from .tags_routes import router as tags_router
 from .user_routes import router as user_router
 from .messages_routes import router as messages_router
 from .notifications_routes import router as notifications_router
+from .recommendations_routes import router as recommendations_router
 
 router = APIRouter()
 
@@ -26,3 +27,4 @@ router.include_router(tags_router)
 router.include_router(user_router)
 router.include_router(messages_router)
 router.include_router(notifications_router)
+router.include_router(recommendations_router, prefix="/api/v1")

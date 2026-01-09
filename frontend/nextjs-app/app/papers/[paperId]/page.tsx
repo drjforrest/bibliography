@@ -3,11 +3,14 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AnnotationSidebar from '@/components/annotations/AnnotationSidebar';
 import Header from '@/components/layout/Header';
+import ActionButton from '@/components/library/ActionButton';
+import PaperActionPanel from '@/components/library/PaperActionPanel';
+import { RecommendationsModal } from '@/components/library/RecommendationsModal';
 import { getApiBaseUrl, useApi } from '@/lib/api';
 import type { Annotation, AnnotationType, Paper } from '@/types';
 import { useAuth } from '@clerk/nextjs';
 import dynamic from 'next/dynamic';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 // Dynamically import InteractivePDFViewer to prevent SSR issues with PDF.js
@@ -27,6 +30,9 @@ export default function PaperAnnotationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [showActionPanel, setShowActionPanel] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const router = useRouter();
 
   // Fetch paper and annotations on mount (only when authenticated)
   useEffect(() => {
@@ -91,6 +97,24 @@ export default function PaperAnnotationPage() {
     }
   };
 
+  const handleActionComplete = (actionId: string) => {
+    switch (actionId) {
+      case 'find-related':
+        if (paper) {
+          setShowRecommendations(true);
+        }
+        break;
+      case 'chat-with-pdf':
+        // Navigate to chat (if you have a chat route)
+        // router.push(`/papers/${paperId}/chat`);
+        break;
+      case 'delete':
+        // Navigate back to library after deletion
+        router.push('/');
+        break;
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="flex h-screen flex-col">
@@ -99,6 +123,16 @@ export default function PaperAnnotationPage() {
         <div className="flex flex-1 overflow-hidden">
           {/* Main Content: PDF Viewer */}
           <div className="flex-1 flex flex-col bg-white dark:bg-gray-900/50 relative">
+            {/* Toolbar with Action Button */}
+            {paper && !isLoading && !error && (
+              <div className="absolute top-4 right-4 z-10">
+                <ActionButton
+                  onClick={() => setShowActionPanel(true)}
+                  variant="default"
+                  label="Actions"
+                />
+              </div>
+            )}
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500 dark:text-gray-400">Loading paper...</p>
@@ -143,6 +177,25 @@ export default function PaperAnnotationPage() {
             </button>
           </div>
         </div>
+
+        {/* Action Panel */}
+        {paper && (
+          <PaperActionPanel
+            paper={paper}
+            isOpen={showActionPanel}
+            onClose={() => setShowActionPanel(false)}
+            onActionComplete={handleActionComplete}
+          />
+        )}
+
+        {/* Recommendations Modal */}
+        {paper && showRecommendations && (
+          <RecommendationsModal
+            paperId={paper.id}
+            paperTitle={paper.title}
+            onClose={() => setShowRecommendations(false)}
+          />
+        )}
       </div>
     </ProtectedRoute>
   );
