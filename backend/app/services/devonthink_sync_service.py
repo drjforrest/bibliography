@@ -11,6 +11,7 @@ from app.db import (
     DevonthinkSyncStatus,
     Document,
     DocumentType,
+    LiteratureType,
     ScientificPaper,
     SearchSpace,
 )
@@ -759,6 +760,187 @@ class DevonthinkSyncService:
                     pass
             raise ValueError(f"Could not copy PDF for {dt_uuid}: {str(e)}")
 
+    def _determine_literature_type(
+        self, record_props: Dict, pdf_metadata: Optional[Dict] = None
+    ) -> LiteratureType:
+        """Determine literature type from DEVONthink record properties and PDF metadata.
+        
+        Checks in priority order:
+        1. Finder Comment (comment field) for hashtags (explicit user classification)
+        2. DOI presence (strong indicator of peer-reviewed - takes precedence)
+        3. Tags for keywords
+        4. Folder path (location) for keywords
+        5. PDF metadata heuristics (journal, title keywords, etc.)
+        6. Default to PEER_REVIEWED (but only if strong indicators present)
+        
+        Args:
+            record_props: DEVONthink record properties dictionary
+            pdf_metadata: Optional extracted PDF metadata dictionary
+            
+        Returns:
+            LiteratureType enum value
+        """
+        # Get comment (Finder Comment) - highest priority (explicit user classification)
+        comment = record_props.get("comment", "") or ""
+        comment_lower = comment.lower()
+        
+        # Check Finder Comment for hashtags
+        if any(
+            tag in comment_lower
+            for tag in ["#peer-review", "#peer", "#journal", "#academic"]
+        ):
+            return LiteratureType.PEER_REVIEWED
+        elif any(
+            tag in comment_lower for tag in ["#grey-lit", "#grey", "#gray-lit", "#gray"]
+        ):
+            return LiteratureType.GREY_LITERATURE
+        elif any(tag in comment_lower for tag in ["#news", "#media", "#press"]):
+            return LiteratureType.NEWS
+        
+        # Check for DOI - strong indicator of peer-reviewed (takes precedence over other heuristics)
+        if pdf_metadata and pdf_metadata.get("doi"):
+            # DOI almost always indicates peer-reviewed academic paper
+            return LiteratureType.PEER_REVIEWED
+        
+        # Check tags for keywords
+        tags = record_props.get("tags", [])
+        if tags:
+            tags_str = " ".join(str(tag).lower() for tag in tags)
+            if any(
+                term in tags_str
+                for term in ["grey", "gray", "grey literature", "gray literature"]
+            ):
+                return LiteratureType.GREY_LITERATURE
+            elif any(term in tags_str for term in ["news", "media", "press"]):
+                return LiteratureType.NEWS
+            elif any(term in tags_str for term in ["peer", "journal", "academic"]):
+                return LiteratureType.PEER_REVIEWED
+        
+        # Check folder path (location) for keywords
+        location = record_props.get("location", "") or ""
+        location_lower = location.lower()
+        if any(
+            term in location_lower
+            for term in ["grey", "gray", "grey literature", "gray literature"]
+        ):
+            return LiteratureType.GREY_LITERATURE
+        elif any(term in location_lower for term in ["news", "media", "press"]):
+            return LiteratureType.NEWS
+        elif any(term in location_lower for term in ["peer", "journal", "academic"]):
+            return LiteratureType.PEER_REVIEWED
+        
+        # Use PDF metadata heuristics if available
+        if pdf_metadata:
+            # Strong indicators of peer-reviewed
+            has_doi = bool(pdf_metadata.get("doi"))
+            has_journal = bool(pdf_metadata.get("journal"))
+            has_abstract = bool(pdf_metadata.get("abstract"))
+            has_references = bool(
+                pdf_metadata.get("references")
+                and len(pdf_metadata.get("references", [])) > 5
+            )
+            
+            # Get metadata for analysis
+            title = (pdf_metadata.get("title") or "").lower()
+            journal = (pdf_metadata.get("journal") or "").lower()
+            pub_year = pdf_metadata.get("publication_year")
+            full_text = (pdf_metadata.get("full_text") or "")[:1000].lower()  # First 1000 chars for analysis
+            
+            # News article indicators
+            news_keywords_title = [
+                "breaking",
+                "news",
+                "article",
+                "press release",
+                "announcement",
+                "update",
+                "reports",
+                "coverage",
+                "story",
+            ]
+            news_sources = [
+                "bbc",
+                "cnn",
+                "reuters",
+                "ap news",
+                "associated press",
+                "the guardian",
+                "new york times",
+                "washington post",
+                "the times",
+                "financial times",
+                "wall street journal",
+                "wsj",
+                "the economist",
+                "nature news",
+                "science news",
+                "scientific american news",
+            ]
+            news_indicators_text = [
+                "by our staff",
+                "reported by",
+                "according to sources",
+                "breaking news",
+                "live updates",
+                "this just in",
+            ]
+            
+            # Check for news indicators (high priority - news is very distinct)
+            title_has_news = any(keyword in title for keyword in news_keywords_title)
+            journal_is_news = any(source in journal for source in news_sources)
+            text_has_news = any(indicator in full_text for indicator in news_indicators_text)
+            is_recent_news = pub_year and pub_year >= 2020  # Recent publication suggests news
+            
+            # Strong news indicators: news source in journal OR multiple news keywords
+            if journal_is_news or (title_has_news and text_has_news):
+                return LiteratureType.NEWS
+            # Moderate news indicators: recent + news keywords
+            if is_recent_news and (title_has_news or text_has_news):
+                return LiteratureType.NEWS
+            
+            # Grey literature indicators
+            grey_lit_keywords = [
+                "report",
+                "brief",
+                "white paper",
+                "policy brief",
+                "working paper",
+                "technical report",
+                "case study",
+                "handbook",
+                "guide",
+                "manual",
+                "position paper",
+                "discussion paper",
+            ]
+            
+            # Check title for grey literature indicators
+            if any(keyword in title for keyword in grey_lit_keywords):
+                return LiteratureType.GREY_LITERATURE
+            
+            # Note: DOI already checked above and returns PEER_REVIEWED if present
+            # Remaining peer-reviewed indicators (DOI already handled)
+            peer_reviewed_score = 0
+            if has_journal:
+                peer_reviewed_score += 2  # Journal name is strong indicator
+            if has_abstract:
+                peer_reviewed_score += 1  # Abstract suggests academic paper
+            if has_references:
+                peer_reviewed_score += 1  # Many references suggests peer-reviewed
+            
+            # If we have strong indicators, classify as peer-reviewed
+            if peer_reviewed_score >= 2:
+                return LiteratureType.PEER_REVIEWED
+            
+            # If we have weak indicators, check for grey lit patterns
+            if peer_reviewed_score < 2:
+                # No journal and no abstract suggests grey literature
+                if not has_journal and not has_abstract:
+                    return LiteratureType.GREY_LITERATURE
+        
+        # Default to peer-reviewed (conservative - assumes academic context)
+        return LiteratureType.PEER_REVIEWED
+
     async def _create_scientific_paper(
         self,
         local_uuid: UUID,
@@ -823,6 +1005,10 @@ class DevonthinkSyncService:
         if extracted_title.lower().endswith(".pdf"):
             extracted_title = extracted_title[:-4]
 
+        # Determine literature type from DEVONthink metadata AND PDF metadata
+        # This uses heuristics like DOI, journal, title keywords, etc.
+        literature_type = self._determine_literature_type(record_props, metadata)
+
         paper = ScientificPaper(
             title=extracted_title,
             authors=metadata.get("authors", []),
@@ -838,6 +1024,7 @@ class DevonthinkSyncService:
             dt_source_path=record_props.get("path"),
             document_id=document.id,
             tags=record_props.get("tags", []),
+            literature_type=literature_type,
             extraction_metadata={
                 "devonthink_custom_fields": record_props.get("custom_meta_data", {}),
                 "extraction_timestamp": datetime.now(timezone.utc).isoformat(),
