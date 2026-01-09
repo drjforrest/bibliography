@@ -208,8 +208,28 @@ ssh ${SERVER_USER}@${SERVER_HOST} "
     python --version
 
     echo 'Installing backend dependencies...'
-    pip install --upgrade pip
-    pip install -r requirements.txt
+    
+    # Check if uv is available, use it for faster and better dependency resolution
+    if command -v uv &> /dev/null; then
+        echo '✓ Using uv for faster dependency installation and better conflict resolution...'
+        # Ensure uv is in PATH
+        export PATH=\"\$HOME/.cargo/bin:\$PATH\"
+        uv pip install -r requirements.txt --resolution=highest
+    else
+        echo '⚠ uv not found, installing uv for better dependency resolution...'
+        # Install uv
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH=\"\$HOME/.cargo/bin:\$PATH\"
+        
+        if command -v uv &> /dev/null; then
+            echo '✓ uv installed successfully, using it for dependency installation...'
+            uv pip install -r requirements.txt --resolution=highest
+        else
+            echo '⚠ uv installation failed, falling back to pip...'
+            pip install --upgrade pip
+            pip install -r requirements.txt
+        fi
+    fi
 
     # Check if .env exists
     if [ ! -f .env ]; then

@@ -39,6 +39,7 @@ dependencies = [
     "scholarly>=1.7.11",
     "crossref-commons>=0.0.7",
     "httpx>=0.27.2,<0.29.0",
+    "numpy<2.0.0",  # PyTorch/rerankers not compatible with NumPy 2.0 yet
 ]
 
 [tool.setuptools.packages.find]
