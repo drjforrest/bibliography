@@ -27,7 +27,7 @@ interface RecommendedPaper {
 
 interface RecommendationsModalProps {
   paperId: number;
-  paperTitle: string;
+  paperTitle?: string;
   onClose: () => void;
 }
 
@@ -84,9 +84,11 @@ export function RecommendationsModal({
               </span>
               Related Papers
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Based on: {paperTitle}
-            </p>
+            {paperTitle && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Based on: {paperTitle}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
