@@ -3,7 +3,7 @@ import os
 from typing import Dict, List, Optional
 
 from app.config import config
-from app.db import Document, DocumentType, ScientificPaper
+from app.db import Document, DocumentType, LiteratureType, ScientificPaper
 from app.services.embedding_service import EmbeddingService
 from app.services.file_storage import FileStorageService
 from app.services.folder_watcher import folder_watcher_manager
@@ -289,7 +289,12 @@ class PaperManagerService:
             stmt = stmt.where(Document.search_space_id == search_space_id)
 
         if literature_type:
-            stmt = stmt.where(ScientificPaper.literature_type == literature_type)
+            # Convert string to enum type for proper comparison
+            try:
+                lit_type_enum = LiteratureType(literature_type)
+                stmt = stmt.where(ScientificPaper.literature_type == lit_type_enum)
+            except ValueError:
+                logger.warning(f"Invalid literature_type: {literature_type}, skipping filter")
 
         stmt = (
             stmt.limit(limit).offset(offset).order_by(ScientificPaper.created_at.desc())

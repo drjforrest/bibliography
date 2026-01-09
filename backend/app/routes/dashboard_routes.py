@@ -265,7 +265,7 @@ async def get_papers_by_topic(
     """
     from sqlalchemy import func, select
 
-    from app.db import ScientificPaper, Tag, paper_tags
+    from app.db import LiteratureType, ScientificPaper, Tag, paper_tags
 
     try:
         # Build query to count papers per tag
@@ -277,7 +277,13 @@ async def get_papers_by_topic(
 
         # Filter by literature type if specified
         if literature_type:
-            query = query.where(ScientificPaper.literature_type == literature_type)
+            # Convert string to enum type for proper comparison
+            try:
+                lit_type_enum = LiteratureType(literature_type)
+                query = query.where(ScientificPaper.literature_type == lit_type_enum)
+            except ValueError:
+                # Invalid literature_type, skip filter
+                pass
 
         # Group by tag name and order by count descending
         query = (
