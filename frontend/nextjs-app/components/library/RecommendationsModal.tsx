@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useApi } from '@/lib/api';
+import { useEffect, useState } from 'react';
 
 interface Author {
   authorId?: string;
@@ -52,9 +52,7 @@ export function RecommendationsModal({
       const data = await api.getRecommendations(paperId);
       setRecommendations(data.recommendations);
 
-      if (data.recommendations.length === 0) {
-        setError('No recommendations found. This paper may not be in Semantic Scholar\'s database.');
-      }
+
     } catch (err: any) {
       console.error('Failed to load recommendations:', err);
       setError(err?.message || 'Failed to load recommendations. Please try again.');

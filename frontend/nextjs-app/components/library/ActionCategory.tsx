@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import type { ActionCategory, PaperAction } from '@/types/actions';
 import { categoryMetadata } from '@/types/actions';
+import { useState } from 'react';
 import ActionCard from './ActionCard';
 
 interface ActionCategoryProps {
@@ -30,6 +30,8 @@ export default function ActionCategory({
       {/* Category Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+        aria-label={`${metadata.label} category with ${actions.length} actions`}
         className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
       >
         <div className="flex items-center gap-2">

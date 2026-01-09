@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import type { Paper } from '@/types';
-import type { PaperAction, ActionCategory } from '@/types/actions';
-import { actionDefinitions, categoryMetadata } from '@/types/actions';
-import ActionCategory from './ActionCategory';
 import { useApi } from '@/lib/api';
-import { useState } from 'react';
+import type { Paper } from '@/types';
+import type { ActionCategory, PaperAction } from '@/types/actions';
+import { actionDefinitions, categoryMetadata } from '@/types/actions';
+import { useEffect, useMemo, useState } from 'react';
+import ActionCategoryComponent from './ActionCategory';
 
 interface PaperActionPanelProps {
   paper: Paper;
@@ -42,7 +41,7 @@ export default function PaperActionPanel({
       // Find Related Papers
       {
         ...actionDefinitions['find-related']!,
-        onClick: async () => {
+        onClick: async (paperIds: number[]) => {
           // Trigger recommendations - parent will handle opening modal
           onActionComplete?.('find-related');
           onClose();
@@ -51,7 +50,7 @@ export default function PaperActionPanel({
       // Chat with PDF
       {
         ...actionDefinitions['chat-with-pdf']!,
-        onClick: async () => {
+        onClick: async (paperIds: number[]) => {
           // Navigate to chat - parent component will handle
           onActionComplete?.('chat-with-pdf');
           onClose();
@@ -60,7 +59,7 @@ export default function PaperActionPanel({
       // Manage Tags
       {
         ...actionDefinitions['manage-tags']!,
-        onClick: async () => {
+        onClick: async (paperIds: number[]) => {
           // Parent component will handle tag dialog
           onActionComplete?.('manage-tags');
           onClose();
@@ -71,18 +70,24 @@ export default function PaperActionPanel({
         ...actionDefinitions['toggle-favorite']!,
         title: isFavorited ? 'Remove from Favorites' : 'Add to Favorites',
         icon: isFavorited ? 'star' : 'star_outline',
-        onClick: async () => {
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
           try {
             setActionStates(prev => ({ ...prev, 'toggle-favorite': { status: 'processing' } }));
             if (isFavorited) {
-              await api.removeFavorite(paper.id);
+              await api.removeFavorite(paperId);
             } else {
-              await api.addFavorite(paper.id);
+              await api.addFavorite(paperId);
             }
-            setIsFavorited(!isFavorited);
+            setIsFavorited(prev => !prev);
             setActionStates(prev => ({ ...prev, 'toggle-favorite': { status: 'completed' } }));
+            // Remove the completed status after 2 seconds
             setTimeout(() => {
-              setActionStates(prev => ({ ...prev, 'toggle-favorite': undefined }));
+              setActionStates(prev => {
+                // Safely remove 'toggle-favorite' while keeping other states
+                const { ['toggle-favorite']: _removed, ...rest } = prev;
+                return rest;
+              });
             }, 2000);
             onActionComplete?.('toggle-favorite');
           } catch (error) {
@@ -95,13 +100,14 @@ export default function PaperActionPanel({
       // Delete
       {
         ...actionDefinitions['delete']!,
-        onClick: async () => {
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
           if (!confirm(`Are you sure you want to delete "${paper.title}"?`)) {
             return;
           }
           try {
             setActionStates(prev => ({ ...prev, 'delete': { status: 'processing' } }));
-            await api.deletePaper(paper.id);
+            await api.deletePaper(paperId);
             setActionStates(prev => ({ ...prev, 'delete': { status: 'completed' } }));
             onActionComplete?.('delete');
             // Parent will handle navigation/refresh
@@ -129,11 +135,11 @@ export default function PaperActionPanel({
     });
 
     return grouped;
-  }, [paper, isFavorited, api, actionStates, onActionComplete, onClose]);
+  }, [paper, isFavorited, api, actionStates, onActionComplete, onClose, isOpen]);
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (!isOpen) return;
+    if (typeof isOpen === 'undefined' || !isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Close on Escape
@@ -175,7 +181,7 @@ export default function PaperActionPanel({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, actionsByCategory, paper.id, onClose]);
+  }, [isOpen, actionsByCategory, onClose]);
 
   if (!isOpen) return null;
 
@@ -232,7 +238,7 @@ export default function PaperActionPanel({
             if (actions.length === 0) return null;
 
             return (
-              <ActionCategory
+              <ActionCategoryComponent
                 key={category}
                 category={category}
                 actions={actions}

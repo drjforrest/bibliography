@@ -126,9 +126,9 @@ BASE_URL = "https://api.semanticscholar.org"
 GRAPH_API = f"{BASE_URL}/graph/v1"
 RECOMMENDATIONS_API = f"{BASE_URL}/recommendations/v1"
 
-# Rate limiting
+# Rate limiting (enforced per-user on our API endpoints)
 RATE_LIMIT_WINDOW = timedelta(minutes=5)
-RATE_LIMIT_MAX_REQUESTS = 100  # Free tier, increase with API key
+RATE_LIMIT_MAX_REQUESTS = 100  # Free tier (increases to 1000 with API key)
 
 
 class SemanticScholarService:
@@ -371,7 +371,22 @@ def create_semantic_scholar_service(api_key: Optional[str] = None) -> SemanticSc
     return SemanticScholarService(api_key=api_key)
 ```
 
-### 2. Pydantic Schemas
+### 2. Rate Limiting
+
+The service implements per-user rate limiting to prevent abuse and stay within Semantic Scholar API limits:
+
+- **Rate Limiter Service** (`app/services/rate_limiter.py`): Tracks requests per user within a sliding time window
+- **Integration**: Rate limiting is enforced in all recommendations endpoints
+- **Configuration**: Uses `RATE_LIMIT_WINDOW` and `RATE_LIMIT_MAX_REQUESTS` constants from `semantic_scholar_service.py`
+- **Response**: Returns 429 status code with rate limit headers when exceeded
+
+**Rate Limit Headers:**
+
+- `X-RateLimit-Limit`: Maximum requests per window
+- `X-RateLimit-Remaining`: Remaining requests in current window
+- `X-RateLimit-Reset`: Seconds until window resets
+
+### 3. Pydantic Schemas
 
 **File:** `/backend/app/schemas/recommendations.py`
 
@@ -401,9 +416,9 @@ class RecommendedPaper(BaseModel):
     url: Optional[str] = None
     abstract: Optional[str] = None
     year: Optional[int] = None
-    authors: Optional[List[Author]] = []
-    citationCount: Optional[int] = 0
-    isOpenAccess: Optional[bool] = False
+    authors: list[Author] = Field(default_factory=list)
+    citationCount: int = 0
+    isOpenAccess: bool = False
     openAccessPdf: Optional[OpenAccessPdf] = None
 
     class Config:
@@ -441,7 +456,20 @@ class SearchResponse(BaseModel):
         from_attributes = True
 ```
 
-### 3. API Routes
+### 3. Rate Limiting Service
+
+**File:** `/backend/app/services/rate_limiter.py`
+
+The rate limiter enforces per-user request limits using the constants defined in `semantic_scholar_service.py`. It tracks request timestamps per client within a sliding time window and rejects excess requests with a 429 status code.
+
+**Key Features:**
+
+- Per-user rate limiting (tracks by user ID)
+- Sliding window algorithm
+- Automatic cleanup of old entries
+- Returns rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+
+### 4. API Routes
 
 **File:** `/backend/app/routes/recommendations_routes.py`
 
@@ -451,25 +479,36 @@ API routes for paper recommendations using Semantic Scholar.
 """
 
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import config
 from app.db import get_async_session
 from app.middleware.clerk_auth import require_clerk_auth, User
-from app.services.semantic_scholar_service import create_semantic_scholar_service
+from app.services.semantic_scholar_service import (
+    create_semantic_scholar_service,
+    RATE_LIMIT_WINDOW,
+    RATE_LIMIT_MAX_REQUESTS,
+)
+from app.services.rate_limiter import RateLimiter
 from app.services.paper_manager import PaperManagerService
 from app.schemas.recommendations import (
     RecommendationsResponse,
     RecommendedPaper,
     SearchResponse
 )
-from app.config import config
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
+router = APIRouter(prefix="/recommendations", tags=["recommendations"])
+
+# Initialize rate limiter with constants from semantic_scholar_service
+# This enforces per-user rate limits on our recommendations endpoints
+rate_limiter = RateLimiter(
+    window=RATE_LIMIT_WINDOW,
+    max_requests=RATE_LIMIT_MAX_REQUESTS,
+)
 
 
 @router.get("/{paper_id}", response_model=RecommendationsResponse)
@@ -489,6 +528,25 @@ async def get_recommendations_for_paper(
     Returns:
         Recommendations from Semantic Scholar
     """
+    # Rate limiting: check if user has exceeded request limit
+    client_id = str(user.id)
+    allowed, remaining, reset_after = rate_limiter.check_rate_limit(client_id)
+
+    if not allowed:
+        logger.warning(
+            f"Rate limit exceeded for user {user.id}: {remaining} remaining, "
+            f"reset in {reset_after}s"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Please try again in {reset_after} seconds.",
+            headers={
+                "X-RateLimit-Limit": str(RATE_LIMIT_MAX_REQUESTS),
+                "X-RateLimit-Remaining": str(remaining),
+                "X-RateLimit-Reset": str(reset_after),
+            },
+        )
+
     try:
         # Get paper from library
         paper_manager = PaperManagerService(session)
@@ -502,14 +560,17 @@ async def get_recommendations_for_paper(
         s2_service = create_semantic_scholar_service(api_key=api_key)
 
         # Get recommendations
-        logger.info(f"Getting recommendations for paper {paper_id}: {paper.title[:60]}...")
+        logger.info(
+            f"Getting recommendations for paper {paper_id}: {paper.title[:60]}... "
+            f"(user {user.id}, {remaining} requests remaining)"
+        )
 
         result = await s2_service.get_recommendations_for_library_paper(
             paper={
                 "doi": paper.doi,
                 "title": paper.title,
             },
-            limit=limit
+            limit=limit,
         )
 
         recommendations = [
@@ -530,7 +591,7 @@ async def get_recommendations_for_paper(
         logger.error(f"Error getting recommendations: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get recommendations: {str(e)}"
+            detail="Failed to get recommendations. Please try again later."
         )
 
 
@@ -550,27 +611,53 @@ async def search_semantic_scholar(
     Returns:
         Search results from Semantic Scholar
     """
+    # Rate limiting: check if user has exceeded request limit
+    client_id = str(user.id)
+    allowed, remaining, reset_after = rate_limiter.check_rate_limit(client_id)
+
+    if not allowed:
+        logger.warning(
+            f"Rate limit exceeded for user {user.id}: {remaining} remaining, "
+            f"reset in {reset_after}s"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Please try again in {reset_after} seconds.",
+            headers={
+                "X-RateLimit-Limit": str(RATE_LIMIT_MAX_REQUESTS),
+                "X-RateLimit-Remaining": str(remaining),
+                "X-RateLimit-Reset": str(reset_after),
+            },
+        )
+
     try:
         # Get Semantic Scholar service
         api_key = getattr(config, "SEMANTIC_SCHOLAR_API_KEY", None)
         s2_service = create_semantic_scholar_service(api_key=api_key)
 
         # Search
-        logger.info(f"Searching Semantic Scholar: '{query}'")
+        logger.info(
+            f"Searching Semantic Scholar: '{query}' "
+            f"(user {user.id}, {remaining} requests remaining)"
+        )
         result = await s2_service.search_papers(query=query, limit=limit)
 
         return SearchResponse(**result)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error searching Semantic Scholar: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Search failed: {str(e)}"
+            detail="Search failed. Please try again later."
         )
 
 
 @router.get("/health")
-async def check_semantic_scholar_health():
+async def check_semantic_scholar_health(
+    user: User = Depends(require_clerk_auth),
+):
     """
     Check if Semantic Scholar API is accessible.
 
@@ -588,13 +675,16 @@ async def check_semantic_scholar_health():
             "status": "healthy",
             "api_key_configured": bool(api_key),
             "rate_limit": "1000/5min" if api_key else "100/5min",
-            "test_search_results": result.get("total", 0)
+            "test_search_results": result.get("total", 0),
         }
     except Exception as e:
+        logger.error(f"Error checking Semantic Scholar health: {e}", exc_info=True)
         return {
             "status": "unhealthy",
-            "error": str(e),
-            "api_key_configured": bool(getattr(config, "SEMANTIC_SCHOLAR_API_KEY", None))
+            "error": "Service unavailable. Please try again later.",
+            "api_key_configured": bool(
+                getattr(config, "SEMANTIC_SCHOLAR_API_KEY", None)
+            ),
         }
 ```
 
@@ -1027,17 +1117,53 @@ test("loads and displays recommendations", async () => {
 
 ### Backend
 
-- [ ] Add `semantic_scholar_service.py` to `/backend/app/services/`
-- [ ] Add `recommendations.py` schemas to `/backend/app/schemas/`
-- [ ] Add `recommendations_routes.py` to `/backend/app/routes/`
-- [ ] Register routes in `app.py`:
-  ```python
-  from app.routes import recommendations_routes
-  app.include_router(recommendations_routes.router)
-  ```
-- [ ] Add `httpx` to requirements.txt if not present
-- [ ] Optional: Add `SEMANTIC_SCHOLAR_API_KEY` to `.env`
-- [ ] Test API endpoint: `curl http://localhost:8000/api/recommendations/health`
+#### Core Files & Registration
+
+- [x] Add `semantic_scholar_service.py` to `/backend/app/services/`
+- [x] Add `recommendations.py` schemas to `/backend/app/schemas/`
+- [x] Add `recommendations_routes.py` to `/backend/app/routes/`
+- [x] Register routes in `app/routes/__init__.py` (already included via `recommendations_router`)
+- [x] Routes available at `/api/v1/recommendations/*` via `crud_router` in `app.py`
+
+#### Dependency Management & Version Pinning
+
+- [x] Pin `pydantic>=2.9.0,<3.0.0` in `requirements.txt` (ensures Pydantic v2)
+- [x] Pin `fastapi==0.115.8` in `requirements.txt` (compatible with Pydantic v2)
+- [x] Pin `httpx==0.27.2` in `requirements.txt` (stable version for async HTTP)
+- [x] Verify all schemas use Pydantic v2 patterns:
+  - [x] `recommendations.py` uses `from_attributes = True` in `Config` class (lines 32, 43, 63)
+  - [x] All models inherit from `pydantic.BaseModel` correctly
+
+#### Production HTTPX Configuration
+
+- [x] Configure httpx client pooling in `semantic_scholar_service.py`:
+  - [x] Timeouts: `connect=5.0s`, `read=30.0s`, `write=30.0s`, `pool=60.0s`
+  - [x] Connection limits: `max_keepalive_connections=10`, `max_connections=20`
+  - [x] Follow redirects enabled
+  - [x] Client created in `__init__` for connection reuse
+
+#### Structured Logging Configuration
+
+- [x] Service uses `logging.getLogger(__name__)` for structured logging
+- [x] Log levels appropriate: `info` for success, `warning` for rate limits, `error` for failures
+- [x] Log messages include context: query strings, paper IDs, rate limit status
+- [ ] Consider adding structured log formatting (JSON) for production monitoring
+
+#### Monitoring & Rate-Limit Alerts
+
+- [x] Rate limiting implemented via `RateLimiter` service (100 req/5min free tier)
+- [x] Rate limit headers included in responses: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- [x] HTTP 429 responses for rate limit exceeded with clear error messages
+- [ ] Set up monitoring alerts for rate limit thresholds (e.g., 80% of limit)
+- [ ] Configure alerting for Semantic Scholar API failures (5xx errors)
+- [ ] Monitor httpx connection pool exhaustion metrics
+
+#### Configuration & Testing
+
+- [ ] Optional: Add `SEMANTIC_SCHOLAR_API_KEY` to `.env` for higher rate limits (1000 req/5min)
+- [ ] Test API endpoint: `curl http://localhost:8000/api/v1/recommendations/health`
+- [ ] Test recommendations endpoint: `curl http://localhost:8000/api/v1/recommendations/{paper_id}`
+- [ ] Test search endpoint: `curl http://localhost:8000/api/v1/recommendations/search?query=machine+learning`
 
 ### Frontend
 

@@ -1,8 +1,8 @@
 'use client';
 
-import TagDialog from '@/components/library/TagDialog';
 import ActionButton from '@/components/library/ActionButton';
 import PaperActionPanel from '@/components/library/PaperActionPanel';
+import TagDialog from '@/components/library/TagDialog';
 import { getApiBaseUrl, useApi } from '@/lib/api';
 import type { Paper } from '@/types';
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS } from '@/types';
@@ -67,12 +67,6 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
     }
   };
 
-  const handleActionButtonClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowActionPanel(true);
-  };
-
   // Generate thumbnail URL if paper has an ID
   // Use full API URL in production (client-side image requests don't use Next.js rewrites)
   const thumbnailUrl = paper.id
@@ -106,10 +100,13 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
           {isLoaded && isSignedIn && (
             <div 
               className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-              onClick={handleActionButtonClick}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
             >
               <ActionButton
-                onClick={handleActionButtonClick}
+                onClick={() => setShowActionPanel(true)}
                 variant="floating"
               />
             </div>

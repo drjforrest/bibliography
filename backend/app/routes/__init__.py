@@ -1,17 +1,19 @@
 from fastapi import APIRouter
-from .search_spaces_routes import router as search_spaces_router
-from .documents_routes import router as documents_router
-from .chats_routes import router as chats_router
-from .papers_routes import router as papers_router
+
 from .annotations_routes import router as annotations_router
-from .semantic_search_routes import router as semantic_search_router
+from .automated_ingestion_routes import router as automated_ingestion_router
+from .chats_routes import router as chats_router
 from .dashboard_routes import router as dashboard_router
 from .devonthink_sync_routes import router as devonthink_router
-from .tags_routes import router as tags_router
-from .user_routes import router as user_router
+from .documents_routes import router as documents_router
 from .messages_routes import router as messages_router
 from .notifications_routes import router as notifications_router
+from .papers_routes import router as papers_router
 from .recommendations_routes import router as recommendations_router
+from .search_spaces_routes import router as search_spaces_router
+from .semantic_search_routes import router as semantic_search_router
+from .tags_routes import router as tags_router
+from .user_routes import router as user_router
 
 router = APIRouter()
 
@@ -27,4 +29,5 @@ router.include_router(tags_router)
 router.include_router(user_router)
 router.include_router(messages_router)
 router.include_router(notifications_router)
-router.include_router(recommendations_router, prefix="/api/v1")
+router.include_router(recommendations_router)
+router.include_router(automated_ingestion_router)
