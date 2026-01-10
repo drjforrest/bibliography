@@ -311,3 +311,5 @@ backend/app/rag_pipeline/.DS_Store
 .env.production
 frontend/nextjs-app/.env.production
 backend/.env.backup_*
+*.env.bak
+backend/.env.bak
