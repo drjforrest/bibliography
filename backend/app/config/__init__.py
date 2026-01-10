@@ -9,26 +9,6 @@ logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
-# Optional imports - chonkie may require sentence-transformers which isn't available on all platforms
-try:
-    from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
-
-    CHONKIE_AVAILABLE = True
-except ImportError:
-    AutoEmbeddings = None
-    CodeChunker = None
-    RecursiveChunker = None
-    CHONKIE_AVAILABLE = False
-
-# Optional imports - rerankers may not be available on all platforms
-try:
-    from rerankers import Reranker
-
-    RERANKERS_AVAILABLE = True
-except ImportError:
-    Reranker = None
-    RERANKERS_AVAILABLE = False
-
 # Try to import ChatLiteLLM from the new package first
 try:
     from langchain_litellm import ChatLiteLLM
@@ -43,6 +23,28 @@ try:
     from langchain_openai import OpenAIEmbeddings
 except ImportError:
     from langchain_community.embeddings import OpenAIEmbeddings
+
+# Use LangChain text splitters instead of chonkie (which requires torch/sentence-transformers)
+# LangChain splitters are lightweight and work on macOS Intel without heavy dependencies
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    LANGCHAIN_TEXT_SPLITTER_AVAILABLE = True
+except ImportError:
+    try:
+        from langchain_community.text_splitter import RecursiveCharacterTextSplitter
+        LANGCHAIN_TEXT_SPLITTER_AVAILABLE = True
+    except ImportError:
+        RecursiveCharacterTextSplitter = None
+        LANGCHAIN_TEXT_SPLITTER_AVAILABLE = False
+
+# Optional imports - rerankers may not be available on all platforms
+try:
+    from rerankers import Reranker
+
+    RERANKERS_AVAILABLE = True
+except ImportError:
+    Reranker = None
+    RERANKERS_AVAILABLE = False
 
 
 # Get the base directory of the project
@@ -127,6 +129,15 @@ class Config:
     embedding_dimension = 1536  # Default dimension
 
     if EMBEDDING_MODEL:
+        # Normalize common typos/variations (penai:// -> openai://)
+        normalized_model = EMBEDDING_MODEL.strip()
+        if normalized_model.startswith("penai://"):
+            normalized_model = "openai://" + normalized_model[7:]
+            logger.warning(
+                f"Fixed typo in EMBEDDING_MODEL: '{EMBEDDING_MODEL}' -> '{normalized_model}'"
+            )
+            EMBEDDING_MODEL = normalized_model
+        
         if EMBEDDING_MODEL.startswith("openai://"):
             # Ollama via OpenAI API compatibility
             model_name = EMBEDDING_MODEL.replace("openai://", "")
@@ -154,30 +165,14 @@ class Config:
                 embedding_dimension = 768
             else:
                 embedding_dimension = 1536  # Default OpenAI dimension
-        elif CHONKIE_AVAILABLE:
-            # Use Chonkie AutoEmbeddings for other models (requires sentence-transformers)
-            try:
-                embedding_model_instance = AutoEmbeddings.get_embeddings(
-                    EMBEDDING_MODEL
-                )
-                # Try to get dimension from the model if available
-                embedding_dimension = getattr(
-                    embedding_model_instance, "dimension", 768
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Failed to initialize embedding model '{EMBEDDING_MODEL}': {e}"
-                )
-                embedding_model_instance = None
         else:
-            # Chonkie not available - suggest using OpenAI-style embeddings instead
+            # For non-OpenAI models, suggest using OpenAI-style embeddings
             import warnings
 
             warnings.warn(
-                f"EMBEDDING_MODEL '{EMBEDDING_MODEL}' requires chonkie (which needs sentence-transformers), "
-                "but chonkie is not available on this platform. "
-                "Please set EMBEDDING_MODEL to use OpenAI-style embeddings (e.g., 'openai://nomic-embed-text') "
-                "or install torch dependencies. Embedding operations will fail until this is fixed.",
+                f"EMBEDDING_MODEL '{EMBEDDING_MODEL}' is not an OpenAI-style model. "
+                "Please set EMBEDDING_MODEL to use OpenAI-style embeddings (e.g., 'openai://nomic-embed-text'). "
+                "Embedding operations will fail until this is fixed.",
                 UserWarning,
             )
             # Try to use a default OpenAI-style model as fallback
@@ -193,7 +188,7 @@ class Config:
                 embedding_dimension = 768
                 warnings.warn(
                     f"Using fallback embedding model: openai://{model_name}. "
-                    f"Original model '{EMBEDDING_MODEL}' requires sentence-transformers which is not available.",
+                    f"Original model '{EMBEDDING_MODEL}' is not supported.",
                     UserWarning,
                 )
             except Exception as e:
@@ -210,14 +205,54 @@ class Config:
     # Use config.embedding_dimension instead of config.embedding_model_instance.dimension
     # The embedding_model_instance (OpenAIEmbeddings) doesn't expose dimension as a settable attribute
 
-    # Configure chunkers
-    # Use a reasonable chunk size (not the embedding dimension)
-    if CHONKIE_AVAILABLE:
-        chunker_instance = RecursiveChunker(chunk_size=512)
-        # Set language to 'python' to suppress auto-detection warning
-        code_chunker_instance = CodeChunker(chunk_size=512, language="python")
+    # Configure chunkers using LangChain text splitters (no torch/sentence-transformers required)
+    # Wrap LangChain splitters to match the expected interface (chunks with .text attribute)
+    class ChunkWrapper:
+        """Wrapper to make LangChain chunks compatible with chonkie interface."""
+        def __init__(self, text):
+            self.text = text
+            self.content = text  # Also support .content for compatibility
+            self.page_content = text  # LangChain compatibility
+    
+    class LangChainChunkerAdapter:
+        """Adapter to make LangChain text splitter work like chonkie chunker."""
+        def __init__(self, splitter):
+            self.splitter = splitter
+        
+        def chunk(self, text: str):
+            """Split text and return chunks with .text attribute."""
+            if not text or not text.strip():
+                return []
+            
+            # Use LangChain splitter to create chunks
+            langchain_chunks = self.splitter.split_text(text)
+            
+            # Wrap each chunk to match chonkie interface
+            return [ChunkWrapper(chunk_text) for chunk_text in langchain_chunks if chunk_text.strip()]
+    
+    # Use LangChain RecursiveCharacterTextSplitter for general text
+    if LANGCHAIN_TEXT_SPLITTER_AVAILABLE:
+        # General text chunker with recursive character splitting
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=512,
+            chunk_overlap=50,
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
+        chunker_instance = LangChainChunkerAdapter(text_splitter)
+        
+        # Code-aware chunker for GitHub files (use Python as default language)
+        # LangChain doesn't have a built-in code splitter, so we use the same splitter
+        # but with better separators for code
+        code_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=512,
+            chunk_overlap=50,
+            length_function=len,
+            separators=["\n\n", "\n", "def ", "class ", "    ", " ", ""]  # Code-aware separators
+        )
+        code_chunker_instance = LangChainChunkerAdapter(code_splitter)
     else:
-        # Simple chunker fallback when chonkie is not available
+        # Fallback simple chunker if LangChain is not available
         class SimpleChunker:
             """Simple chunker that splits text into fixed-size chunks."""
 
@@ -235,7 +270,7 @@ class Config:
 
                 # If text is shorter than chunk size, return as single chunk
                 if text_length <= self.chunk_size:
-                    return [text.strip()]
+                    return [ChunkWrapper(text.strip())]
 
                 start = 0
                 while start < text_length:
@@ -243,7 +278,7 @@ class Config:
                     chunk = text[start:end].strip()
 
                     if chunk:
-                        chunks.append(chunk)
+                        chunks.append(ChunkWrapper(chunk))
 
                     # Break if we've reached the end
                     if end >= text_length:
@@ -252,15 +287,10 @@ class Config:
                     # Move start position with overlap
                     start = end - self.overlap
 
-                # Return chunks that match chonkie's interface (objects with .text attribute)
-                class Chunk:
-                    def __init__(self, text):
-                        self.text = text
-
-                return [Chunk(chunk_text) for chunk_text in chunks]
+                return chunks
 
         chunker_instance = SimpleChunker(chunk_size=512, overlap=100)
-        code_chunker_instance = None
+        code_chunker_instance = SimpleChunker(chunk_size=512, overlap=100)
 
     # Reranker's Configuration | Pinecode, Cohere etc. Read more at https://github.com/AnswerDotAI/rerankers?tab=readme-ov-file#usage
     RERANKERS_MODEL_NAME = os.getenv("RERANKERS_MODEL_NAME")

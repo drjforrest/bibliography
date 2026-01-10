@@ -424,7 +424,6 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "bibtexparser" },
-    { name = "chonkie" },
     { name = "crossref-commons" },
     { name = "fastapi" },
     { name = "fastapi-users", extra = ["oauth", "sqlalchemy"] },
@@ -470,7 +469,6 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13.0" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "bibtexparser", specifier = ">=1.4.0" },
-    { name = "chonkie", specifier = ">=0.1.0" },
     { name = "crossref-commons", specifier = ">=0.0.7" },
     { name = "fastapi", specifier = ">=0.115.8" },
     { name = "fastapi-users", extras = ["oauth", "sqlalchemy"], specifier = ">=14.0.1" },
@@ -636,19 +634,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/51/8ade005e5ca5b0d80fb4aff72a3775b325bdc3d27408c8113811a7cbe640/charset_normalizer-3.4.4-cp314-cp314-win_amd64.whl", hash = "sha256:8a6562c3700cce886c5be75ade4a5db4214fda19fede41d9792d100288d8f94c", size = 107104 },
     { url = "https://files.pythonhosted.org/packages/da/5f/6b8f83a55bb8278772c5ae54a577f3099025f9ade59d0136ac24a0df4bde/charset_normalizer-3.4.4-cp314-cp314-win_arm64.whl", hash = "sha256:de00632ca48df9daf77a2c65a484531649261ec9f25489917f09e455cb09ddb2", size = 100743 },
     { url = "https://files.pythonhosted.org/packages/0a/4c/925909008ed5a988ccbb72dcc897407e5d6d3bd72410d69e051fc0c14647/charset_normalizer-3.4.4-py3-none-any.whl", hash = "sha256:7a32c560861a02ff789ad905a2fe94e3f840803362c84fecf1851cb4cf3dc37f", size = 53402 },
-]
-
-[[package]]
-name = "chonkie"
-version = "0.5.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "tokenizers" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/5a/aefea8b6140795249c4554afe98350f108d0ea62ef981e4a2284e55c8df0/chonkie-0.5.1.tar.gz", hash = "sha256:baa86c21c1edadf0f5122b01e9ff1c1ea189dd0c2feaa8123a8e504f6a4d76cf", size = 54830 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/b1/65819446c21f2664f6e147b5c058c9eb4cbb1600c9221943c2d53fa2461d/chonkie-0.5.1-py3-none-any.whl", hash = "sha256:91293b3c555ee953e84ad9c3dfbefae1673f64e61e49e3d4fc88dde6e10d05d2", size = 62652 },
 ]
 
 [[package]]

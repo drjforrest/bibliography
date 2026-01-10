@@ -306,7 +306,7 @@ EOF
 
     # Start frontend service
     echo 'Starting hero-evidence-library frontend on port ${FRONTEND_PORT}...'
-    nohup pnpm run start -- -p ${FRONTEND_PORT} > ../../hero_evidence_library_frontend.log 2>&1 &
+    PORT=${FRONTEND_PORT} nohup pnpm run start > ../../hero_evidence_library_frontend.log 2>&1 &
 
     echo 'hero-evidence-library services started:'
     echo '  - Backend: http://localhost:${BACKEND_PORT}'

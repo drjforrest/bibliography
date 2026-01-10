@@ -841,8 +841,10 @@ async def index_github_repos(
                         summary_content
                     )
 
-                    # Chunk the content
+                    # Chunk the content using code-aware chunker or fallback to regular chunker
                     try:
+                        # Use code chunker if available, otherwise use regular chunker
+                        chunker = config.code_chunker_instance if config.code_chunker_instance else config.chunker_instance
                         chunks_data = [
                             Chunk(
                                 content=chunk.text,
@@ -850,9 +852,7 @@ async def index_github_repos(
                                     chunk.text
                                 ),
                             )
-                            for chunk in config.code_chunker_instance.chunk(
-                                file_content
-                            )
+                            for chunk in chunker.chunk(file_content)
                         ]
                     except Exception as chunk_err:
                         logger.error(

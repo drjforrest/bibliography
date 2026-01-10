@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,6 +56,25 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+# Handle browser favicon/apple-touch-icon requests to prevent 404s in logs
+# Register these before other routes to ensure they're matched first
+@app.get("/favicon.ico")
+async def favicon():
+    """Handle browser favicon requests."""
+    return Response(status_code=204)  # No Content - appropriate for missing favicon
+
+
+@app.get("/apple-touch-icon.png")
+async def apple_touch_icon():
+    """Handle iOS Safari apple-touch-icon requests."""
+    return Response(status_code=204)  # No Content - appropriate for missing icon
+
+
+@app.get("/apple-touch-icon-precomposed.png")
+async def apple_touch_icon_precomposed():
+    """Handle iOS Safari precomposed icon requests."""
+    return Response(status_code=204)  # No Content - appropriate for missing icon
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]

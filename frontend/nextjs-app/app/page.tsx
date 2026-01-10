@@ -12,6 +12,7 @@ import type { LiteratureType, Paper, SortOption, Tag, Topic, ViewMode } from "@/
 import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState, useMemo } from "react";
+import axios from "axios";
 import { useTagLiteratureTypesCache } from "@/hooks/useTagLiteratureTypesCache";
 import { findTagInTopics, validateTagAssignment } from "@/lib/dragDropValidation";
 
@@ -29,11 +30,20 @@ export default function HomePage() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [dragFeedback, setDragFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Create authenticated API client
-  const authenticatedApi = useMemo(
-    () => createAuthenticatedClient(getToken),
-    [getToken]
-  );
+  // Create authenticated API client - only when Clerk is loaded and getToken is available
+  const authenticatedApi = useMemo(() => {
+    if (!isLoaded || typeof getToken !== 'function') {
+      // Return null to indicate client is not ready yet
+      // This will prevent API calls until Clerk is initialized
+      return null;
+    }
+    try {
+      return createAuthenticatedClient(getToken);
+    } catch (error) {
+      console.error('Failed to create authenticated API client:', error);
+      return null;
+    }
+  }, [isLoaded, getToken]);
 
   // API hook for tag operations
   const api = useApi();
@@ -48,18 +58,24 @@ export default function HomePage() {
       setIsLoading(false);
       return;
     }
+    if (!authenticatedApi) {
+      // Wait for authenticated API client to be created
+      return;
+    }
 
     const fetchData = async () => {
+      // authenticatedApi is guaranteed to be non-null here due to check above
+      const api = authenticatedApi!;
       try {
         setIsLoading(true);
         const [papersData, tagsData] = await Promise.all([
-          authenticatedApi.get('/api/v1/papers', {
+          api.get('/api/v1/papers', {
             params: {
               limit: 100,
               literature_type: selectedLiteratureType === 'ALL' ? undefined : selectedLiteratureType,
             }
           }).then(r => r.data),
-          authenticatedApi.get('/api/v1/tags/hierarchy').then(r => r.data),
+          api.get('/api/v1/tags/hierarchy').then(r => r.data),
         ]);
         setPapers(papersData.papers || []);
         
@@ -76,6 +92,7 @@ export default function HomePage() {
   }, [isLoaded, isSignedIn, selectedLiteratureType, authenticatedApi, calculateTagLiteratureTypes]);
 
   const handleSearch = async (query: string) => {
+    if (!authenticatedApi) return;
     setSearchQuery(query);
     try {
       if (query) {
@@ -96,6 +113,7 @@ export default function HomePage() {
   };
 
   const handleDelete = async () => {
+    if (!authenticatedApi) return;
     // Refetch papers after deletion
     try {
       const result = await authenticatedApi.get('/api/v1/papers', {

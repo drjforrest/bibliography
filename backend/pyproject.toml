@@ -7,10 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.13.0",
     "asyncpg>=0.30.0",
-    # chonkie is used for chunking (RecursiveChunker, CodeChunker)
-    # chonkie[all] includes sentence-transformers support, but we only need base chonkie for chunking
-    # If you need sentence-transformers embeddings, install torch-deps optional group
-    "chonkie>=0.1.0",  # Base chonkie works without sentence-transformers for chunking
+    # chonkie removed - using LangChain text splitters instead (no torch/sentence-transformers required)
+    # LangChain RecursiveCharacterTextSplitter is available via langchain-community dependency
     "fastapi>=0.115.8",
     "fastapi-users[oauth,sqlalchemy]>=14.0.1",
     "firecrawl-py>=1.12.0",
