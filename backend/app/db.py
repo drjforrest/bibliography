@@ -106,7 +106,7 @@ class Document(BaseModel, TimestampMixin):
     document_metadata = Column(JSON, nullable=True)
 
     content = Column(Text, nullable=False)
-    embedding = Column(Vector(config.embedding_model_instance.dimension))
+    embedding = Column(Vector(config.embedding_dimension))
 
     search_space_id = Column(
         Integer, ForeignKey("searchspaces.id", ondelete="CASCADE"), nullable=False
@@ -127,7 +127,7 @@ class Chunk(BaseModel, TimestampMixin):
     __tablename__ = "chunks"
 
     content = Column(Text, nullable=False)
-    embedding = Column(Vector(config.embedding_model_instance.dimension))
+    embedding = Column(Vector(config.embedding_dimension))
 
     document_id = Column(
         Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False

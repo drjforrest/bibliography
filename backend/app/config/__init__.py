@@ -1,12 +1,31 @@
 import os
 import shutil
 import warnings
+import logging
 from pathlib import Path
 from typing import Optional
 
-from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
+logger = logging.getLogger(__name__)
+
 from dotenv import load_dotenv
-from rerankers import Reranker
+
+# Optional imports - chonkie may require sentence-transformers which isn't available on all platforms
+try:
+    from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
+    CHONKIE_AVAILABLE = True
+except ImportError:
+    AutoEmbeddings = None
+    CodeChunker = None
+    RecursiveChunker = None
+    CHONKIE_AVAILABLE = False
+
+# Optional imports - rerankers may not be available on all platforms
+try:
+    from rerankers import Reranker
+    RERANKERS_AVAILABLE = True
+except ImportError:
+    Reranker = None
+    RERANKERS_AVAILABLE = False
 
 # Try to import ChatLiteLLM from the new package first
 try:
@@ -101,49 +120,143 @@ class Config:
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 
     # Configure embedding model based on the type
-    if EMBEDDING_MODEL and EMBEDDING_MODEL.startswith("openai://"):
-        # Ollama via OpenAI API compatibility
-        model_name = EMBEDDING_MODEL.replace("openai://", "")
-        try:
-            # Try with newer langchain-openai parameters
-            embedding_model_instance = OpenAIEmbeddings(
-                model=model_name,
-                base_url=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
-                api_key=os.getenv("OPENAI_API_KEY", "ollama"),
-            )
-        except:
-            # Fallback to older parameter names
-            embedding_model_instance = OpenAIEmbeddings(
-                model=model_name,
-                openai_api_base=os.getenv(
-                    "OPENAI_API_BASE", "http://localhost:11434/v1"
-                ),
-                openai_api_key=os.getenv("OPENAI_API_KEY", "ollama"),
-            )
+    embedding_model_instance = None
+    embedding_dimension = 1536  # Default dimension
+    
+    if EMBEDDING_MODEL:
+        if EMBEDDING_MODEL.startswith("openai://"):
+            # Ollama via OpenAI API compatibility
+            model_name = EMBEDDING_MODEL.replace("openai://", "")
+            try:
+                # Try with newer langchain-openai parameters
+                embedding_model_instance = OpenAIEmbeddings(
+                    model=model_name,
+                    base_url=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
+                    api_key=os.getenv("OPENAI_API_KEY", "ollama"),
+                )
+            except:
+                # Fallback to older parameter names
+                embedding_model_instance = OpenAIEmbeddings(
+                    model=model_name,
+                    openai_api_base=os.getenv(
+                        "OPENAI_API_BASE", "http://localhost:11434/v1"
+                    ),
+                    openai_api_key=os.getenv("OPENAI_API_KEY", "ollama"),
+                )
 
-        # Set dimension manually for known models
-        if "nomic" in model_name:
-            embedding_model_instance.dimension = 768
+            # Store dimension separately (OpenAIEmbeddings doesn't expose this as a settable attribute)
+            if "nomic" in model_name:
+                embedding_dimension = 768
+            else:
+                embedding_dimension = 1536  # Default OpenAI dimension
+        elif CHONKIE_AVAILABLE:
+            # Use Chonkie AutoEmbeddings for other models (requires sentence-transformers)
+            try:
+                embedding_model_instance = AutoEmbeddings.get_embeddings(EMBEDDING_MODEL)
+                # Try to get dimension from the model if available
+                embedding_dimension = getattr(embedding_model_instance, "dimension", 768)
+            except Exception as e:
+                logger.warning(f"Failed to initialize embedding model '{EMBEDDING_MODEL}': {e}")
+                embedding_model_instance = None
         else:
-            embedding_model_instance.dimension = 1536  # Default OpenAI dimension
-    else:
-        # Use Chonkie AutoEmbeddings for other models
-        embedding_model_instance = AutoEmbeddings.get_embeddings(EMBEDDING_MODEL)
+            # Chonkie not available - suggest using OpenAI-style embeddings instead
+            import warnings
+            warnings.warn(
+                f"EMBEDDING_MODEL '{EMBEDDING_MODEL}' requires chonkie (which needs sentence-transformers), "
+                "but chonkie is not available on this platform. "
+                "Please set EMBEDDING_MODEL to use OpenAI-style embeddings (e.g., 'openai://nomic-embed-text') "
+                "or install torch dependencies. Embedding operations will fail until this is fixed.",
+                UserWarning
+            )
+            # Try to use a default OpenAI-style model as fallback
+            try:
+                model_name = "nomic-embed-text"  # Default fallback
+                embedding_model_instance = OpenAIEmbeddings(
+                    model=model_name,
+                    base_url=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
+                    api_key=os.getenv("OPENAI_API_KEY", "ollama"),
+                )
+                embedding_dimension = 768
+                warnings.warn(
+                    f"Using fallback embedding model: openai://{model_name}. "
+                    f"Original model '{EMBEDDING_MODEL}' requires sentence-transformers which is not available.",
+                    UserWarning
+                )
+            except Exception as e:
+                warnings.warn(
+                    f"Could not initialize fallback embedding model: {e}. "
+                    "Embedding operations will fail. Please fix EMBEDDING_MODEL in your .env file.",
+                    UserWarning
+                )
+                # Set to None explicitly so code can check and fail gracefully
+                embedding_model_instance = None
+                embedding_dimension = 768  # Default dimension even if model fails
+    
+    # Note: embedding_dimension is stored as a separate config variable
+    # Use config.embedding_dimension instead of config.embedding_model_instance.dimension
+    # The embedding_model_instance (OpenAIEmbeddings) doesn't expose dimension as a settable attribute
 
     # Configure chunkers
-    chunk_size = getattr(embedding_model_instance, "dimension", 512)
     # Use a reasonable chunk size (not the embedding dimension)
-    chunker_instance = RecursiveChunker(chunk_size=512)
-    # Set language to 'python' to suppress auto-detection warning
-    code_chunker_instance = CodeChunker(chunk_size=512, language="python")
+    if CHONKIE_AVAILABLE:
+        chunker_instance = RecursiveChunker(chunk_size=512)
+        # Set language to 'python' to suppress auto-detection warning
+        code_chunker_instance = CodeChunker(chunk_size=512, language="python")
+    else:
+        # Simple chunker fallback when chonkie is not available
+        class SimpleChunker:
+            """Simple chunker that splits text into fixed-size chunks."""
+            def __init__(self, chunk_size=512, overlap=100):
+                self.chunk_size = chunk_size
+                self.overlap = overlap
+            
+            def chunk(self, text: str):
+                """Split text into overlapping chunks."""
+                if not text or not text.strip():
+                    return []
+                
+                chunks = []
+                text_length = len(text)
+                
+                # If text is shorter than chunk size, return as single chunk
+                if text_length <= self.chunk_size:
+                    return [text.strip()]
+                
+                start = 0
+                while start < text_length:
+                    end = min(start + self.chunk_size, text_length)
+                    chunk = text[start:end].strip()
+                    
+                    if chunk:
+                        chunks.append(chunk)
+                    
+                    # Break if we've reached the end
+                    if end >= text_length:
+                        break
+                    
+                    # Move start position with overlap
+                    start = end - self.overlap
+                
+                # Return chunks that match chonkie's interface (objects with .text attribute)
+                class Chunk:
+                    def __init__(self, text):
+                        self.text = text
+                
+                return [Chunk(chunk_text) for chunk_text in chunks]
+        
+        chunker_instance = SimpleChunker(chunk_size=512, overlap=100)
+        code_chunker_instance = None
 
     # Reranker's Configuration | Pinecode, Cohere etc. Read more at https://github.com/AnswerDotAI/rerankers?tab=readme-ov-file#usage
     RERANKERS_MODEL_NAME = os.getenv("RERANKERS_MODEL_NAME")
     RERANKERS_MODEL_TYPE = os.getenv("RERANKERS_MODEL_TYPE")
-    reranker_instance = Reranker(
-        model_name=RERANKERS_MODEL_NAME,
-        model_type=RERANKERS_MODEL_TYPE,
-    )
+    if RERANKERS_AVAILABLE and RERANKERS_MODEL_NAME and RERANKERS_MODEL_TYPE:
+        reranker_instance = Reranker(
+            model_name=RERANKERS_MODEL_NAME,
+            model_type=RERANKERS_MODEL_TYPE,
+        )
+    else:
+        reranker_instance = None
 
     # OAuth JWT
     SECRET_KEY = os.getenv("SECRET_KEY")
@@ -183,17 +296,20 @@ class Config:
         or os.getenv("CLERK_FRONTEND_API_URL")
         or _default_clerk_issuer
     )
+    # Allow running scripts without Clerk config (only needed for API endpoints)
     if not CLERK_ISSUER:
-        raise ValueError(
-            "CLERK_ISSUER or CLERK_FRONTEND_API_URL environment variable is required. "
-            f"Set APP_ENV=production to use production defaults, or set CLERK_ISSUER/CLERK_FRONTEND_API_URL explicitly."
+        CLERK_ISSUER = None
+        logger.warning(
+            "CLERK_ISSUER not set - Clerk authentication will not work. "
+            "This is fine for running scripts, but required for API endpoints."
         )
 
     CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", _default_clerk_jwks_url)
     if not CLERK_JWKS_URL:
-        raise ValueError(
-            "CLERK_JWKS_URL environment variable is required. "
-            f"Set APP_ENV=production to use production defaults, or set CLERK_JWKS_URL explicitly."
+        CLERK_JWKS_URL = None
+        logger.warning(
+            "CLERK_JWKS_URL not set - Clerk authentication will not work. "
+            "This is fine for running scripts, but required for API endpoints."
         )
 
     # Optional: audience for token verification (None means audience validation is skipped)
@@ -219,13 +335,10 @@ class Config:
 
     # Validation Checks
     # Check embedding dimension
-    if (
-        hasattr(embedding_model_instance, "dimension")
-        and embedding_model_instance.dimension > 2000
-    ):
+    if embedding_dimension > 2000:
         raise ValueError(
             f"Embedding dimension for Model: {EMBEDDING_MODEL} "
-            f"has {embedding_model_instance.dimension} dimensions, which "
+            f"has {embedding_dimension} dimensions, which "
             f"exceeds the maximum of 2000 allowed by PGVector."
         )
 

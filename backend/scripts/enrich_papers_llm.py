@@ -49,8 +49,10 @@ class LLMEnrichmentPipeline:
         self.batch_size = batch_size
 
         # Use LM Studio (OpenAI-compatible API)
-        self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv("LLM_API_BASE", "http://localhost:1234/v1")
-        self.llm_model = os.getenv("FAST_LLM", "gpt-3.5-turbo")
+        self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv("LLM_API_BASE", "http://192.168.1.88:1234/v1")
+        # Default to mistral-7b-v0.1 if FAST_LLM not set
+        # Set FAST_LLM in .env to match your LMStudio model name
+        self.llm_model = os.getenv("FAST_LLM", "mistral-7b-v0.1")
         self.session: Optional[aiohttp.ClientSession] = None
         self.timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout
 

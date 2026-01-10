@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import DroppableTag from './DroppableTag';
 
 interface SidebarProps {
   topics?: Topic[];
@@ -110,30 +111,13 @@ export default function Sidebar({ topics = [] }: SidebarProps) {
           <h2 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
             Topics
           </h2>
-          <ul className="space-y-2">
-            {topics.slice(0, 3).map((topic) => (
-              <li key={topic.id}>
-                <Link
-                  href={`/topics/${topic.id}`}
-                  className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800"
-                >
-                  {topic.name}
-                </Link>
-                {topic.children && topic.children.length > 0 && (
-                  <ul className="pl-6 mt-1 space-y-1">
-                    {topic.children.map((child) => (
-                      <li key={child.id}>
-                        <Link
-                          href={`/topics/${child.id}`}
-                          className="block text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                        >
-                          {child.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
+          <ul className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
+            {topics.map((topic) => (
+              <DroppableTag 
+                key={topic.id} 
+                topic={topic} 
+                dominantLiteratureType={topic.dominantLiteratureType}
+              />
             ))}
           </ul>
         </div>

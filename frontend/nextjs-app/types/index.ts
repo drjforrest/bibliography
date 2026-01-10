@@ -159,6 +159,7 @@ export interface Topic {
   name: string;
   children?: Topic[];
   paperCount?: number;
+  dominantLiteratureType?: LiteratureType; // Dominant literature type for this tag
 }
 
 // Message Board types

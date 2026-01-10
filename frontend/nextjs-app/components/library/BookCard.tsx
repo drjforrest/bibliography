@@ -7,6 +7,8 @@ import { getApiBaseUrl, useApi } from '@/lib/api';
 import type { Paper } from '@/types';
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS } from '@/types';
 import { useAuth } from '@clerk/nextjs';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -25,6 +27,23 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
   const [showTagDialog, setShowTagDialog] = useState(false);
   const { isLoaded, isSignedIn } = useAuth();
   const api = useApi();
+
+  // Make card draggable
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `paper-${paper.id}`,
+    data: {
+      type: 'paper',
+      paper: paper,
+      literature_type: paper.literature_type || 'PEER_REVIEWED', // Include literature_type in drag data
+    },
+    disabled: !isLoaded || !isSignedIn, // Only allow dragging when authenticated
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+  };
 
   // Reset image error state when paper changes
   useEffect(() => {
@@ -87,8 +106,23 @@ export default function BookCard({ paper, onChatWithDocument, onFavoriteChange, 
   const showFallbackText = !paper.coverImage && (!thumbnailUrl || imageError);
 
   return (
-    <div className="group relative">
-      <Link href={`/papers/${paper.id}`} className="flex flex-col gap-3">
+    <div 
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="group relative"
+    >
+      <Link 
+        href={`/papers/${paper.id}`} 
+        className="flex flex-col gap-3"
+        onClick={(e) => {
+          // Prevent navigation if currently dragging
+          if (isDragging) {
+            e.preventDefault();
+          }
+        }}
+      >
         <div
           className="w-full bg-center bg-no-repeat aspect-[3/4] bg-cover rounded-lg shadow-md group-hover:shadow-xl transition-shadow cursor-pointer relative"
           style={{

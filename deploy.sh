@@ -86,6 +86,7 @@ rsync -avz -e "ssh -o Ciphers=aes256-gcm@openssh.com" \
     --exclude='.git' \
     --exclude='node_modules' \
     --exclude='venv' \
+    --exclude='.venv' \
     --exclude='logs' \
     --exclude='*.log' \
     --exclude='__pycache__' \

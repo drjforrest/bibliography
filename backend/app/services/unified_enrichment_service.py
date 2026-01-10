@@ -335,32 +335,38 @@ class UnifiedEnrichmentService:
 
             # Create and embed chunks
             if len(document.content.strip()) > 100:
-                chunks = self.embedding_service.chunker.chunk(document.content)
-                logger.debug(f"  Created {len(chunks)} chunks")
+                if not self.embedding_service.chunker:
+                    logger.warning(f"  No chunker available, skipping chunk creation for document {document.id}")
+                else:
+                    chunks = self.embedding_service.chunker.chunk(document.content)
+                    logger.debug(f"  Created {len(chunks)} chunks")
 
-                # Delete existing chunks
-                from app.db import Chunk
-                from sqlalchemy import select
+                    # Delete existing chunks
+                    from app.db import Chunk
+                    from sqlalchemy import select
 
-                delete_stmt = select(Chunk).where(Chunk.document_id == document.id)
-                result = await self.session.execute(delete_stmt)
-                existing_chunks = result.scalars().all()
-                for chunk in existing_chunks:
-                    await self.session.delete(chunk)
+                    delete_stmt = select(Chunk).where(Chunk.document_id == document.id)
+                    result = await self.session.execute(delete_stmt)
+                    existing_chunks = result.scalars().all()
+                    for chunk in existing_chunks:
+                        await self.session.delete(chunk)
 
-                # Generate embeddings for each chunk
-                for chunk_obj in chunks:
-                    chunk_text = chunk_obj.text if hasattr(chunk_obj, 'text') else str(chunk_obj)
-                    chunk_embedding = await self.embedding_service.embed_text(chunk_text)
+                    # Generate embeddings for each chunk
+                    for chunk_obj in chunks:
+                        # Handle both chonkie chunks (have .text attribute) and simple chunks
+                        chunk_text = chunk_obj.text if hasattr(chunk_obj, 'text') else str(chunk_obj)
+                        chunk_embedding = await self.embedding_service.embed_text(chunk_text)
 
-                    if chunk_embedding and len(chunk_embedding) > 0:
-                        from app.db import Chunk
-                        chunk = Chunk(
-                            document_id=document.id,
-                            content=chunk_text,
-                            embedding=chunk_embedding
-                        )
-                        self.session.add(chunk)
+                        if chunk_embedding and len(chunk_embedding) > 0:
+                            from app.db import Chunk
+                            chunk = Chunk(
+                                document_id=document.id,
+                                content=chunk_text,
+                                embedding=chunk_embedding
+                            )
+                            self.session.add(chunk)
+                        else:
+                            logger.warning(f"  Failed to generate embedding for chunk, skipping")
 
             await self.session.commit()
             logger.info(f"  ✓ Vectorized document {document.id}")

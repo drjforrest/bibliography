@@ -8,12 +8,16 @@ import SearchBar from "@/components/library/SearchBar";
 import ViewToggle from "@/components/library/ViewToggle";
 import { useApi } from "@/lib/api";
 import type { Paper, SortOption, Tag, Topic, ViewMode } from "@/types";
+import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import { useTagLiteratureTypesCache } from "@/hooks/useTagLiteratureTypesCache";
+import { findTagInTopics, validateTagAssignment } from "@/lib/dragDropValidation";
 
 export default function TopicsPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const api = useApi();
+  const { calculateTagLiteratureTypes, invalidateCache } = useTagLiteratureTypesCache();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -21,6 +25,7 @@ export default function TopicsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [literatureFilter, setLiteratureFilter] = useState<LiteratureType>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [dragFeedback, setDragFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Fetch papers and tags on mount (only when authenticated)
   useEffect(() => {
@@ -42,15 +47,8 @@ export default function TopicsPage() {
         ]);
         setPapers(papersData.papers || []);
 
-        // Convert tags to topics format for sidebar
-        const convertedTopics: Topic[] = (tagsData.tags || []).map((tag: Tag) => ({
-          id: tag.id.toString(),
-          name: tag.name,
-          children: tag.children?.map((child: Tag) => ({
-            id: child.id.toString(),
-            name: child.name,
-          })),
-        }));
+        // Convert tags to topics format for sidebar and calculate dominant literature types
+        const convertedTopics = await calculateTagLiteratureTypes(tagsData.tags || []);
         setTopics(convertedTopics);
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -97,10 +95,56 @@ export default function TopicsPage() {
     setPapers(sorted);
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over) {
+      return; // Dropped outside any drop zone
+    }
+
+    // Extract paper ID and tag ID from drag/drop IDs
+    const paperIdMatch = active.id.toString().match(/^paper-(\d+)$/);
+    const tagIdMatch = over.id.toString().match(/^tag-(\d+)$/);
+
+    if (!paperIdMatch || !tagIdMatch) {
+      return; // Invalid IDs
+    }
+
+    const paperId = parseInt(paperIdMatch[1], 10);
+    const tagId = parseInt(tagIdMatch[1], 10);
+
+    // Get paper and validate assignment
+    const paper = papers.find(p => p.id === paperId);
+    const tag = findTagInTopics(topics, tagId);
+
+    const validation = validateTagAssignment(paper, tag);
+    if (!validation.valid) {
+      setDragFeedback({ 
+        message: validation.errorMessage || 'Cannot assign tag', 
+        type: 'error' 
+      });
+      setTimeout(() => setDragFeedback(null), 5000);
+      return;
+    }
+
+    try {
+      await api.addTagToPaper(paperId, tagId);
+      setDragFeedback({ message: 'Tag assigned successfully', type: 'success' });
+      invalidateCache(tagId);
+      setTimeout(() => setDragFeedback(null), 3000);
+    } catch (error: any) {
+      console.error('Failed to assign tag:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to assign tag';
+      setDragFeedback({ message: errorMessage, type: 'error' });
+      setTimeout(() => setDragFeedback(null), 5000);
+    }
+  };
+
   return (
     <ProtectedRoute>
-      <div className="flex min-h-screen bg-background-light dark:bg-background-dark">
-        <Sidebar topics={topics} />
+      <DndContext onDragEnd={handleDragEnd}>
+        <div className="flex min-h-screen bg-background-light dark:bg-background-dark">
+          <Sidebar topics={topics} />
 
         <main className="flex-1 p-6">
             <div className="flex flex-col h-full">
@@ -192,7 +236,26 @@ export default function TopicsPage() {
               </div>
             </div>
           </main>
+
+        {/* Drag and Drop Feedback */}
+        {dragFeedback && (
+          <div
+            className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 transition-opacity ${
+              dragFeedback.type === 'success'
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">
+                {dragFeedback.type === 'success' ? 'check_circle' : 'error'}
+              </span>
+              <span className="text-sm font-medium">{dragFeedback.message}</span>
+            </div>
+          </div>
+        )}
       </div>
+      </DndContext>
     </ProtectedRoute>
   );
 }

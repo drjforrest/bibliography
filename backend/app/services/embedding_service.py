@@ -33,6 +33,10 @@ class EmbeddingService:
             List of embedding floats
         """
         try:
+            if not self.embedding_model:
+                logger.error("Embedding model is not initialized. Check your EMBEDDING_MODEL configuration.")
+                return []
+            
             if not text or not text.strip():
                 logger.warning("Empty text provided for embedding")
                 return []
