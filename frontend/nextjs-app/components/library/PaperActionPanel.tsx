@@ -135,7 +135,7 @@ export default function PaperActionPanel({
     });
 
     return grouped;
-  }, [paper, isFavorited, api, actionStates, onActionComplete, onClose, isOpen]);
+  }, [paper, isFavorited, api, actionStates, onActionComplete, onClose]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -181,7 +181,7 @@ export default function PaperActionPanel({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, actionsByCategory, onClose]);
+  }, [isOpen, actionsByCategory, onClose, paper.id]);
 
   if (!isOpen) return null;
 

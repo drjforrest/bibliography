@@ -57,7 +57,7 @@ export default function TopicsPage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn, api, literatureFilter]);
+  }, [isLoaded, isSignedIn, api, literatureFilter, calculateTagLiteratureTypes]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

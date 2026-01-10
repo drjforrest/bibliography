@@ -51,7 +51,7 @@ export default function RecentPage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn, api]);
+  }, [isLoaded, isSignedIn, api, calculateTagLiteratureTypes]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

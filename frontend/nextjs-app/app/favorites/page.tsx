@@ -51,7 +51,7 @@ export default function FavoritesPage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn, api]);
+  }, [isLoaded, isSignedIn, api, calculateTagLiteratureTypes]);
 
   const handleSearch = async (query: string) => {
     if (!isLoaded || !isSignedIn) return;

@@ -73,7 +73,7 @@ export default function HomePage() {
       }
     };
     fetchData();
-  }, [isLoaded, isSignedIn, selectedLiteratureType, authenticatedApi]);
+  }, [isLoaded, isSignedIn, selectedLiteratureType, authenticatedApi, calculateTagLiteratureTypes]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

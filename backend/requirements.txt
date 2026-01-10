@@ -1,6 +1,8 @@
 alembic>=1.13.0
 asyncpg>=0.30.0
-chonkie[all]>=1.0.6
+chonkie>=0.1.0  # Base chonkie works without sentence-transformers for chunking
+# chonkie[all] includes sentence-transformers support, but we only need base chonkie
+# If you need sentence-transformers embeddings, use pyproject.toml optional dependencies
 fastapi>=0.115.8,<0.128.0  # Pinned: tested with 0.127.0, compatible with Pydantic v2
 fastapi-users[oauth,sqlalchemy]>=14.0.1
 pydantic>=2.9.0,<3.0.0  # Pinned: tested with 2.12.5, ensures Pydantic v2 (from_attributes pattern)
@@ -17,13 +19,14 @@ notion-client>=2.3.0
 pgvector>=0.3.6
 playwright>=1.50.0
 python-ffmpeg>=2.0.12
-rerankers[flashrank]>=0.7.1
-sentence-transformers>=3.4.1
+# rerankers[flashrank]>=0.7.1  # Moved to optional dependencies (requires torch)
+# sentence-transformers>=3.4.1  # Moved to optional dependencies (requires torch)
+# unstructured[all-docs]>=0.16.25  # Moved to optional dependencies (requires torch)
+# Install torch dependencies with: uv pip install -e ".[torch-deps]"
 slack-sdk>=3.34.0
 static-ffmpeg>=2.13
 tavily-python>=0.3.2
 unstructured-client>=0.30.0
-unstructured[all-docs]>=0.16.25
 uvicorn[standard]>=0.34.0
 validators>=0.34.0
 youtube-transcript-api>=1.0.3
