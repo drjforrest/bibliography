@@ -1,7 +1,7 @@
+import logging
 import os
 import shutil
 import warnings
-import logging
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 # Optional imports - chonkie may require sentence-transformers which isn't available on all platforms
 try:
     from chonkie import AutoEmbeddings, CodeChunker, RecursiveChunker
+
     CHONKIE_AVAILABLE = True
 except ImportError:
     AutoEmbeddings = None
@@ -22,6 +23,7 @@ except ImportError:
 # Optional imports - rerankers may not be available on all platforms
 try:
     from rerankers import Reranker
+
     RERANKERS_AVAILABLE = True
 except ImportError:
     Reranker = None
@@ -117,12 +119,13 @@ class Config:
         strategic_llm_instance = ChatLiteLLM(model=STRATEGIC_LLM)
 
     # Embedding Configuration
-    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+    # Default to OpenAI-compatible embedding model (nomic-embed-text via LMStudio/Ollama)
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "openai://nomic-embed-text")
 
     # Configure embedding model based on the type
     embedding_model_instance = None
     embedding_dimension = 1536  # Default dimension
-    
+
     if EMBEDDING_MODEL:
         if EMBEDDING_MODEL.startswith("openai://"):
             # Ollama via OpenAI API compatibility
@@ -131,7 +134,9 @@ class Config:
                 # Try with newer langchain-openai parameters
                 embedding_model_instance = OpenAIEmbeddings(
                     model=model_name,
-                    base_url=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
+                    base_url=os.getenv(
+                        "OPENAI_API_BASE", "http://192.168.1.81:1234/v1"
+                    ),
                     api_key=os.getenv("OPENAI_API_KEY", "ollama"),
                 )
             except:
@@ -139,7 +144,7 @@ class Config:
                 embedding_model_instance = OpenAIEmbeddings(
                     model=model_name,
                     openai_api_base=os.getenv(
-                        "OPENAI_API_BASE", "http://localhost:11434/v1"
+                        "OPENAI_API_BASE", "http://192.168.1.81:1234/v1"
                     ),
                     openai_api_key=os.getenv("OPENAI_API_KEY", "ollama"),
                 )
@@ -152,46 +157,55 @@ class Config:
         elif CHONKIE_AVAILABLE:
             # Use Chonkie AutoEmbeddings for other models (requires sentence-transformers)
             try:
-                embedding_model_instance = AutoEmbeddings.get_embeddings(EMBEDDING_MODEL)
+                embedding_model_instance = AutoEmbeddings.get_embeddings(
+                    EMBEDDING_MODEL
+                )
                 # Try to get dimension from the model if available
-                embedding_dimension = getattr(embedding_model_instance, "dimension", 768)
+                embedding_dimension = getattr(
+                    embedding_model_instance, "dimension", 768
+                )
             except Exception as e:
-                logger.warning(f"Failed to initialize embedding model '{EMBEDDING_MODEL}': {e}")
+                logger.warning(
+                    f"Failed to initialize embedding model '{EMBEDDING_MODEL}': {e}"
+                )
                 embedding_model_instance = None
         else:
             # Chonkie not available - suggest using OpenAI-style embeddings instead
             import warnings
+
             warnings.warn(
                 f"EMBEDDING_MODEL '{EMBEDDING_MODEL}' requires chonkie (which needs sentence-transformers), "
                 "but chonkie is not available on this platform. "
                 "Please set EMBEDDING_MODEL to use OpenAI-style embeddings (e.g., 'openai://nomic-embed-text') "
                 "or install torch dependencies. Embedding operations will fail until this is fixed.",
-                UserWarning
+                UserWarning,
             )
             # Try to use a default OpenAI-style model as fallback
             try:
                 model_name = "nomic-embed-text"  # Default fallback
                 embedding_model_instance = OpenAIEmbeddings(
                     model=model_name,
-                    base_url=os.getenv("OPENAI_API_BASE", "http://localhost:11434/v1"),
+                    base_url=os.getenv(
+                        "OPENAI_API_BASE", "http://192.168.1.81:1234/v1"
+                    ),
                     api_key=os.getenv("OPENAI_API_KEY", "ollama"),
                 )
                 embedding_dimension = 768
                 warnings.warn(
                     f"Using fallback embedding model: openai://{model_name}. "
                     f"Original model '{EMBEDDING_MODEL}' requires sentence-transformers which is not available.",
-                    UserWarning
+                    UserWarning,
                 )
             except Exception as e:
                 warnings.warn(
                     f"Could not initialize fallback embedding model: {e}. "
                     "Embedding operations will fail. Please fix EMBEDDING_MODEL in your .env file.",
-                    UserWarning
+                    UserWarning,
                 )
                 # Set to None explicitly so code can check and fail gracefully
                 embedding_model_instance = None
                 embedding_dimension = 768  # Default dimension even if model fails
-    
+
     # Note: embedding_dimension is stored as a separate config variable
     # Use config.embedding_dimension instead of config.embedding_model_instance.dimension
     # The embedding_model_instance (OpenAIEmbeddings) doesn't expose dimension as a settable attribute
@@ -206,44 +220,45 @@ class Config:
         # Simple chunker fallback when chonkie is not available
         class SimpleChunker:
             """Simple chunker that splits text into fixed-size chunks."""
+
             def __init__(self, chunk_size=512, overlap=100):
                 self.chunk_size = chunk_size
                 self.overlap = overlap
-            
+
             def chunk(self, text: str):
                 """Split text into overlapping chunks."""
                 if not text or not text.strip():
                     return []
-                
+
                 chunks = []
                 text_length = len(text)
-                
+
                 # If text is shorter than chunk size, return as single chunk
                 if text_length <= self.chunk_size:
                     return [text.strip()]
-                
+
                 start = 0
                 while start < text_length:
                     end = min(start + self.chunk_size, text_length)
                     chunk = text[start:end].strip()
-                    
+
                     if chunk:
                         chunks.append(chunk)
-                    
+
                     # Break if we've reached the end
                     if end >= text_length:
                         break
-                    
+
                     # Move start position with overlap
                     start = end - self.overlap
-                
+
                 # Return chunks that match chonkie's interface (objects with .text attribute)
                 class Chunk:
                     def __init__(self, text):
                         self.text = text
-                
+
                 return [Chunk(chunk_text) for chunk_text in chunks]
-        
+
         chunker_instance = SimpleChunker(chunk_size=512, overlap=100)
         code_chunker_instance = None
 
