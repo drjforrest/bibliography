@@ -119,6 +119,10 @@ app.include_router(devonthink_router, prefix="/devonthink", tags=["devonthink"])
 app.include_router(automated_ingestion_router, tags=["automated-ingestion"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
 
+# V2 API routes
+from app.routes.podcasts_routes import router as podcasts_router
+app.include_router(podcasts_router, prefix="/api/v2", tags=["podcasts-v2"])
+
 
 @app.get("/verify-token")
 async def authenticated_route(

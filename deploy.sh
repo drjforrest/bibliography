@@ -313,6 +313,45 @@ EOF
     echo '  - Frontend: http://localhost:${FRONTEND_PORT}'
     echo '  - Database: PostgreSQL on port ${DB_PORT}'
     echo '  - Logs: hero_evidence_library_backend.log, hero_evidence_library_frontend.log'
+
+    # Setup visual abstracts cleanup cron job
+    echo ''
+    echo 'Setting up visual abstracts cleanup cron job...'
+    PLIST_FILE=\"${SERVER_PATH}/scripts/com.hero.visual_abstracts_cleanup.plist\"
+    LAUNCHD_DIR=\"\$HOME/Library/LaunchAgents\"
+    LAUNCHD_PLIST=\"\$LAUNCHD_DIR/com.hero.visual_abstracts_cleanup.plist\"
+    
+    if [ -f \"\$PLIST_FILE\" ]; then
+        # Create LaunchAgents directory if it doesn't exist
+        mkdir -p \"\$LAUNCHD_DIR\"
+        
+        # Check if already loaded
+        if launchctl list | grep -q \"com.hero.visual_abstracts_cleanup\"; then
+            echo '✓ Visual abstracts cleanup service is already loaded'
+        else
+            # Copy plist to LaunchAgents and expand ~ to actual home directory
+            cp \"\$PLIST_FILE\" \"\$LAUNCHD_PLIST\"
+            
+            # Expand ~ in the plist file to actual home directory path
+            HOME_DIR=\"\$HOME\"
+            sed -i.bak \"s|~|\$HOME_DIR|g\" \"\$LAUNCHD_PLIST\" 2>/dev/null || sed -i '' \"s|~|\$HOME_DIR|g\" \"\$LAUNCHD_PLIST\"
+            rm -f \"\$LAUNCHD_PLIST.bak\" 2>/dev/null || true
+            
+            # Load the service
+            launchctl load \"\$LAUNCHD_PLIST\" 2>/dev/null || true
+            
+            if launchctl list | grep -q \"com.hero.visual_abstracts_cleanup\"; then
+                echo '✓ Visual abstracts cleanup service installed and loaded'
+                echo '  - Runs daily at 2:00 AM'
+                echo '  - Logs: ~/.hero_visual_abstracts_cleanup.log'
+            else
+                echo '⚠ Failed to load visual abstracts cleanup service'
+            fi
+        fi
+    else
+        echo '⚠ Visual abstracts cleanup plist not found at \$PLIST_FILE'
+        echo '  Skipping cleanup service setup'
+    fi
 "
 
 print_status "hero-evidence-library has been deployed to production server!"

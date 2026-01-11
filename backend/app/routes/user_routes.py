@@ -13,10 +13,14 @@ router = APIRouter()
 
 class UserAPIKeysUpdate(BaseModel):
     openrouter_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    elevenlabs_api_key: Optional[str] = None
 
 
 class UserAPIKeysResponse(BaseModel):
     openrouter_api_key_set: bool
+    openai_api_key_set: bool
+    elevenlabs_api_key_set: bool
 
 
 class UserProfileUpdate(BaseModel):
@@ -157,9 +161,11 @@ async def get_api_keys_status(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ):
-    """Get the status of user's OpenRouter API key (whether it is set or not)."""
+    """Get the status of user's API keys (whether they are set or not)."""
     return UserAPIKeysResponse(
         openrouter_api_key_set=bool(user.openrouter_api_key),
+        openai_api_key_set=bool(user.openai_api_key),
+        elevenlabs_api_key_set=bool(user.elevenlabs_api_key),
     )
 
 
@@ -169,12 +175,19 @@ async def update_api_keys(
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ):
-    """Update user's OpenRouter API key."""
+    """Update user's API keys."""
     if api_keys.openrouter_api_key is not None:
         user.openrouter_api_key = api_keys.openrouter_api_key
+    if api_keys.openai_api_key is not None:
+        user.openai_api_key = api_keys.openai_api_key
+    if api_keys.elevenlabs_api_key is not None:
+        user.elevenlabs_api_key = api_keys.elevenlabs_api_key
 
     await session.commit()
+    await session.refresh(user)
 
     return UserAPIKeysResponse(
         openrouter_api_key_set=bool(user.openrouter_api_key),
+        openai_api_key_set=bool(user.openai_api_key),
+        elevenlabs_api_key_set=bool(user.elevenlabs_api_key),
     )

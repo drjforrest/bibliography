@@ -139,6 +139,24 @@ export const actionDefinitions: Record<string, Omit<PaperAction, 'onClick'>> = {
     badge: 'new',
     supportsBatch: false,
   },
+  'generate-podcast': {
+    id: 'generate-podcast',
+    title: 'Generate Podcast',
+    description: 'Convert this paper into an engaging podcast conversation',
+    icon: 'podcasts',
+    category: 'ai-powered',
+    badge: 'new',
+    supportsBatch: false,
+  },
+  'generate-visual-abstract': {
+    id: 'generate-visual-abstract',
+    title: 'Generate Visual Abstract',
+    description: 'Create a visual summary of this paper for sharing and engagement',
+    icon: 'image',
+    category: 'ai-powered',
+    badge: 'new',
+    supportsBatch: false,
+  },
 };
 
 /**

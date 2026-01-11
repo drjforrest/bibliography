@@ -220,6 +220,9 @@ class ScientificPaper(BaseModel, TimestampMixin):
     favorited_by = relationship(
         "User", secondary="user_favorites", back_populates="favorite_papers"
     )
+    visual_abstracts = relationship(
+        "VisualAbstract", back_populates="paper", cascade="all, delete-orphan"
+    )
 
 
 class PaperAnnotation(BaseModel, TimestampMixin):
@@ -343,6 +346,27 @@ class Podcast(BaseModel, TimestampMixin):
         Integer, ForeignKey("searchspaces.id", ondelete="CASCADE"), nullable=False
     )
     search_space = relationship("SearchSpace", back_populates="podcasts")
+
+
+class VisualAbstract(BaseModel, TimestampMixin):
+    __tablename__ = "visual_abstracts"
+
+    paper_id = Column(
+        Integer,
+        ForeignKey("scientific_papers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    file_path = Column(String(500), nullable=False)  # Path to generated image file
+    prompt_used = Column(Text, nullable=True)  # Store the prompt used for generation
+    model_used = Column(
+        String(100), nullable=True
+    )  # Store which model was used (e.g., "dall-e-3", "openrouter/gpt-4-vision")
+    expires_at = Column(
+        TIMESTAMP(timezone=True), nullable=False, index=True
+    )  # Auto-delete after 30 days
+
+    paper = relationship("ScientificPaper", back_populates="visual_abstracts")
 
 
 class SearchSpace(BaseModel, TimestampMixin):
@@ -583,8 +607,10 @@ if config.AUTH_TYPE == "GOOGLE":
         pass
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
-        # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
-        openrouter_api_key = Column(String, nullable=True)
+        # AI API Keys for BYOK (Bring Your Own Key) functionality
+        openrouter_api_key = Column(String, nullable=True)  # For LLM script generation
+        openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
+        elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
@@ -626,8 +652,10 @@ if config.AUTH_TYPE == "GOOGLE":
 else:
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
-        # AI API Key for BYOK (Bring Your Own Key) functionality via OpenRouter
-        openrouter_api_key = Column(String, nullable=True)
+        # AI API Keys for BYOK (Bring Your Own Key) functionality
+        openrouter_api_key = Column(String, nullable=True)  # For LLM script generation
+        openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
+        elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
@@ -719,6 +747,36 @@ if config.AUTH_TYPE == "GOOGLE":
         yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 else:
+
+    async def get_user_db(session: AsyncSession = Depends(get_async_session)):
+        yield SQLAlchemyUserDatabase(session, User)
+
+
+async def get_chunks_hybrid_search_retriever(
+    session: AsyncSession = Depends(get_async_session),
+):
+    return ChunksHybridSearchRetriever(session)
+
+
+async def get_documents_hybrid_search_retriever(
+    session: AsyncSession = Depends(get_async_session),
+):
+    return DocumentHybridSearchRetriever(session)
+
+    async def get_user_db(session: AsyncSession = Depends(get_async_session)):
+        yield SQLAlchemyUserDatabase(session, User)
+
+
+async def get_chunks_hybrid_search_retriever(
+    session: AsyncSession = Depends(get_async_session),
+):
+    return ChunksHybridSearchRetriever(session)
+
+
+async def get_documents_hybrid_search_retriever(
+    session: AsyncSession = Depends(get_async_session),
+):
+    return DocumentHybridSearchRetriever(session)
 
     async def get_user_db(session: AsyncSession = Depends(get_async_session)):
         yield SQLAlchemyUserDatabase(session, User)

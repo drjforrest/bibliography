@@ -23,6 +23,8 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [openrouterKey, setOpenrouterKey] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [elevenlabsKey, setElevenlabsKey] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -74,7 +76,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const originalDisplayName = profile?.display_name || "";
     const originalBio = profile?.bio || "";
-    setHasUnsavedChanges(displayName !== originalDisplayName || bio !== originalBio || !!avatarFile || !!openrouterKey.trim());
+    setHasUnsavedChanges(displayName !== originalDisplayName || bio !== originalBio || !!avatarFile || !!openrouterKey.trim() || !!openaiKey.trim() || !!elevenlabsKey.trim());
   }, [displayName, bio, avatarFile, openrouterKey, profile]);
 
   const showMessage = (type: "success" | "error", text: string) => {
@@ -162,19 +164,25 @@ export default function ProfilePage() {
         await uploadAvatar();
       }
 
-      // Save API key if provided
-      if (openrouterKey.trim()) {
+      // Save API keys if any were provided
+      const apiKeysData: any = {};
+      if (openrouterKey.trim()) apiKeysData.openrouter_api_key = openrouterKey.trim();
+      if (openaiKey.trim()) apiKeysData.openai_api_key = openaiKey.trim();
+      if (elevenlabsKey.trim()) apiKeysData.elevenlabs_api_key = elevenlabsKey.trim();
+      
+      if (Object.keys(apiKeysData).length > 0) {
         await axios.put(
           `${API_URL}/api/v1/api-keys`,
-          { openrouter_api_key: openrouterKey.trim() },
+          apiKeysData,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           }
         );
-
         setOpenrouterKey("");
+        setOpenaiKey("");
+        setElevenlabsKey("");
       }
 
       showMessage("success", "Profile updated successfully");
@@ -344,15 +352,16 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* API Key Section */}
+        {/* API Keys Section */}
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            OpenRouter API Key
+            API Keys
           </h2>
           <div className="space-y-4">
+            {/* OpenRouter Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                API Key
+                OpenRouter API Key <span className="text-xs text-gray-500 dark:text-gray-400">(LLM)</span>
                 {profile && (
                   <span
                     className={`ml-2 text-xs px-2 py-1 rounded ${
@@ -372,6 +381,43 @@ export default function ProfilePage() {
                 placeholder="sk-or-v1-..."
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                For podcast script generation (access to 100+ AI models)
+              </p>
+            </div>
+
+            {/* OpenAI Key */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                OpenAI API Key <span className="text-xs text-gray-500 dark:text-gray-400">(TTS)</span>
+              </label>
+              <input
+                type="password"
+                value={openaiKey}
+                onChange={(e) => setOpenaiKey(e.target.value)}
+                placeholder="sk-..."
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                For podcast TTS generation (pay-per-use, $15/1M chars)
+              </p>
+            </div>
+
+            {/* ElevenLabs Key */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                ElevenLabs API Key <span className="text-xs text-gray-500 dark:text-gray-400">(TTS)</span>
+              </label>
+              <input
+                type="password"
+                value={elevenlabsKey}
+                onChange={(e) => setElevenlabsKey(e.target.value)}
+                placeholder="..."
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                For podcast TTS generation (subscription-based, $5-99/month)
+              </p>
             </div>
 
             <div className="bg-[#4e989e]/10 dark:bg-[#4e989e]/20 border border-[#4e989e]/30 dark:border-[#4e989e]/40 rounded-lg p-4">
@@ -408,8 +454,8 @@ export default function ProfilePage() {
             </div>
 
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Your API key is stored securely and used only for chat functionality. It enables
-              you to use your own AI provider account with model selection.
+              Your API keys are stored securely and used for AI-powered features like podcast generation.
+              They enable you to use your own provider accounts instead of relying on system defaults.
             </p>
           </div>
         </div>

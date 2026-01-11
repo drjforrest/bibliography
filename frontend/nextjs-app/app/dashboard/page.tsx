@@ -21,6 +21,8 @@ export default function DashboardPage() {
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [visualAbstracts, setVisualAbstracts] = useState<any[]>([]);
+  const [visualAbstractsLoading, setVisualAbstractsLoading] = useState(false);
 
   // Create authenticated API client
   const authenticatedApi = useMemo(() => createAuthenticatedClient(getToken), [getToken]);
@@ -47,6 +49,17 @@ export default function DashboardPage() {
         setActivityFeed(activityData.activities || []);
         setNotifications(notificationsData.notifications || []);
         setUnreadCount(notificationsData.unread_count || 0);
+
+        // Fetch visual abstracts
+        setVisualAbstractsLoading(true);
+        try {
+          const visualAbstractsData = await authenticatedApi.listVisualAbstracts(10, 0);
+          setVisualAbstracts(visualAbstractsData.visual_abstracts || []);
+        } catch (err) {
+          console.error('Failed to fetch visual abstracts:', err);
+        } finally {
+          setVisualAbstractsLoading(false);
+        }
 
         // Convert tags to topics for sidebar
         const convertedTopics: Topic[] = (tagsData.tags || []).map((tag: any) => ({
@@ -401,6 +414,135 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Visual Abstracts Section */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                  <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                          Visual Abstracts
+                        </h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          AI-generated visual summaries of your papers
+                        </p>
+                      </div>
+                      {visualAbstracts.length > 0 && (
+                        <span className="bg-[#4e989e]/20 text-[#4e989e] dark:bg-[#4e989e]/30 dark:text-[#94d2bd] px-3 py-1 rounded-full text-sm font-semibold">
+                          {visualAbstracts.length}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {visualAbstractsLoading ? (
+                      <div className="p-8 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-[#4e989e] mx-auto"></div>
+                        <p className="text-gray-600 dark:text-gray-400 mt-2">Loading visual abstracts...</p>
+                      </div>
+                    ) : visualAbstracts.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <span className="material-symbols-outlined text-5xl text-gray-400 dark:text-gray-600 mb-3">
+                          image
+                        </span>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          No visual abstracts yet
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                          Generate one from any paper using the action panel
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+                        {visualAbstracts.map((abstract) => {
+                          const imageUrl = authenticatedApi.getVisualAbstractImageUrl(abstract.id);
+                          const expiresDate = new Date(abstract.expires_at);
+                          const daysLeft = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                          
+                          return (
+                            <div
+                              key={abstract.id}
+                              className="relative group cursor-pointer"
+                              onClick={() => {
+                                const previewWindow = window.open('', '_blank');
+                                if (previewWindow) {
+                                  previewWindow.document.write(`
+                                    <!DOCTYPE html>
+                                    <html>
+                                      <head>
+                                        <meta charset="UTF-8">
+                                        <title>Visual Abstract - ${abstract.paper_title || 'Paper'}</title>
+                                        <style>
+                                          body {
+                                            font-family: system-ui;
+                                            max-width: 1200px;
+                                            margin: 40px auto;
+                                            padding: 20px;
+                                            text-align: center;
+                                            background: #f5f5f5;
+                                          }
+                                          img {
+                                            max-width: 100%;
+                                            height: auto;
+                                            border-radius: 8px;
+                                            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                                          }
+                                          h1 {
+                                            color: #333;
+                                            margin-bottom: 20px;
+                                          }
+                                          .info {
+                                            margin-top: 20px;
+                                            color: #666;
+                                            font-size: 14px;
+                                          }
+                                        </style>
+                                      </head>
+                                      <body>
+                                        <h1>Visual Abstract</h1>
+                                        <p><strong>${abstract.paper_title || 'Untitled'}</strong></p>
+                                        <img src="${imageUrl}" alt="Visual Abstract" />
+                                        <div class="info">
+                                          <p>Generated: ${formatDate(abstract.created_at)}</p>
+                                          <p>Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</p>
+                                        </div>
+                                      </body>
+                                    </html>
+                                  `);
+                                  previewWindow.document.close();
+                                }
+                              }}
+                            >
+                              <div className="relative aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
+                                <img
+                                  src={imageUrl}
+                                  alt={abstract.paper_title || 'Visual Abstract'}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+                                  <span className="material-symbols-outlined text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                    open_in_new
+                                  </span>
+                                </div>
+                                {daysLeft <= 7 && (
+                                  <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
+                                    {daysLeft}d left
+                                  </div>
+                                )}
+                              </div>
+                              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                                {abstract.paper_title || 'Untitled'}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {formatDate(abstract.created_at)}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>

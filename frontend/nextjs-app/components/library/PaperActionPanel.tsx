@@ -1,6 +1,7 @@
 'use client';
 
 import { useApi } from '@/lib/api';
+import { usePodcastApi } from '@/lib/podcast-api';
 import type { Paper } from '@/types';
 import type { ActionCategory, PaperAction } from '@/types/actions';
 import { actionDefinitions, categoryMetadata } from '@/types/actions';
@@ -60,6 +61,7 @@ export default function PaperActionPanel({
   buttonRef,
 }: PaperActionPanelProps) {
   const api = useApi();
+  const podcastApi = usePodcastApi();
   const [actionStates, setActionStates] = useState<Record<string, { status?: PaperAction['status'] }>>({});
   const [isFavorited, setIsFavorited] = useState(false);
 
@@ -252,6 +254,110 @@ export default function PaperActionPanel({
         },
         status: actionStates['generate-research-gaps']?.status,
       },
+      // Generate Podcast
+      {
+        ...actionDefinitions['generate-podcast']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-podcast': { status: 'processing' } }));
+            
+            if (!podcastApi.api) {
+              throw new Error('Podcast API not initialized');
+            }
+
+            const result = await podcastApi.generatePodcast({
+              paper_id: paperId,
+              tts_provider: 'openai', // Default to OpenAI for now
+            });
+
+            setActionStates(prev => ({ ...prev, 'generate-podcast': { status: 'completed' } }));
+            onActionComplete?.('generate-podcast');
+            onClose();
+            
+            // Show success message with podcast info
+            alert(`Podcast "${result.title}" generated successfully! You can find it in your podcasts library.`);
+          } catch (error: any) {
+            console.error('Failed to generate podcast:', error);
+            setActionStates(prev => ({ ...prev, 'generate-podcast': { status: 'error' } }));
+            const errorMessage = error?.response?.data?.detail || error.message || 'Failed to generate podcast. Please check your API key configuration.';
+            alert(errorMessage);
+          }
+        },
+        status: actionStates['generate-podcast']?.status,
+      },
+      // Generate Visual Abstract
+      {
+        ...actionDefinitions['generate-visual-abstract']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-visual-abstract': { status: 'processing' } }));
+            
+            const result = await api.generateVisualAbstract(paperId, false);
+            
+            setActionStates(prev => ({ ...prev, 'generate-visual-abstract': { status: 'completed' } }));
+            onActionComplete?.('generate-visual-abstract');
+            onClose();
+            
+            // Show success message with image preview
+            const imageUrl = api.getVisualAbstractImageUrl(result.id);
+            const previewWindow = window.open('', '_blank');
+            if (previewWindow) {
+              previewWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <meta charset="UTF-8">
+                    <title>Visual Abstract - ${paper.title}</title>
+                    <style>
+                      body {
+                        font-family: system-ui;
+                        max-width: 1200px;
+                        margin: 40px auto;
+                        padding: 20px;
+                        text-align: center;
+                        background: #f5f5f5;
+                      }
+                      img {
+                        max-width: 100%;
+                        height: auto;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                      }
+                      h1 {
+                        color: #333;
+                        margin-bottom: 20px;
+                      }
+                      .info {
+                        margin-top: 20px;
+                        color: #666;
+                        font-size: 14px;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <h1>Visual Abstract</h1>
+                    <p><strong>${paper.title}</strong></p>
+                    <img src="${imageUrl}" alt="Visual Abstract" />
+                    <div class="info">
+                      <p>Visual abstract generated successfully! This image will be available for 30 days.</p>
+                      <p>You can find it in your dashboard under Visual Abstracts.</p>
+                    </div>
+                  </body>
+                </html>
+              `);
+              previewWindow.document.close();
+            }
+          } catch (error: any) {
+            console.error('Failed to generate visual abstract:', error);
+            setActionStates(prev => ({ ...prev, 'generate-visual-abstract': { status: 'error' } }));
+            const errorMessage = error?.response?.data?.detail || error.message || 'Failed to generate visual abstract. Please check your API key configuration.';
+            alert(errorMessage);
+          }
+        },
+        status: actionStates['generate-visual-abstract']?.status,
+      },
     ];
 
     // Group by category
@@ -268,7 +374,7 @@ export default function PaperActionPanel({
     });
 
     return grouped;
-  }, [paper, isFavorited, api, actionStates, onActionComplete, onClose]);
+  }, [paper, isFavorited, api, podcastApi, actionStates, onActionComplete, onClose]);
 
   // Keyboard shortcuts
   useEffect(() => {

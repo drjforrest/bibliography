@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 interface APIKeyStatus {
   openai_api_key_set: boolean;
-  anthropic_api_key_set: boolean;
+  elevenlabs_api_key_set: boolean;
   openrouter_api_key_set: boolean;
 }
 
@@ -14,7 +14,7 @@ export default function APIKeySettings() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [status, setStatus] = useState<APIKeyStatus | null>(null);
   const [openaiKey, setOpenaiKey] = useState('');
-  const [anthropicKey, setAnthropicKey] = useState('');
+  const [elevenlabsKey, setElevenlabsKey] = useState('');
   const [openrouterKey, setOpenrouterKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -58,7 +58,7 @@ export default function APIKeySettings() {
     try {
       const data: any = {};
       if (openaiKey.trim()) data.openai_api_key = openaiKey.trim();
-      if (anthropicKey.trim()) data.anthropic_api_key = anthropicKey.trim();
+      if (elevenlabsKey.trim()) data.elevenlabs_api_key = elevenlabsKey.trim();
       if (openrouterKey.trim()) data.openrouter_api_key = openrouterKey.trim();
 
       const response = await axios.put(
@@ -73,7 +73,7 @@ export default function APIKeySettings() {
 
       setStatus(response.data);
       setOpenaiKey('');
-      setAnthropicKey('');
+      setElevenlabsKey('');
       setOpenrouterKey('');
       alert('API keys updated successfully!');
     } catch (error) {
@@ -111,6 +111,7 @@ export default function APIKeySettings() {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 OpenAI API Key
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(TTS)</span>
                 {status && (
                   <span className={`ml-2 text-xs px-2 py-1 rounded ${
                     status.openai_api_key_set
@@ -128,35 +129,43 @@ export default function APIKeySettings() {
                 placeholder="sk-..."
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                For podcast TTS generation (pay-per-use, $15/1M chars)
+              </p>
             </div>
 
-            {/* Anthropic Key */}
+            {/* ElevenLabs Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Anthropic API Key
+                ElevenLabs API Key
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(TTS)</span>
                 {status && (
                   <span className={`ml-2 text-xs px-2 py-1 rounded ${
-                    status.anthropic_api_key_set
+                    status.elevenlabs_api_key_set
                       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                       : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                   }`}>
-                    {status.anthropic_api_key_set ? 'Set' : 'Not Set'}
+                    {status.elevenlabs_api_key_set ? 'Set' : 'Not Set'}
                   </span>
                 )}
               </label>
               <input
                 type="password"
-                value={anthropicKey}
-                onChange={(e) => setAnthropicKey(e.target.value)}
-                placeholder="sk-ant-..."
+                value={elevenlabsKey}
+                onChange={(e) => setElevenlabsKey(e.target.value)}
+                placeholder="..."
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                For podcast TTS generation (subscription-based, $5-99/month)
+              </p>
             </div>
 
             {/* OpenRouter Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 OpenRouter API Key
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(LLM)</span>
                 {status && (
                   <span className={`ml-2 text-xs px-2 py-1 rounded ${
                     status.openrouter_api_key_set
@@ -174,19 +183,22 @@ export default function APIKeySettings() {
                 placeholder="sk-or-v1-..."
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4e989e]"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                For podcast script generation (access to 100+ AI models)
+              </p>
             </div>
 
             <button
               onClick={updateKeys}
-              disabled={isLoading || (!openaiKey.trim() && !anthropicKey.trim() && !openrouterKey.trim())}
+              disabled={isLoading || (!openaiKey.trim() && !elevenlabsKey.trim() && !openrouterKey.trim())}
               className="w-full px-4 py-2 bg-[#4e989e] hover:bg-[#3d7a7f] disabled:bg-gray-400 text-white rounded-lg transition-colors"
             >
               {isLoading ? 'Updating...' : 'Update Keys'}
             </button>
 
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Your API keys are stored securely and used only for AI chat functionality.
-              They enable you to use your own AI provider accounts instead of relying on system defaults.
+              Your API keys are stored securely and used for AI-powered features like podcast generation.
+              They enable you to use your own provider accounts instead of relying on system defaults.
             </p>
           </div>
         </div>

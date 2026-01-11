@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service Label -->
+    <key>Label</key>
+    <string>com.hero.visual_abstracts_cleanup</string>
+
+    <!-- Program to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>~/production/hero-evidence-library/scripts/cleanup_expired_visual_abstracts.sh</string>
+    </array>
+
+    <!-- Run daily at 2:00 AM -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Standard output and error logs -->
+    <key>StandardOutPath</key>
+    <string>~/.hero_visual_abstracts_cleanup.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>~/.hero_visual_abstracts_cleanup_error.log</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>~/production/hero-evidence-library/backend</string>
+
+    <!-- User to run as -->
+    <key>UserName</key>
+    <string>jforrest</string>
+</dict>
+</plist>
