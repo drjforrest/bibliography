@@ -7,13 +7,13 @@ Uses user's OpenRouter API key when available, falls back to config.
 
 import logging
 import os
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import aiohttp
+from app.db import ScientificPaper
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db import ScientificPaper
+from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +22,15 @@ class PaperReportService:
     """Service for generating AI-powered analysis reports on scientific papers."""
 
     def __init__(
-        self, 
-        session: AsyncSession, 
+        self,
+        session: AsyncSession,
         openrouter_api_key: Optional[str] = None,
         model: Optional[str] = None,
         api_base: Optional[str] = None,
     ):
         """
         Initialize Paper Report Service.
-        
+
         Args:
             session: Database session
             openrouter_api_key: User's OpenRouter API key (optional, for BYOK)
@@ -39,35 +39,46 @@ class PaperReportService:
         """
         self.session = session
         self.openrouter_api_key = openrouter_api_key
-        
+
         # Configure LLM endpoint
         if openrouter_api_key:
             # Use OpenRouter API for user keys
             self.llm_base = api_base or "https://openrouter.ai/api/v1"
             self.api_key = openrouter_api_key
-            
+
             # Get model from config if not provided
             if not model:
                 model = os.getenv("STRATEGIC_LLM", "openrouter/openai/gpt-4")
-            
+
             # Ensure model uses openrouter/ prefix if not already
             if not model.startswith("openrouter/"):
                 if "/" in model:
                     model = f"openrouter/{model}"
                 else:
                     model = f"openrouter/openai/{model}"
-            
+
             self.llm_model = model
-            logger.info(f"Paper Report Service initialized with user's OpenRouter key (model: {self.llm_model})")
+            logger.info(
+                f"Paper Report Service initialized with user's OpenRouter key (model: {self.llm_model})"
+            )
         else:
             # Fallback to config instances (uses .env keys)
-            self.llm_base = api_base or os.getenv("FAST_LLM_API_BASE") or os.getenv(
-                "LLM_API_BASE", "http://192.168.1.88:1234/v1"
+            self.llm_base = (
+                api_base or os.getenv("FAST_LLM_API_BASE") or os.getenv("LLM_API_BASE")
             )
             self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
             self.llm_model = model or os.getenv("FAST_LLM", "mistral-7b-v0.1")
-            logger.info(f"Paper Report Service initialized with config defaults (model: {self.llm_model})")
-        
+            logger.info(
+                f"Paper Report Service initialized with config defaults (model: {self.llm_model})"
+            )
+
+        # Validate that llm_base is configured
+        if not self.llm_base:
+            raise ValueError(
+                "LLM endpoint (llm_base) is not configured. "
+                "Please set one of: api_base parameter, FAST_LLM_API_BASE, or LLM_API_BASE environment variable."
+            )
+
         self.http_session: Optional[aiohttp.ClientSession] = None
         self.timeout = aiohttp.ClientTimeout(total=600)  # 10 min timeout for reports
 
@@ -110,7 +121,97 @@ class PaperReportService:
             ) as response:
                 if response.status == 200:
                     result = await response.json()
-                    return result["choices"][0]["message"]["content"].strip()
+
+                    # Defensive checks for response structure
+                    try:
+                        # Verify result is a dict
+                        if not isinstance(result, dict):
+                            logger.error(
+                                f"LLM API response is not a dict. Type: {type(result)}, "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        # Verify result contains "choices" key
+                        if "choices" not in result:
+                            logger.error(
+                                f"LLM API response missing 'choices' key. "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        # Verify choices is a non-empty list
+                        choices = result["choices"]
+                        if not isinstance(choices, list):
+                            logger.error(
+                                f"LLM API response 'choices' is not a list. Type: {type(choices)}, "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        if len(choices) == 0:
+                            logger.error(
+                                f"LLM API response 'choices' list is empty. "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        # Verify choices[0] is a dict with "message" key
+                        first_choice = choices[0]
+                        if not isinstance(first_choice, dict):
+                            logger.error(
+                                f"LLM API response choices[0] is not a dict. Type: {type(first_choice)}, "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        if "message" not in first_choice:
+                            logger.error(
+                                f"LLM API response choices[0] missing 'message' key. "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        # Verify message is a dict with "content" key
+                        message = first_choice["message"]
+                        if not isinstance(message, dict):
+                            logger.error(
+                                f"LLM API response choices[0]['message'] is not a dict. Type: {type(message)}, "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        if "content" not in message:
+                            logger.error(
+                                f"LLM API response choices[0]['message'] missing 'content' key. "
+                                f"Raw result: {result}"
+                            )
+                            return None
+
+                        # Verify content is a string
+                        content = message["content"]
+                        if not isinstance(content, str):
+                            logger.error(
+                                f"LLM API response choices[0]['message']['content'] is not a string. "
+                                f"Type: {type(content)}, Raw result: {result}"
+                            )
+                            return None
+
+                        return content.strip()
+
+                    except KeyError as e:
+                        logger.error(
+                            f"LLM API response structure error (KeyError): Missing key '{e}'. "
+                            f"Raw result: {result}"
+                        )
+                        return None
+
+                    except IndexError as e:
+                        logger.error(
+                            f"LLM API response structure error (IndexError): {str(e)}. "
+                            f"Raw result: {result}"
+                        )
+                        return None
                 else:
                     error_text = await response.text()
                     logger.error(f"LLM API error ({response.status}): {error_text}")
@@ -122,7 +223,12 @@ class PaperReportService:
     async def _get_paper_content(self, paper_id: int) -> Optional[Dict]:
         """Get paper content and metadata for report generation."""
         try:
-            stmt = select(ScientificPaper).where(ScientificPaper.id == paper_id)
+            # Eagerly load the document relationship to avoid async lazy-loading issues
+            stmt = (
+                select(ScientificPaper)
+                .where(ScientificPaper.id == paper_id)
+                .options(selectinload(ScientificPaper.document))
+            )
             result = await self.session.execute(stmt)
             paper = result.scalar_one_or_none()
 
@@ -132,29 +238,37 @@ class PaperReportService:
 
             # Build paper content
             content_parts = []
-            
+
             if paper.title:
                 content_parts.append(f"Title: {paper.title}")
-            
+
             if paper.authors:
                 content_parts.append(f"Authors: {', '.join(paper.authors)}")
-            
+
             if paper.journal:
                 content_parts.append(f"Journal: {paper.journal}")
-            
+
             if paper.publication_year:
                 content_parts.append(f"Year: {paper.publication_year}")
-            
+
             if paper.doi:
                 content_parts.append(f"DOI: {paper.doi}")
-            
+
             if paper.abstract:
                 content_parts.append(f"\nAbstract:\n{paper.abstract}")
-            
-            if paper.document and paper.document.content:
+
+            # Guard access to document.content with null-check to prevent async lazy-loading
+            document = getattr(paper, "document", None)
+            if (
+                document is not None
+                and hasattr(document, "content")
+                and document.content
+            ):
                 # Include full text (may be truncated by LLM context window)
-                content_parts.append(f"\nFull Text:\n{paper.document.content[:10000]}")  # First 10k chars
-            
+                content_parts.append(
+                    f"\nFull Text:\n{document.content[:10000]}"
+                )  # First 10k chars
+
             return {
                 "title": paper.title,
                 "content": "\n\n".join(content_parts),
@@ -164,7 +278,7 @@ class PaperReportService:
                     "year": paper.publication_year,
                     "doi": paper.doi,
                     "abstract": paper.abstract,
-                }
+                },
             }
         except Exception as e:
             logger.error(f"Error getting paper content: {str(e)}")
@@ -173,7 +287,7 @@ class PaperReportService:
     async def generate_quick_summary(self, paper_id: int) -> Optional[str]:
         """
         Generate a quick 150-word summary (Prompt #2).
-        
+
         Captures:
         - Central research question
         - Methodology type
@@ -187,7 +301,7 @@ class PaperReportService:
 
         prompt = f"""Provide a concise 150-word overview of this research paper:
 
-{paper_data['content']}
+{paper_data["content"]}
 
 Capture:
 - Central research question
@@ -201,9 +315,9 @@ Format as a clear, readable summary suitable for quick understanding."""
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert research analyst specializing in summarizing scientific papers clearly and concisely."
+                "content": "You are an expert research analyst specializing in summarizing scientific papers clearly and concisely.",
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         return await self._call_llm(messages, max_tokens=300, temperature=0.5)
@@ -211,7 +325,7 @@ Format as a clear, readable summary suitable for quick understanding."""
     async def generate_comprehensive_analysis(self, paper_id: int) -> Optional[str]:
         """
         Generate comprehensive analysis (Prompt #1).
-        
+
         Analyzes:
         - Research Question & Objectives
         - Methodology & Data
@@ -227,7 +341,7 @@ Format as a clear, readable summary suitable for quick understanding."""
 
         prompt = f"""Analyze this research paper systematically:
 
-{paper_data['content']}
+{paper_data["content"]}
 
 Provide a comprehensive analysis covering:
 - Research Question & Objectives: What is the study's central aim?
@@ -243,9 +357,9 @@ Format as a structured, professional analysis."""
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert research analyst specializing in comprehensive critical analysis of scientific papers."
+                "content": "You are an expert research analyst specializing in comprehensive critical analysis of scientific papers.",
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         return await self._call_llm(messages, max_tokens=3000, temperature=0.7)
@@ -253,7 +367,7 @@ Format as a structured, professional analysis."""
     async def generate_critical_appraisal(self, paper_id: int) -> Optional[str]:
         """
         Generate critical appraisal via IMRaD structure (Prompt #4).
-        
+
         Reviews:
         - INTRODUCTION: Research gaps, relevance
         - METHODS: Reproducibility, ethics
@@ -267,7 +381,7 @@ Format as a structured, professional analysis."""
 
         prompt = f"""Review this paper using IMRaD framework:
 
-{paper_data['content']}
+{paper_data["content"]}
 
 Provide critical appraisal covering:
 INTRODUCTION: Are the research gaps clearly identified? Is the relevance established?
@@ -281,9 +395,9 @@ Format as a structured critical appraisal."""
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert research critic specializing in methodological quality assessment and critical appraisal of scientific papers."
+                "content": "You are an expert research critic specializing in methodological quality assessment and critical appraisal of scientific papers.",
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         return await self._call_llm(messages, max_tokens=2500, temperature=0.6)
@@ -291,7 +405,7 @@ Format as a structured critical appraisal."""
     async def generate_methodology_assessment(self, paper_id: int) -> Optional[str]:
         """
         Generate methodology and risk of bias assessment (Prompt #3).
-        
+
         Evaluates:
         - Study Design Appropriateness
         - Sample Adequacy
@@ -307,7 +421,7 @@ Format as a structured critical appraisal."""
 
         prompt = f"""Evaluate the methodological quality of this paper:
 
-{paper_data['content']}
+{paper_data["content"]}
 
 Assess:
 - Study Design Appropriateness: Is the design well-suited to the research question?
@@ -324,9 +438,9 @@ Format as a structured methodology assessment."""
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert in research methodology and study design, specializing in quality assessment and bias detection."
+                "content": "You are an expert in research methodology and study design, specializing in quality assessment and bias detection.",
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         return await self._call_llm(messages, max_tokens=2500, temperature=0.6)
@@ -334,7 +448,7 @@ Format as a structured methodology assessment."""
     async def generate_research_gap_analysis(self, paper_id: int) -> Optional[str]:
         """
         Generate research gap identification (Prompt #7).
-        
+
         Identifies:
         - Gaps This Paper Addressed
         - Gaps This Paper Creates
@@ -347,7 +461,7 @@ Format as a structured methodology assessment."""
 
         prompt = f"""Based on this paper, identify the research gaps it addresses and creates:
 
-{paper_data['content']}
+{paper_data["content"]}
 
 Analyze:
 - Gaps This Paper Addressed: What prior knowledge or methodological gaps did it fill?
@@ -360,9 +474,9 @@ Format as a structured gap analysis."""
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert research strategist specializing in identifying research gaps and proposing next steps for scientific inquiry."
+                "content": "You are an expert research strategist specializing in identifying research gaps and proposing next steps for scientific inquiry.",
             },
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         return await self._call_llm(messages, max_tokens=2000, temperature=0.7)

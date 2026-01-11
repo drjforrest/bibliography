@@ -1,12 +1,11 @@
-from typing import Any, AsyncGenerator, List, Union
+from typing import Any, AsyncGenerator, List, Optional, Union
 from uuid import UUID
 
+from app.agents.researcher.configuration import SearchMode
 from app.agents.researcher.graph import graph as researcher_graph
 from app.agents.researcher.state import State
 from app.utils.streaming_service import StreamingService
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.agents.researcher.configuration import SearchMode
 
 
 async def stream_connector_search_results(

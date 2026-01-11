@@ -6,6 +6,42 @@ import type { ActionCategory, PaperAction } from '@/types/actions';
 import { actionDefinitions, categoryMetadata } from '@/types/actions';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+// Helper function to escape HTML entities to prevent XSS attacks
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Helper function to open a report window with properly escaped content
+function openReportWindow(title: string | undefined, reportTitle: string, content: string | undefined): void {
+  const reportWindow = window.open('', '_blank');
+  if (!reportWindow) return;
+
+  const escapedTitle = escapeHtml(title || 'Untitled');
+  const escapedReportTitle = escapeHtml(reportTitle);
+  const escapedContent = escapeHtml(content || '');
+
+  reportWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${escapedReportTitle} - ${escapedTitle}</title>
+      </head>
+      <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
+        <h1>${escapedReportTitle}</h1>
+        <h2>${escapedTitle}</h2>
+        <div style="white-space: pre-wrap; margin-top: 20px;">${escapedContent}</div>
+      </body>
+    </html>
+  `);
+  reportWindow.document.close();
+}
+
 interface PaperActionPanelProps {
   paper: Paper;
   isOpen: boolean;
@@ -128,20 +164,7 @@ export default function PaperActionPanel({
           try {
             setActionStates(prev => ({ ...prev, 'generate-quick-summary': { status: 'processing' } }));
             const result = await api.generatePaperReport(paperId, 'quick-summary');
-            // Open report in new window/modal
-            const reportWindow = window.open('', '_blank');
-            if (reportWindow) {
-              reportWindow.document.write(`
-                <html>
-                  <head><title>Quick Summary - ${paper.title}</title></head>
-                  <body style="font-family: system-ui; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6;">
-                    <h1>Quick Summary</h1>
-                    <h2>${paper.title}</h2>
-                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
-                  </body>
-                </html>
-              `);
-            }
+            openReportWindow(paper.title, 'Quick Summary', result.report_content);
             setActionStates(prev => ({ ...prev, 'generate-quick-summary': { status: 'completed' } }));
             onActionComplete?.('generate-quick-summary');
             onClose();
@@ -160,19 +183,7 @@ export default function PaperActionPanel({
           try {
             setActionStates(prev => ({ ...prev, 'generate-comprehensive-analysis': { status: 'processing' } }));
             const result = await api.generatePaperReport(paperId, 'comprehensive');
-            const reportWindow = window.open('', '_blank');
-            if (reportWindow) {
-              reportWindow.document.write(`
-                <html>
-                  <head><title>Comprehensive Analysis - ${paper.title}</title></head>
-                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
-                    <h1>Comprehensive Analysis</h1>
-                    <h2>${paper.title}</h2>
-                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
-                  </body>
-                </html>
-              `);
-            }
+            openReportWindow(paper.title, 'Comprehensive Analysis', result.report_content);
             setActionStates(prev => ({ ...prev, 'generate-comprehensive-analysis': { status: 'completed' } }));
             onActionComplete?.('generate-comprehensive-analysis');
             onClose();
@@ -191,19 +202,7 @@ export default function PaperActionPanel({
           try {
             setActionStates(prev => ({ ...prev, 'generate-critical-appraisal': { status: 'processing' } }));
             const result = await api.generatePaperReport(paperId, 'critical-appraisal');
-            const reportWindow = window.open('', '_blank');
-            if (reportWindow) {
-              reportWindow.document.write(`
-                <html>
-                  <head><title>Critical Appraisal - ${paper.title}</title></head>
-                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
-                    <h1>Critical Appraisal</h1>
-                    <h2>${paper.title}</h2>
-                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
-                  </body>
-                </html>
-              `);
-            }
+            openReportWindow(paper.title, 'Critical Appraisal', result.report_content);
             setActionStates(prev => ({ ...prev, 'generate-critical-appraisal': { status: 'completed' } }));
             onActionComplete?.('generate-critical-appraisal');
             onClose();
@@ -222,19 +221,7 @@ export default function PaperActionPanel({
           try {
             setActionStates(prev => ({ ...prev, 'generate-methodology-assessment': { status: 'processing' } }));
             const result = await api.generatePaperReport(paperId, 'methodology');
-            const reportWindow = window.open('', '_blank');
-            if (reportWindow) {
-              reportWindow.document.write(`
-                <html>
-                  <head><title>Methodology Assessment - ${paper.title}</title></head>
-                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
-                    <h1>Methodology Assessment</h1>
-                    <h2>${paper.title}</h2>
-                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
-                  </body>
-                </html>
-              `);
-            }
+            openReportWindow(paper.title, 'Methodology Assessment', result.report_content);
             setActionStates(prev => ({ ...prev, 'generate-methodology-assessment': { status: 'completed' } }));
             onActionComplete?.('generate-methodology-assessment');
             onClose();
@@ -253,19 +240,7 @@ export default function PaperActionPanel({
           try {
             setActionStates(prev => ({ ...prev, 'generate-research-gaps': { status: 'processing' } }));
             const result = await api.generatePaperReport(paperId, 'research-gaps');
-            const reportWindow = window.open('', '_blank');
-            if (reportWindow) {
-              reportWindow.document.write(`
-                <html>
-                  <head><title>Research Gap Analysis - ${paper.title}</title></head>
-                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
-                    <h1>Research Gap Analysis</h1>
-                    <h2>${paper.title}</h2>
-                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
-                  </body>
-                </html>
-              `);
-            }
+            openReportWindow(paper.title, 'Research Gap Analysis', result.report_content);
             setActionStates(prev => ({ ...prev, 'generate-research-gaps': { status: 'completed' } }));
             onActionComplete?.('generate-research-gaps');
             onClose();

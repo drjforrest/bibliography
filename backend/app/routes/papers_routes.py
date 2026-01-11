@@ -21,19 +21,32 @@ from app.services.citation_formatter import CitationFormatter
 from app.services.paper_manager import PaperManagerService
 from app.services.paper_report_service import PaperReportService
 from app.services.thumbnail_generator import ThumbnailGenerator
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
+# In-memory set to track papers currently being enriched (prevents duplicate background tasks)
+_enrichment_in_progress: set[int] = set()
+
 
 # Report generation schemas
 class PaperReportResponse(BaseModel):
     """Response schema for paper report generation."""
+
     report_type: str
     report_content: str
     paper_id: int
@@ -41,38 +54,53 @@ class PaperReportResponse(BaseModel):
 
 class PaperReportRequest(BaseModel):
     """Request schema for paper report generation."""
+
     report_type: str  # "quick-summary", "comprehensive", "critical-appraisal", "methodology", "research-gaps"
 
 
 async def _enrich_paper_in_background(paper_id: int):
     """
     Background task to enrich a paper when triggered by a user event (event-based).
-    
+
     This is triggered when a user views/requests a paper. Uses cloud-based LLMs
     since this runs in production when users access papers.
     Creates its own database session to avoid context issues.
+
+    Includes deduplication to prevent multiple concurrent enrichment tasks for the same paper.
     """
+    # Check if this paper is already being enriched
+    if paper_id in _enrichment_in_progress:
+        logger.debug(
+            f"Paper {paper_id} enrichment already in progress, skipping duplicate task"
+        )
+        return
+
+    # Mark this paper as being enriched
+    _enrichment_in_progress.add(paper_id)
+
     try:
         async with get_async_session_context() as session:
-            from app.services.paper_manager import PaperManagerService
             from app.services.embedding_service import EmbeddingService
             from app.services.llm_enrichment_service import LLMEnrichmentService
-            
+            from app.services.paper_manager import PaperManagerService
+
             # Create paper manager to check if enrichment is needed
             paper_manager = PaperManagerService(session)
             paper = await paper_manager.get_paper_by_id(paper_id)
-            
+
             if not paper:
                 logger.warning(f"Paper {paper_id} not found for background enrichment")
                 return
-            
+
             # Check if enrichment is needed
             if not paper_manager._needs_enrichment(paper):
                 logger.debug(f"Paper {paper_id} already enriched, skipping")
                 return
-            
-            logger.info(f"Starting event-based enrichment for paper {paper_id} (using cloud LLM)")
-            
+
+            logger.info(
+                f"Starting event-based enrichment for paper {paper_id} (using cloud LLM)"
+            )
+
             # Get the paper with document
             if not paper.document:
                 logger.error(f"Paper {paper_id} has no document for enrichment")
@@ -88,30 +116,48 @@ async def _enrich_paper_in_background(paper_id: int):
                     logger.info(f"Successfully embedded document {paper.document_id}")
 
                 # Create and embed chunks
-                chunks_embedded = await embedding_service.create_and_embed_chunks(paper.document)
+                chunks_embedded = await embedding_service.create_and_embed_chunks(
+                    paper.document
+                )
                 if chunks_embedded:
-                    logger.info(f"Successfully created and embedded chunks for document {paper.document_id}")
+                    logger.info(
+                        f"Successfully created and embedded chunks for document {paper.document_id}"
+                    )
             except Exception as e:
                 logger.error(f"Vectorization failed for paper {paper_id}: {str(e)}")
                 # Continue to LLM enrichment even if vectorization fails
 
             # Step 2: LLM enrichment with cloud LLM (event-based = user triggered, always uses cloud)
-            logger.info(f"Step 2/2: Running LLM enrichment for paper {paper_id} (cloud LLM)")
+            logger.info(
+                f"Step 2/2: Running LLM enrichment for paper {paper_id} (cloud LLM)"
+            )
             try:
                 # Use cloud LLM for event-based enrichment (user-triggered)
                 cloud_llm_enrichment = LLMEnrichmentService(session, use_cloud_llm=True)
                 enriched = await cloud_llm_enrichment.enrich_paper(paper_id)
                 if enriched:
-                    logger.info(f"Successfully enriched paper {paper_id} with cloud LLM")
+                    logger.info(
+                        f"Successfully enriched paper {paper_id} with cloud LLM"
+                    )
                 else:
-                    logger.warning(f"Cloud LLM enrichment returned False for paper {paper_id}")
+                    logger.warning(
+                        f"Cloud LLM enrichment returned False for paper {paper_id}"
+                    )
             except Exception as e:
-                logger.error(f"Cloud LLM enrichment failed for paper {paper_id}: {str(e)}")
-            
+                logger.error(
+                    f"Cloud LLM enrichment failed for paper {paper_id}: {str(e)}"
+                )
+
             logger.info(f"Completed event-based enrichment for paper {paper_id}")
-            
+
     except Exception as e:
-        logger.error(f"Error in background enrichment for paper {paper_id}: {str(e)}", exc_info=True)
+        logger.error(
+            f"Error in background enrichment for paper {paper_id}: {str(e)}",
+            exc_info=True,
+        )
+    finally:
+        # Always remove from in-progress set when done (success or failure)
+        _enrichment_in_progress.discard(paper_id)
 
 
 async def _get_paper_file_path(
@@ -169,12 +215,16 @@ async def _get_paper_file_path(
             # Try to find the file in the devonthink_import subdirectory
             dt_uuid = paper.file_path.replace("devonthink_import/", "")
             fallback_paths = [
-                paper_manager.file_storage.storage_root / "devonthink_import" / f"{dt_uuid}.pdf",
+                paper_manager.file_storage.storage_root
+                / "devonthink_import"
+                / f"{dt_uuid}.pdf",
                 paper_manager.file_storage.storage_root / "devonthink_import" / dt_uuid,
                 # Also check if PDF_STORAGE_ROOT points to a different location
-                Path(paper_manager.file_storage.storage_root) / "devonthink_import" / f"{dt_uuid}.pdf",
+                Path(paper_manager.file_storage.storage_root)
+                / "devonthink_import"
+                / f"{dt_uuid}.pdf",
             ]
-            
+
             for fallback in fallback_paths:
                 if fallback.exists() and fallback.is_file():
                     logger.info(
@@ -195,7 +245,7 @@ async def _get_paper_file_path(
                 )
                 raise HTTPException(
                     status_code=404,
-                    detail=f"PDF file not found. This paper may need to be re-imported (DT UUID: {dt_uuid})."
+                    detail=f"PDF file not found. This paper may need to be re-imported (DT UUID: {dt_uuid}).",
                 )
         else:
             logger.error(
@@ -371,7 +421,7 @@ async def get_paper_pdf(
             raise HTTPException(
                 status_code=404,
                 detail=f"PDF file not found on server. Stored path: {paper.file_path}, "
-                       f"Resolved path: {full_path}"
+                f"Resolved path: {full_path}",
             )
 
         if not full_path.is_file():
@@ -520,7 +570,7 @@ async def get_paper(
 ):
     """
     Get a specific paper by ID.
-    
+
     If the paper needs enrichment (missing lay_summary, insights, etc.),
     enrichment will be triggered in the background without blocking the response.
     """
@@ -533,9 +583,19 @@ async def get_paper(
             raise HTTPException(status_code=404, detail="Paper not found")
 
         # Check if enrichment is needed and trigger it in the background
-        if paper_manager._needs_enrichment(paper):
-            logger.info(f"Paper {paper_id} needs enrichment, triggering background task")
+        # Also check if enrichment is already in progress to avoid duplicate tasks
+        if (
+            paper_manager._needs_enrichment(paper)
+            and paper_id not in _enrichment_in_progress
+        ):
+            logger.info(
+                f"Paper {paper_id} needs enrichment, triggering background task"
+            )
             background_tasks.add_task(_enrich_paper_in_background, paper_id)
+        elif paper_id in _enrichment_in_progress:
+            logger.debug(
+                f"Paper {paper_id} enrichment already in progress, skipping duplicate task spawn"
+            )
 
         return PaperResponse.from_orm(paper)
     except HTTPException:
@@ -936,43 +996,41 @@ async def generate_paper_report(
     session: AsyncSession = Depends(get_async_session),
 ):
     """
-    Generate an AI-powered analysis report for a paper.
-    
-    Report types:
-    - quick-summary: 150-word overview (Prompt #2)
-    - comprehensive: Full systematic analysis (Prompt #1)
-    - critical-appraisal: IMRaD-based critical review (Prompt #4)
-    - methodology: Methodology and bias assessment (Prompt #3)
-    - research-gaps: Research gap identification (Prompt #7)
-    
-    Uses user's OpenRouter API key if available, falls back to config.
+    Generate a report for a paper.
+
+    Supports multiple report types: quick-summary, comprehensive, critical-appraisal,
+    methodology, and research-gaps. Uses the user's OpenRouter API key for BYOK.
     """
     try:
         # Verify paper exists and user has access
         paper_manager = PaperManagerService(session)
         paper = await paper_manager.get_paper_by_id(paper_id)
-        
+
         if not paper:
             raise HTTPException(status_code=404, detail="Paper not found")
-        
+
         # Check ownership via document's search space
         if paper.document:
             from app.db import SearchSpace
             from sqlalchemy import select
-            
-            stmt = select(SearchSpace).where(SearchSpace.id == paper.document.search_space_id)
+
+            stmt = select(SearchSpace).where(
+                SearchSpace.id == paper.document.search_space_id
+            )
             result = await session.execute(stmt)
             search_space = result.scalar_one_or_none()
-            
+
             if search_space and search_space.user_id != user.id:
-                raise HTTPException(status_code=403, detail="You don't have access to this paper")
-        
+                raise HTTPException(
+                    status_code=403, detail="You don't have access to this paper"
+                )
+
         # Initialize report service with user's OpenRouter key
         report_service = PaperReportService(
             session=session,
             openrouter_api_key=user.openrouter_api_key,
         )
-        
+
         # Generate report based on type
         report_type_map = {
             "quick-summary": report_service.generate_quick_summary,
@@ -981,33 +1039,36 @@ async def generate_paper_report(
             "methodology": report_service.generate_methodology_assessment,
             "research-gaps": report_service.generate_research_gap_analysis,
         }
-        
+
         if request.report_type not in report_type_map:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid report type. Must be one of: {', '.join(report_type_map.keys())}"
+                status_code=400,
+                detail=f"Invalid report type. Must be one of: {', '.join(report_type_map.keys())}",
             )
-        
-        logger.info(f"Generating {request.report_type} report for paper {paper_id} (user: {user.id})")
+
+        logger.info(
+            f"Generating {request.report_type} report for paper {paper_id} (user: {user.id})"
+        )
         report_content = await report_type_map[request.report_type](paper_id)
-        
+
         if not report_content:
             raise HTTPException(
                 status_code=500,
-                detail="Failed to generate report. Please check your API key configuration and try again."
+                detail="Failed to generate report. Please check your API key configuration and try again.",
             )
-        
+
         return PaperReportResponse(
             report_type=request.report_type,
             report_content=report_content,
             paper_id=paper_id,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating report for paper {paper_id}: {str(e)}", exc_info=True)
+        logger.error(
+            f"Error generating report for paper {paper_id}: {str(e)}", exc_info=True
+        )
         raise HTTPException(
-            status_code=500,
-            detail=f"Error generating report: {str(e)}"
+            status_code=500, detail=f"Error generating report: {str(e)}"
         )

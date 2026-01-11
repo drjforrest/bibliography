@@ -1,13 +1,14 @@
-from .configuration import Configuration
-from langchain_core.runnables import RunnableConfig
-from .state import State
-from typing import Any, Dict, Optional
-from app.config import config as app_config
-from .prompts import get_citation_system_prompt
-from langchain_core.messages import HumanMessage, SystemMessage
-from .configuration import SubSectionType
-import os
 import logging
+import os
+from typing import Any, Dict, Optional
+
+from app.config import config as app_config
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+
+from .configuration import Configuration, SubSectionType
+from .prompts import get_citation_system_prompt
+from .state import State
 
 logger = logging.getLogger(__name__)
 
@@ -27,32 +28,65 @@ def get_llm_with_user_key(
 ):
     """
     Get LLM instance, using user's OpenRouter key if provided, otherwise fallback to config.
-    
+
     Args:
         llm_type: Type of LLM ("strategic", "fast", "long_context")
         openrouter_api_key: User's OpenRouter API key (optional)
         model: Model name (optional, uses config default if not provided)
         api_base: API base URL (optional, uses config default if not provided)
-    
+
     Returns:
         ChatLiteLLM instance configured with user key or config defaults
     """
     # If user provided OpenRouter key, use it with OpenRouter
     if openrouter_api_key:
-        # Use OpenRouter API for user keys
-        openrouter_api_base = "https://openrouter.ai/api/v1"
-        
+        # Use provided api_base or fallback to OpenRouter API for user keys
+        openrouter_api_base = api_base or "https://openrouter.ai/api/v1"
+
         # Get model from config if not provided
+        # Model selection: Environment variables are required to avoid hardcoded version dependencies.
+        # Update these env vars in .env when model versions change. For OpenRouter, prefer stable
+        # family identifiers (e.g., "openrouter/openai/gpt-4" without version suffixes) or use
+        # non-versioned aliases when available. Review and update model selections quarterly or
+        # when provider deprecates specific versions.
         if not model:
             if llm_type == "strategic":
-                model = os.getenv("STRATEGIC_LLM", "openrouter/openai/gpt-4")
+                model = os.getenv("STRATEGIC_LLM")
+                if not model:
+                    error_msg = (
+                        "STRATEGIC_LLM environment variable is required when using user's OpenRouter key. "
+                        "Please set STRATEGIC_LLM in your .env file (e.g., 'openrouter/openai/gpt-4')."
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
             elif llm_type == "fast":
-                model = os.getenv("FAST_LLM", "openrouter/openai/gpt-3.5-turbo")
+                model = os.getenv("FAST_LLM")
+                if not model:
+                    error_msg = (
+                        "FAST_LLM environment variable is required when using user's OpenRouter key. "
+                        "Please set FAST_LLM in your .env file (e.g., 'openrouter/openai/gpt-3.5-turbo')."
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
             elif llm_type == "long_context":
-                model = os.getenv("LONG_CONTEXT_LLM", "openrouter/anthropic/claude-3-sonnet")
+                model = os.getenv("LONG_CONTEXT_LLM")
+                if not model:
+                    error_msg = (
+                        "LONG_CONTEXT_LLM environment variable is required when using user's OpenRouter key. "
+                        "Please set LONG_CONTEXT_LLM in your .env file (e.g., 'openrouter/anthropic/claude-3-sonnet')."
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
             else:
-                model = os.getenv("FAST_LLM", "openrouter/openai/gpt-3.5-turbo")
-        
+                model = os.getenv("FAST_LLM")
+                if not model:
+                    error_msg = (
+                        "FAST_LLM environment variable is required when using user's OpenRouter key. "
+                        "Please set FAST_LLM in your .env file (e.g., 'openrouter/openai/gpt-3.5-turbo')."
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+
         # Ensure model uses openrouter/ prefix if not already
         if not model.startswith("openrouter/"):
             # If it's a provider/model format, add openrouter prefix
@@ -61,13 +95,31 @@ def get_llm_with_user_key(
             else:
                 # Default to OpenAI via OpenRouter
                 model = f"openrouter/openai/{model}"
-        
-        logger.info(f"Using user's OpenRouter key for {llm_type} LLM with model {model}")
-        return ChatLiteLLM(
-            model=model,
-            api_key=openrouter_api_key,
-            api_base=openrouter_api_base,
+
+        logger.info(
+            f"Using user's OpenRouter key for {llm_type} LLM with model {model}"
         )
+        try:
+            return ChatLiteLLM(
+                model=model,
+                api_key=openrouter_api_key,
+                api_base=openrouter_api_base,
+            )
+        except Exception as e:
+            # Mask API key for logging (show first 8 chars, mask the rest)
+            masked_key = (
+                f"{openrouter_api_key[:8]}..."
+                if openrouter_api_key and len(openrouter_api_key) > 8
+                else "***"
+                if openrouter_api_key
+                else "None"
+            )
+            error_msg = (
+                f"Failed to initialize ChatLiteLLM: {str(e)}. "
+                f"Model: {model}, API key: {masked_key}, API base: {openrouter_api_base}"
+            )
+            logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     else:
         # Fallback to config instances (uses .env keys)
         if llm_type == "strategic":
@@ -257,5 +309,8 @@ async def write_sub_section(state: State, config: RunnableConfig) -> Dict[str, A
     # Call the LLM and get the response
     response = await llm.ainvoke(messages_with_chat_history)
     final_answer = response.content
+
+    return {"final_answer": final_answer}
+    return {"final_answer": final_answer}
 
     return {"final_answer": final_answer}

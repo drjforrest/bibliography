@@ -13,12 +13,11 @@ import os
 from typing import Dict, List, Optional
 
 import aiohttp
+from app.db import ScientificPaper
+from app.services.citation_formatter import CitationFormatter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
-
-from app.db import ScientificPaper
-from app.services.citation_formatter import CitationFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ class LLMEnrichmentService:
     def __init__(self, session: AsyncSession, use_cloud_llm: bool = False):
         """
         Initialize LLM Enrichment Service.
-        
+
         Args:
             session: Database session
             use_cloud_llm: If True, forces use of cloud-based LLM configuration.
@@ -48,14 +47,15 @@ class LLMEnrichmentService:
                     "FAST_LLM_API_BASE or LLM_API_BASE must be set for cloud-based LLM enrichment. "
                     "Event-based enrichment (user-triggered) requires a cloud LLM endpoint."
                 )
-            
+
             # Require API key for cloud LLMs
             self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
             if not self.api_key:
-                logger.warning(
-                    "OPENAI_API_KEY or LLM_API_KEY not set. Cloud LLM requests may fail."
+                raise ValueError(
+                    "OPENAI_API_KEY or LLM_API_KEY must be set for cloud-based LLM enrichment. "
+                    "Event-based enrichment (user-triggered) requires an API key for cloud LLM endpoints."
                 )
-            
+
             # Use FAST_LLM model (should be cloud model like gpt-3.5-turbo, gpt-4, etc.)
             self.llm_model = os.getenv("FAST_LLM")
             if not self.llm_model:
@@ -63,22 +63,25 @@ class LLMEnrichmentService:
                     "FAST_LLM must be set for cloud-based LLM enrichment. "
                     "Set to a cloud model (e.g., gpt-3.5-turbo, gpt-4, claude-3-haiku)"
                 )
-            
+
             logger.info(
                 f"✅ LLM Enrichment Service initialized with cloud endpoint: {self.llm_base} "
                 f"(model: {self.llm_model})"
             )
         else:
             # For on-demand/manual enrichment (dev scripts): allow localhost fallback
+            # Defaults to http://127.0.0.1:1234/v1 if neither FAST_LLM_API_BASE nor LLM_API_BASE is set.
+            # This assumes a local LLM server (e.g., LM Studio) running on the default port.
+            # For production or remote LLM servers, set FAST_LLM_API_BASE or LLM_API_BASE explicitly.
             self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv(
-                "LLM_API_BASE", "http://192.168.1.88:1234/v1"
+                "LLM_API_BASE", "http://127.0.0.1:1234/v1"
             )
             self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
             self.llm_model = os.getenv("FAST_LLM", "mistral-7b-v0.1")
             logger.info(
                 f"LLM Enrichment Service initialized: {self.llm_base} with model {self.llm_model}"
             )
-        
+
         self.http_session: Optional[aiohttp.ClientSession] = None
         self.timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout
 

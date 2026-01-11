@@ -7,21 +7,18 @@ from typing import Any, Dict, List, Optional
 from app.config import config as app_config
 from app.db import async_session_maker
 from app.utils.connector_service import ConnectorService
+from app.utils.query_service import QueryService
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import StreamWriter
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .configuration import Configuration, SearchMode
 from .prompts import get_answer_outline_system_prompt
 from .state import State
-from .sub_section_writer.graph import graph as sub_section_writer_graph
 from .sub_section_writer.configuration import SubSectionType
-
-from app.utils.query_service import QueryService
-
-
-from langgraph.types import StreamWriter
+from .sub_section_writer.graph import graph as sub_section_writer_graph
 
 logger = logging.getLogger(__name__)
 
@@ -41,21 +38,21 @@ def get_llm_with_user_key(
 ):
     """
     Get LLM instance, using user's OpenRouter key if provided, otherwise fallback to config.
-    
+
     Args:
         llm_type: Type of LLM ("strategic", "fast", "long_context")
         openrouter_api_key: User's OpenRouter API key (optional)
         model: Model name (optional, uses config default if not provided)
         api_base: API base URL (optional, uses config default if not provided)
-    
+
     Returns:
         ChatLiteLLM instance configured with user key or config defaults
     """
     # If user provided OpenRouter key, use it with OpenRouter
     if openrouter_api_key:
-        # Use OpenRouter API for user keys
-        openrouter_api_base = "https://openrouter.ai/api/v1"
-        
+        # Use provided api_base or fallback to OpenRouter API for user keys
+        openrouter_api_base = api_base or "https://openrouter.ai/api/v1"
+
         # Get model from config if not provided
         if not model:
             if llm_type == "strategic":
@@ -63,10 +60,12 @@ def get_llm_with_user_key(
             elif llm_type == "fast":
                 model = os.getenv("FAST_LLM", "openrouter/openai/gpt-3.5-turbo")
             elif llm_type == "long_context":
-                model = os.getenv("LONG_CONTEXT_LLM", "openrouter/anthropic/claude-3-sonnet")
+                model = os.getenv(
+                    "LONG_CONTEXT_LLM", "openrouter/anthropic/claude-3-sonnet"
+                )
             else:
                 model = os.getenv("STRATEGIC_LLM", "openrouter/openai/gpt-4")
-        
+
         # Ensure model uses openrouter/ prefix if not already
         if not model.startswith("openrouter/"):
             # If it's a provider/model format, add openrouter prefix
@@ -75,8 +74,10 @@ def get_llm_with_user_key(
             else:
                 # Default to OpenAI via OpenRouter
                 model = f"openrouter/openai/{model}"
-        
-        logger.info(f"Using user's OpenRouter key for {llm_type} LLM with model {model}")
+
+        logger.info(
+            f"Using user's OpenRouter key for {llm_type} LLM with model {model}"
+        )
         return ChatLiteLLM(
             model=model,
             api_key=openrouter_api_key,
@@ -295,7 +296,7 @@ async def fetch_relevant_documents(
         # Stream question being researched
         if streaming_service and writer:
             streaming_service.only_update_terminal(
-                f'🧠 Researching question {i+1}/{len(research_questions)}: "{user_query[:100]}..."'
+                f'🧠 Researching question {i + 1}/{len(research_questions)}: "{user_query[:100]}..."'
             )
             writer({"yeild_value": streaming_service._format_annotations()})
 
@@ -315,14 +316,15 @@ async def fetch_relevant_documents(
 
             try:
                 if connector == "YOUTUBE_VIDEO":
-                    source_object, youtube_chunks = (
-                        await connector_service.search_youtube(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            search_space_id=search_space_id,
-                            top_k=top_k,
-                            search_mode=search_mode,
-                        )
+                    (
+                        source_object,
+                        youtube_chunks,
+                    ) = await connector_service.search_youtube(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        search_space_id=search_space_id,
+                        top_k=top_k,
+                        search_mode=search_mode,
                     )
 
                     # Add to sources and raw documents
@@ -338,14 +340,15 @@ async def fetch_relevant_documents(
                         writer({"yeild_value": streaming_service._format_annotations()})
 
                 elif connector == "EXTENSION":
-                    source_object, extension_chunks = (
-                        await connector_service.search_extension(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            search_space_id=search_space_id,
-                            top_k=top_k,
-                            search_mode=search_mode,
-                        )
+                    (
+                        source_object,
+                        extension_chunks,
+                    ) = await connector_service.search_extension(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        search_space_id=search_space_id,
+                        top_k=top_k,
+                        search_mode=search_mode,
                     )
 
                     # Add to sources and raw documents
@@ -361,14 +364,15 @@ async def fetch_relevant_documents(
                         writer({"yeild_value": streaming_service._format_annotations()})
 
                 elif connector == "CRAWLED_URL":
-                    source_object, crawled_urls_chunks = (
-                        await connector_service.search_crawled_urls(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            search_space_id=search_space_id,
-                            top_k=top_k,
-                            search_mode=search_mode,
-                        )
+                    (
+                        source_object,
+                        crawled_urls_chunks,
+                    ) = await connector_service.search_crawled_urls(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        search_space_id=search_space_id,
+                        top_k=top_k,
+                        search_mode=search_mode,
                     )
 
                     # Add to sources and raw documents
@@ -426,14 +430,15 @@ async def fetch_relevant_documents(
                         writer({"yeild_value": streaming_service._format_annotations()})
 
                 elif connector == "NOTION_CONNECTOR":
-                    source_object, notion_chunks = (
-                        await connector_service.search_notion(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            search_space_id=search_space_id,
-                            top_k=top_k,
-                            search_mode=search_mode,
-                        )
+                    (
+                        source_object,
+                        notion_chunks,
+                    ) = await connector_service.search_notion(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        search_space_id=search_space_id,
+                        top_k=top_k,
+                        search_mode=search_mode,
                     )
 
                     # Add to sources and raw documents
@@ -449,14 +454,15 @@ async def fetch_relevant_documents(
                         writer({"yeild_value": streaming_service._format_annotations()})
 
                 elif connector == "GITHUB_CONNECTOR":
-                    source_object, github_chunks = (
-                        await connector_service.search_github(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            search_space_id=search_space_id,
-                            top_k=top_k,
-                            search_mode=search_mode,
-                        )
+                    (
+                        source_object,
+                        github_chunks,
+                    ) = await connector_service.search_github(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        search_space_id=search_space_id,
+                        top_k=top_k,
+                        search_mode=search_mode,
                     )
 
                     # Add to sources and raw documents
@@ -472,14 +478,15 @@ async def fetch_relevant_documents(
                         writer({"yeild_value": streaming_service._format_annotations()})
 
                 elif connector == "LINEAR_CONNECTOR":
-                    source_object, linear_chunks = (
-                        await connector_service.search_linear(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            search_space_id=search_space_id,
-                            top_k=top_k,
-                            search_mode=search_mode,
-                        )
+                    (
+                        source_object,
+                        linear_chunks,
+                    ) = await connector_service.search_linear(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        search_space_id=search_space_id,
+                        top_k=top_k,
+                        search_mode=search_mode,
                     )
 
                     # Add to sources and raw documents
@@ -495,10 +502,11 @@ async def fetch_relevant_documents(
                         writer({"yeild_value": streaming_service._format_annotations()})
 
                 elif connector == "TAVILY_API":
-                    source_object, tavily_chunks = (
-                        await connector_service.search_tavily(
-                            user_query=reformulated_query, user_id=user_id, top_k=top_k
-                        )
+                    (
+                        source_object,
+                        tavily_chunks,
+                    ) = await connector_service.search_tavily(
+                        user_query=reformulated_query, user_id=user_id, top_k=top_k
                     )
 
                     # Add to sources and raw documents
@@ -519,12 +527,13 @@ async def fetch_relevant_documents(
                     else:
                         linkup_mode = "standard"
 
-                    source_object, linkup_chunks = (
-                        await connector_service.search_linkup(
-                            user_query=reformulated_query,
-                            user_id=user_id,
-                            mode=linkup_mode,
-                        )
+                    (
+                        source_object,
+                        linkup_chunks,
+                    ) = await connector_service.search_linkup(
+                        user_query=reformulated_query,
+                        user_id=user_id,
+                        mode=linkup_mode,
                     )
 
                     # Add to sources and raw documents
@@ -941,7 +950,7 @@ async def process_section_with_documents(
                         if delta and state and state.streaming_service and writer:
                             # Update terminal with real-time progress indicator
                             state.streaming_service.only_update_terminal(
-                                f"✍️ Writing section {section_id+1}... ({len(complete_content.split())} words)"
+                                f"✍️ Writing section {section_id + 1}... ({len(complete_content.split())} words)"
                             )
 
                             # Update section_contents with just the new delta
