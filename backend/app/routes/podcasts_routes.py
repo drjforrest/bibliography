@@ -36,7 +36,7 @@ def sanitize_filename(title: str, max_length: int = 200) -> str:
 
     Removes or replaces unsafe characters:
     - Null bytes
-    - Path separators (/, \)
+    - Path separators (/, \\)
     - Parent directory references (..)
     - Limits length to prevent filesystem issues
 

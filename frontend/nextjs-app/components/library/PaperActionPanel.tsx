@@ -422,14 +422,8 @@ export default function PaperActionPanel({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, actionsByCategory, onClose, paper.id]);
 
-  if (!isOpen) return null;
-
-  // Sort categories by order
-  const sortedCategories = (Object.keys(categoryMetadata) as ActionCategory[]).sort(
-    (a, b) => categoryMetadata[a].order - categoryMetadata[b].order
-  );
-
   // Calculate position for dropdown (below action button, aligned to right)
+  // MUST be before early return to follow Rules of Hooks
   const [position, setPosition] = useState<{
     top: number;
     right?: number;
@@ -511,7 +505,13 @@ export default function PaperActionPanel({
     }
   }, [isOpen, buttonRef]);
 
+  // Early return AFTER all hooks
   if (!isOpen) return null;
+
+  // Sort categories by order
+  const sortedCategories = (Object.keys(categoryMetadata) as ActionCategory[]).sort(
+    (a, b) => categoryMetadata[a].order - categoryMetadata[b].order
+  );
 
   return (
     <>

@@ -64,7 +64,8 @@ export default function PaperAnnotationPage() {
             paperData.insights = JSON.parse(paperData.insights);
           } catch (e) {
             // If parsing fails, try to extract array from string using regex (non-greedy to match first array)
-            const match = paperData.insights.match(/\[.*?\]/s);
+            // Using [\s\S] instead of /s flag for ES2017 compatibility
+            const match = paperData.insights.match(/\[[\s\S]*?\]/);
             if (match) {
               try {
                 paperData.insights = JSON.parse(match[0]);

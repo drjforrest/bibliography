@@ -105,7 +105,7 @@ async def get_search_suggestions(
 async def quick_search(
     query: str,
     limit: int = Query(5, le=20),
-    search_type: str = Query("hybrid", regex="^(semantic|keyword|hybrid)$"),
+    search_type: str = Query("hybrid", pattern="^(semantic|keyword|hybrid)$"),
     user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):

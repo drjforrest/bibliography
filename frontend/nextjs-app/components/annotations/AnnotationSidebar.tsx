@@ -29,7 +29,8 @@ export default function AnnotationSidebar({ annotations, paperTitle, paperSummar
       } catch (e) {
         console.warn('Failed to parse insights as JSON:', e);
         // Try to extract array from string using regex
-        const match = insights.match(/\[.*?\]/s);
+        // Using [\s\S] instead of /s flag for ES2017 compatibility
+        const match = insights.match(/\[[\s\S]*?\]/);
         if (match) {
           try {
             const parsed = JSON.parse(match[0]);
