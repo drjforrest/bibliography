@@ -192,21 +192,83 @@ export default function PaperActionPanel({
   );
 
   // Calculate position for dropdown (below action button, aligned to right)
-  const [position, setPosition] = useState({ top: 0, right: 0 });
+  const [position, setPosition] = useState<{
+    top: number;
+    right?: number;
+    left?: number;
+  }>({ top: 0, right: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen && buttonRef?.current) {
-      const button = buttonRef.current instanceof HTMLElement 
-        ? buttonRef.current 
-        : buttonRef.current.querySelector('button') || buttonRef.current;
+      const buttonEl = buttonRef.current instanceof HTMLElement
+        ? buttonRef.current
+        : (buttonRef.current as HTMLElement);
+      
+      const button = buttonEl.tagName === 'BUTTON'
+        ? buttonEl
+        : buttonEl.querySelector<HTMLElement>('button') || buttonEl;
       
       if (button) {
         const rect = button.getBoundingClientRect();
-        setPosition({
-          top: rect.bottom + 8, // 8px gap below button
-          right: window.innerWidth - rect.right, // Align to right edge of button
-        });
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Dropdown dimensions (w-80 = 320px)
+        const dropdownWidth = 320;
+        const estimatedDropdownHeight = 400; // Reasonable estimate, will be clamped by max-h
+        const gap = 8;
+        const margin = 16; // Minimum margin from viewport edges
+        
+        // Calculate initial position (below button, aligned to right edge)
+        let top = rect.bottom + gap;
+        let right: number | undefined = viewportWidth - rect.right;
+        let left: number | undefined = undefined;
+        
+        // Check bottom overflow - position above if not enough space below
+        const spaceBelow = viewportHeight - rect.bottom - margin;
+        const spaceAbove = rect.top - margin;
+        if (spaceBelow < estimatedDropdownHeight && spaceAbove > spaceBelow) {
+          // Position above button
+          top = rect.top - estimatedDropdownHeight - gap;
+          // Clamp to viewport if still too high
+          if (top < margin) {
+            top = margin;
+          }
+        } else {
+          // Position below button
+          // Clamp to viewport if would overflow bottom
+          const maxTop = viewportHeight - estimatedDropdownHeight - margin;
+          if (top > maxTop) {
+            top = Math.max(margin, maxTop);
+          }
+        }
+        
+        // Check horizontal overflow
+        // When using 'right', the dropdown's right edge is at the specified position
+        // Dropdown extends leftward from that point
+        const dropdownLeftEdge = viewportWidth - (right ?? 0) - dropdownWidth;
+        
+        if (dropdownLeftEdge < margin) {
+          // Would overflow left - switch to left positioning
+          // Align to button's left edge, but ensure it fits within viewport
+          const proposedLeft = rect.left;
+          const dropdownRightEdge = proposedLeft + dropdownWidth;
+          
+          if (dropdownRightEdge > viewportWidth - margin) {
+            // Would overflow right - position to fit within viewport
+            left = viewportWidth - dropdownWidth - margin;
+          } else {
+            // Align to button's left edge
+            left = Math.max(margin, proposedLeft);
+          }
+          right = undefined;
+        } else if (right && right < margin) {
+          // Would overflow right - ensure minimum margin
+          right = margin;
+        }
+        
+        setPosition({ top, right, left });
       }
     }
   }, [isOpen, buttonRef]);
@@ -225,7 +287,12 @@ export default function PaperActionPanel({
       <div
         ref={menuRef}
         className="fixed z-50 w-80 max-h-[calc(100vh-120px)] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden"
-        style={{ top: `${position.top}px`, right: `${position.right}px` }}
+        style={{
+          top: `${position.top}px`,
+          ...(position.left !== undefined
+            ? { left: `${position.left}px` }
+            : { right: `${position.right ?? 0}px` }),
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

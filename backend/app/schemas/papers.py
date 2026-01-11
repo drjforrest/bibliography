@@ -1,8 +1,9 @@
-from datetime import datetime
-from typing import List, Optional, Dict
-from pydantic import BaseModel, field_validator
-from enum import Enum
 import json
+from datetime import datetime
+from enum import Enum
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, field_validator
 
 
 class LiteratureType(str, Enum):
@@ -44,7 +45,9 @@ class PaperResponse(BaseModel):
     # LLM-generated enrichment fields from extraction_metadata
     short_description: Optional[str] = None
     insights: List[str] = []
-    citations: Optional[Dict[str, str]] = None  # Dict of citation styles to formatted citations
+    citations: Optional[Dict[str, str]] = (
+        None  # Dict of citation styles to formatted citations
+    )
 
     @field_validator("keywords", "subject_areas", "tags", "insights", mode="before")
     @classmethod
@@ -60,37 +63,47 @@ class PaperResponse(BaseModel):
         for field in cls.model_fields:
             if hasattr(obj, field):
                 data[field] = getattr(obj, field)
-        
+
         # Fix title for DEVONthink imports
-        if hasattr(obj, 'document') and obj.document:
+        if hasattr(obj, "document") and obj.document:
             document = obj.document
             # Use document title if paper title looks incorrect (e.g., all caps journal name)
-            if hasattr(document, 'title') and document.title:
-                current_title = data.get('title', '')
-                if current_title and current_title.isupper() and len(current_title) > 20:
-                    data['title'] = document.title
-            
+            if hasattr(document, "title") and document.title:
+                current_title = data.get("title", "")
+                if (
+                    current_title
+                    and current_title.isupper()
+                    and len(current_title) > 20
+                ):
+                    data["title"] = document.title
+
             # Extract summary from document_metadata
-            if not data.get('summary'):
-                if hasattr(document, 'document_metadata') and document.document_metadata:
+            if not data.get("summary"):
+                if (
+                    hasattr(document, "document_metadata")
+                    and document.document_metadata
+                ):
                     doc_metadata = document.document_metadata
-                    if isinstance(doc_metadata, dict) and 'devonthink_description' in doc_metadata:
-                        data['summary'] = doc_metadata['devonthink_description']
-        
+                    if (
+                        isinstance(doc_metadata, dict)
+                        and "devonthink_description" in doc_metadata
+                    ):
+                        data["summary"] = doc_metadata["devonthink_description"]
+
         # Also check extraction_metadata.finder_comment as fallback
-        if not data.get('summary') and 'extraction_metadata' in data:
-            metadata = data.get('extraction_metadata', {})
-            if isinstance(metadata, dict) and 'finder_comment' in metadata:
-                data['summary'] = metadata['finder_comment']
+        if not data.get("summary") and "extraction_metadata" in data:
+            metadata = data.get("extraction_metadata", {})
+            if isinstance(metadata, dict) and "finder_comment" in metadata:
+                data["summary"] = metadata["finder_comment"]
 
         # Extract LLM-generated enrichment fields from extraction_metadata
-        if hasattr(obj, 'extraction_metadata') and obj.extraction_metadata:
+        if hasattr(obj, "extraction_metadata") and obj.extraction_metadata:
             metadata = obj.extraction_metadata
             if isinstance(metadata, dict):
-                data['short_description'] = metadata.get('short_description')
+                data["short_description"] = metadata.get("short_description")
                 # Ensure insights is always a list of strings
-                insights_raw = metadata.get('insights', [])
-                
+                insights_raw = metadata.get("insights", [])
+
                 # Parse JSON string if insights is stored as a string
                 if isinstance(insights_raw, str):
                     try:
@@ -103,33 +116,48 @@ class PaperResponse(BaseModel):
                         if cleaned.endswith("```"):
                             cleaned = cleaned[:-3]
                         cleaned = cleaned.strip()
-                        
+
                         insights_raw = json.loads(cleaned)
                     except (json.JSONDecodeError, ValueError) as e:
-                        # If parsing fails, try to extract JSON array from string using regex
-                        import re
-                        json_match = re.search(r'\[.*\]', insights_raw, re.DOTALL)
-                        if json_match:
+                        # If parsing fails, try to extract JSON array from string using bracket matching
+                        # Find the first '[' and match it with the corresponding ']' to handle nested brackets
+                        json_array_str = None
+                        start_idx = insights_raw.find("[")
+                        if start_idx != -1:
+                            bracket_count = 0
+                            for i in range(start_idx, len(insights_raw)):
+                                if insights_raw[i] == "[":
+                                    bracket_count += 1
+                                elif insights_raw[i] == "]":
+                                    bracket_count -= 1
+                                    if bracket_count == 0:
+                                        # Found matching closing bracket
+                                        json_array_str = insights_raw[start_idx : i + 1]
+                                        break
+
+                        if json_array_str:
                             try:
-                                insights_raw = json.loads(json_match.group(0))
+                                insights_raw = json.loads(json_array_str)
                             except json.JSONDecodeError:
                                 insights_raw = []
                         else:
                             insights_raw = []
-                
+
                 if isinstance(insights_raw, dict):
                     # If it's a dict, extract values or convert to list
-                    if 'insights' in insights_raw:
-                        insights_raw = insights_raw['insights']
+                    if "insights" in insights_raw:
+                        insights_raw = insights_raw["insights"]
                     elif isinstance(insights_raw, dict):
-                        insights_raw = list(insights_raw.values()) if insights_raw else []
-                
+                        insights_raw = (
+                            list(insights_raw.values()) if insights_raw else []
+                        )
+
                 if not isinstance(insights_raw, list):
                     insights_raw = []
-                
+
                 # Ensure all items are strings
-                data['insights'] = [str(item) for item in insights_raw if item]
-                data['citations'] = metadata.get('citations', {})
+                data["insights"] = [str(item) for item in insights_raw if item]
+                data["citations"] = metadata.get("citations", {})
 
         return cls(**data)
 
@@ -257,7 +285,7 @@ class AnnotationResponse(BaseModel):
     @classmethod
     def convert_uuid_to_string(cls, v):
         """Convert UUID objects to string representation."""
-        if hasattr(v, '__str__'):
+        if hasattr(v, "__str__"):
             return str(v)
         return v
 
@@ -274,4 +302,6 @@ class PaperWithAnnotationsResponse(BaseModel):
 
     paper: PaperResponse
     annotations: List[AnnotationResponse]
+    user_can_annotate: bool = True
+    user_can_annotate: bool = True
     user_can_annotate: bool = True

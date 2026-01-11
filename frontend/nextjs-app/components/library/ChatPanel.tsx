@@ -103,7 +103,17 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
       });
 
       if (!response.ok) {
-        throw new Error(`Chat request failed: ${response.statusText}`);
+        // Try to get error details from response body
+        let errorText = response.statusText;
+        try {
+          const errorData = await response.text();
+          if (errorData) {
+            errorText = errorData;
+          }
+        } catch (e) {
+          // If we can't read the body, use statusText
+        }
+        throw new Error(errorText);
       }
 
       // Handle streaming response
@@ -114,6 +124,7 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
 
       const decoder = new TextDecoder();
       let assistantContent = '';
+      let hasApiKeyError = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -128,6 +139,12 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 assistantContent += data.content;
+                // Check for API key errors in the content
+                if (data.content.toLowerCase().includes('no api key') || 
+                    data.content.toLowerCase().includes('api key returned') ||
+                    data.content.toLowerCase().includes('missing api key')) {
+                  hasApiKeyError = true;
+                }
               }
             } catch (e) {
               // Ignore parsing errors for now
@@ -136,20 +153,40 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
         }
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: assistantContent,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      // If API key error detected in streaming content, show special message
+      if (hasApiKeyError) {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'No API key returned. Please add your OpenRouter API key in your profile settings to use the chat feature.',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } else {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: assistantContent,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      }
     } catch (error) {
       console.error('Chat error:', error);
+      
+      // Check if error is related to API key
+      const errorMessageText = error instanceof Error ? error.message : String(error);
+      const isApiKeyError = errorMessageText.toLowerCase().includes('no api key') ||
+                           errorMessageText.toLowerCase().includes('api key returned') ||
+                           errorMessageText.toLowerCase().includes('missing api key') ||
+                           errorMessageText.toLowerCase().includes('api key');
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: isApiKeyError
+          ? 'No API key returned. Please add your OpenRouter API key in your profile settings to use the chat feature.'
+          : 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);

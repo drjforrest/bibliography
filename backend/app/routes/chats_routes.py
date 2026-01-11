@@ -1,18 +1,16 @@
 from typing import List
 
 from app.db import Chat, SearchSpace, User, get_async_session
+from app.middleware.clerk_auth import require_clerk_auth
 from app.schemas import AISDKChatRequest, ChatCreate, ChatRead, ChatUpdate
 from app.tasks.stream_connector_search_results import stream_connector_search_results
-from app.users import current_active_user
-from app.middleware.clerk_auth import require_clerk_auth
 from app.utils.check_ownership import check_ownership
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from langchain_core.messages import HumanMessage, AIMessage
-
 
 router = APIRouter()
 
@@ -88,7 +86,7 @@ async def handle_chat_data(
 async def create_chat(
     chat: ChatCreate,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
 ):
     try:
         await check_ownership(session, SearchSpace, chat.search_space_id, user)
@@ -124,7 +122,7 @@ async def read_chats(
     limit: int = 100,
     search_space_id: int = None,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
 ):
     try:
         query = select(Chat).join(SearchSpace).filter(SearchSpace.user_id == user.id)
@@ -149,7 +147,7 @@ async def read_chats(
 async def read_chat(
     chat_id: int,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
 ):
     try:
         result = await session.execute(
@@ -180,7 +178,7 @@ async def update_chat(
     chat_id: int,
     chat_update: ChatUpdate,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
 ):
     try:
         db_chat = await read_chat(chat_id, session, user)
@@ -215,7 +213,7 @@ async def update_chat(
 async def delete_chat(
     chat_id: int,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
 ):
     try:
         db_chat = await read_chat(chat_id, session, user)
@@ -308,4 +306,6 @@ async def delete_chat(
 #             "Surfsense is A Personal NotebookLM and Perplexity-like AI Assistant for Everyone. Research and Never forget Anything. [1] [3]"
 #         ]
 #     }
+# ]
+# ]
 # ]

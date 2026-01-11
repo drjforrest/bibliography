@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import type { Annotation } from '@/types';
+import { useState } from 'react';
 import AnnotationCard from './AnnotationCard';
 
 interface AnnotationSidebarProps {
@@ -10,7 +10,7 @@ interface AnnotationSidebarProps {
   paperSummary?: string;
   shortDescription?: string;
   laySummary?: string;
-  insights?: string[];
+  insights?: string | string[];
 }
 
 export default function AnnotationSidebar({ annotations, paperTitle, paperSummary, shortDescription, laySummary, insights }: AnnotationSidebarProps) {
@@ -27,14 +27,15 @@ export default function AnnotationSidebar({ annotations, paperTitle, paperSummar
         const parsed = JSON.parse(insights);
         return Array.isArray(parsed) ? parsed : [];
       } catch (e) {
+        console.warn('Failed to parse insights as JSON:', e);
         // Try to extract array from string using regex
-        const match = insights.match(/\[.*\]/s);
+        const match = insights.match(/\[.*?\]/s);
         if (match) {
           try {
             const parsed = JSON.parse(match[0]);
             return Array.isArray(parsed) ? parsed : [];
           } catch (e2) {
-            console.warn('Failed to parse insights:', e2);
+            console.warn('Failed to parse insights from regex match:', e2);
             return [];
           }
         }
@@ -95,7 +96,7 @@ export default function AnnotationSidebar({ annotations, paperTitle, paperSummar
         </div>
 
         {/* Key Insights Section (LLM-generated) */}
-        {parsedInsights && parsedInsights.length > 0 && (
+        {parsedInsights.length > 0 && (
           <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">

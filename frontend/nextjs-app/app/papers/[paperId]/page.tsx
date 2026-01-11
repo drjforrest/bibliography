@@ -58,12 +58,13 @@ export default function PaperAnnotationPage() {
         ]);
 
         // Parse insights if they come as a JSON string
+        // TODO: Investigate and fix the backend so insights are returned as an actual array rather than a JSON string
         if (paperData?.insights && typeof paperData.insights === 'string') {
           try {
             paperData.insights = JSON.parse(paperData.insights);
           } catch (e) {
-            // If parsing fails, try to extract array from string using regex
-            const match = paperData.insights.match(/\[.*\]/s);
+            // If parsing fails, try to extract array from string using regex (non-greedy to match first array)
+            const match = paperData.insights.match(/\[.*?\]/s);
             if (match) {
               try {
                 paperData.insights = JSON.parse(match[0]);
