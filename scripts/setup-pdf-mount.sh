@@ -69,14 +69,12 @@ print_status "SSH connection successful!"
 
 # Mount via SSHFS
 print_status "Mounting PDF directory from dev machine..."
-$SSHFS_BIN ${DEV_USER}@${DEV_HOST}:${DEV_PDF_PATH} ${MOUNT_POINT} \
+if $SSHFS_BIN ${DEV_USER}@${DEV_HOST}:${DEV_PDF_PATH} ${MOUNT_POINT} \
     -o follow_symlinks \
     -o auto_cache \
     -o reconnect \
     -o ServerAliveInterval=15 \
-    -o ServerAliveCountMax=3
-
-if [ $? -eq 0 ]; then
+    -o ServerAliveCountMax=3; then
     print_status "✓ PDF directory mounted successfully!"
     print_status "Mount point: $MOUNT_POINT"
     print_status ""

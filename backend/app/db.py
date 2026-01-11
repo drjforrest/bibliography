@@ -14,6 +14,8 @@ from sqlalchemy import Float, ForeignKey, Integer, String, Table, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, relationship
+from sqlalchemy_utils import EncryptedType
+from sqlalchemy_utils.types.encrypted.encrypted_type import AesEngine
 
 if config.AUTH_TYPE == "GOOGLE":
     from fastapi_users.db import (
@@ -608,9 +610,19 @@ if config.AUTH_TYPE == "GOOGLE":
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
         # AI API Keys for BYOK (Bring Your Own Key) functionality
-        openrouter_api_key = Column(String, nullable=True)  # For LLM script generation
-        openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
-        elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
+        # Encrypted at rest using AES encryption for security
+        openrouter_api_key = Column(
+            EncryptedType(String, config.ENCRYPTION_KEY, AesEngine, 'pkcs5') if config.ENCRYPTION_KEY else String,
+            nullable=True
+        )  # For LLM script generation
+        openai_api_key = Column(
+            EncryptedType(String, config.ENCRYPTION_KEY, AesEngine, 'pkcs5') if config.ENCRYPTION_KEY else String,
+            nullable=True
+        )  # For OpenAI TTS
+        elevenlabs_api_key = Column(
+            EncryptedType(String, config.ENCRYPTION_KEY, AesEngine, 'pkcs5') if config.ENCRYPTION_KEY else String,
+            nullable=True
+        )  # For ElevenLabs TTS
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)
@@ -653,9 +665,19 @@ else:
 
     class User(SQLAlchemyBaseUserTableUUID, Base):
         # AI API Keys for BYOK (Bring Your Own Key) functionality
-        openrouter_api_key = Column(String, nullable=True)  # For LLM script generation
-        openai_api_key = Column(String, nullable=True)  # For OpenAI TTS
-        elevenlabs_api_key = Column(String, nullable=True)  # For ElevenLabs TTS
+        # Encrypted at rest using AES encryption for security
+        openrouter_api_key = Column(
+            EncryptedType(String, config.ENCRYPTION_KEY, AesEngine, 'pkcs5') if config.ENCRYPTION_KEY else String,
+            nullable=True
+        )  # For LLM script generation
+        openai_api_key = Column(
+            EncryptedType(String, config.ENCRYPTION_KEY, AesEngine, 'pkcs5') if config.ENCRYPTION_KEY else String,
+            nullable=True
+        )  # For OpenAI TTS
+        elevenlabs_api_key = Column(
+            EncryptedType(String, config.ENCRYPTION_KEY, AesEngine, 'pkcs5') if config.ENCRYPTION_KEY else String,
+            nullable=True
+        )  # For ElevenLabs TTS
 
         # Clerk integration
         clerk_user_id = Column(String(255), nullable=True, unique=True, index=True)

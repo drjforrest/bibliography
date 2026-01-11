@@ -52,6 +52,7 @@ Requires PostgreSQL with pgvector extension. Create `.env` file in backend direc
 ```
 DATABASE_URL=postgresql+asyncpg://username:password@localhost/bibliography_db
 SECRET_KEY=your-secret-key-here
+ENCRYPTION_KEY=generate-with-python-secrets-module
 AUTH_TYPE=basic
 EMBEDDING_MODEL=openai://nomic-embed-text
 OPENAI_API_BASE=http://localhost:11434/v1
@@ -93,6 +94,44 @@ Key models in `app/db.py`:
 ## Authentication
 
 Uses fastapi-users for authentication. Supports basic auth by default, configurable for Google OAuth via `AUTH_TYPE` environment variable.
+
+## Security
+
+### API Key Encryption at Rest
+
+User API keys (OpenRouter, OpenAI, ElevenLabs) are encrypted at rest in the database using AES encryption:
+
+- **Encryption Library**: `sqlalchemy-utils` with `cryptography` backend
+- **Algorithm**: AES with PKCS5 padding
+- **Implementation**: Application-level encryption (transparent to API code)
+- **Setup**: Requires `ENCRYPTION_KEY` in environment configuration
+
+**Documentation**: See `backend/docs/ENCRYPTION_SETUP.md` for:
+- Security architecture and implementation details
+- Step-by-step setup instructions
+- Database migration scripts
+- Key management best practices
+- Testing and verification procedures
+
+**Quick Start**:
+```bash
+# Generate encryption key
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Add to .env
+echo "ENCRYPTION_KEY=<your-generated-key>" >> backend/.env
+
+# Migrate existing data (if any)
+python backend/scripts/migrate_encrypt_api_keys.py
+
+# Verify encryption
+python backend/scripts/test_encryption.py
+```
+
+**Important**:
+- Store encryption key securely (never commit to git)
+- Backup the key - lost keys mean lost data
+- Use different keys for dev/staging/production
 
 ## API Structure
 

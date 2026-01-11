@@ -58,7 +58,7 @@ class VisualAbstractService:
 
         logger.info(
             f"Visual Abstract Service initialized - Using: "
-            f"{'OpenAI' if self.use_openai else 'OpenRouter'}"
+            f"{'OpenAI' if self.use_openai else 'OpenRouter' if self.use_openrouter else 'No API configured'}"
         )
 
     def _get_storage_path(self, paper_id: int) -> Path:
@@ -71,7 +71,8 @@ class VisualAbstractService:
 
     async def _generate_with_openai(self, prompt: str) -> bytes:
         """Generate image using OpenAI DALL-E."""
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=120)  # 2 minutes for image generation
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             headers = {
                 "Authorization": f"Bearer {self.openai_api_key}",
                 "Content-Type": "application/json",
@@ -233,7 +234,7 @@ Create a professional, engaging visual abstract that would increase engagement a
             raise ValueError(f"Paper {paper_id} not found")
 
         logger.info(
-            f"Generating visual abstract for paper {paper_id}: {paper.title[:60]}"
+            f"Generating visual abstract for paper {paper_id}: {(paper.title or 'Untitled')[:60]}"
         )
 
         # Check if API keys are available

@@ -1,8 +1,9 @@
 # Podcast Generation
 
-## What to Built First
+## What to Build First
 
 ### 1. Database Foundation (Completed Earlier)
+
 - **Podcast table** with full metadata tracking
 - User API keys (openrouter, openai, elevenlabs)
 - TTS optimization preferences
@@ -11,6 +12,7 @@
 ### 2. Backend Services
 
 **TTSService** (`backend/app/services/tts_service.py`)
+
 - Multi-provider support:
   - **Kokoro**: Free, local (planned)
   - **OpenAI TTS**: Pay-per-use ($15/1M chars)
@@ -20,6 +22,7 @@
 - Auto-optimization mode
 
 **PodcastGenerationService** (`backend/app/services/podcast_generation_service.py`)
+
 - Single-paper podcast generation
 - Multi-paper comparative podcasts
 - OpenRouter LLM integration
@@ -30,6 +33,7 @@
 ### 3. API Routes
 
 **Endpoints** (`backend/app/routes/podcasts_routes.py`)
+
 - `POST /api/v2/podcasts/generate` - Generate from single paper
 - `POST /api/v2/podcasts/generate-multi` - Generate from multiple papers
 - `GET /api/v2/podcasts` - List user's podcasts
@@ -38,6 +42,7 @@
 - `GET /api/v2/podcasts/{id}/download` - Stream audio file
 
 **Features:**
+
 - Full Clerk authentication
 - API key validation
 - Error handling
@@ -46,6 +51,7 @@
 ### 4. Frontend UI
 
 **GenerateContentPanel** (`components/papers/GenerateContentPanel.tsx`)
+
 - Beautiful gradient-styled buttons for each content type
 - Real API integration with authentication
 - Loading states with progress indicators
@@ -55,6 +61,7 @@
 - Error handling
 
 **Podcast API Client** (`lib/podcast-api.ts`)
+
 - TypeScript client for all v2 endpoints
 - Type-safe request/response models
 - Token management
@@ -127,41 +134,48 @@ Frontend displays audio player
 Users need to configure in **Settings** (future UI):
 
 1. **OpenRouter API Key** (Required)
+
    - Used for LLM script generation
    - Get from: https://openrouter.ai
    - Models: Claude Sonnet 4, GPT-4o, etc.
 
 2. **TTS Provider Key** (One of these)
+
    - **Free Option**: Kokoro (no key needed, local)
    - **Pay-per-use**: OpenAI API key ($15/1M chars)
    - **Subscription**: ElevenLabs API key ($5-99/month)
 
-   ---
+   ***
 
 ## 2nd Stage of Implementation
 
 ### Kokoro TTS
+
 - Local model integration pending
 - Currently throws NotImplementedError
 - Requires local model deployment on HERO server
 
 ### Settings UI
+
 - API key management interface
 - Model selector dropdown
 - TTS provider preferences
 - Need to add to `/profile` page
 
 ### Other Content Types
+
 - Summary generation (database ready, service pending)
 - Infographic creation (database ready, service pending)
 - Slide deck generation (database ready, service pending)
 
 ### Multi-Paper Podcast UI
+
 - Bulk selection in library/search-spaces
 - "Generate from Selection" button
 - UI exists in plan, not yet built
 
 ### Generated Content Library
+
 - `/generated` page to view all podcasts
 - Tabs for different content types
 - Search and filtering
@@ -172,9 +186,11 @@ Users need to configure in **Settings** (future UI):
 ## Next Steps
 
 ### Priority 1: Settings UI
+
 **Goal**: Let users add API keys
 
 Create/update `frontend/nextjs-app/app/profile/page.tsx`:
+
 - OpenRouter API key field
 - Default model selector
 - TTS provider dropdown
@@ -182,6 +198,7 @@ Create/update `frontend/nextjs-app/app/profile/page.tsx`:
 - ElevenLabs API key (optional)
 
 ### Priority 2: Test End-to-End
+
 **Goal**: Generate a real podcast
 
 1. Add OpenRouter key to database manually (temp)
@@ -190,25 +207,31 @@ Create/update `frontend/nextjs-app/app/profile/page.tsx`:
 4. Verify audio plays
 
 ### Priority 3: Kokoro Implementation
+
 **Goal**: Free TTS option
 
 Implement `_generate_kokoro()` in TTSService:
+
 - Deploy Kokoro model on HERO server
 - Create local inference endpoint
 - Update service to call local model
 
 ### Priority 4: Multi-Paper UI
+
 **Goal**: Bulk generation
 
 Update library/search-space views:
+
 - Add selection checkboxes
 - "Generate from Selection" dropdown
 - Wire to `POST /api/v2/podcasts/generate-multi`
 
 ### Priority 5: Generated Content Library
+
 **Goal**: View all generated content
 
 Create `frontend/nextjs-app/app/generated/page.tsx`:
+
 - Tabs: Podcasts | Summaries | Infographics | Slides
 - Grid of cards for each item
 - Play/download/delete actions
@@ -218,18 +241,22 @@ Create `frontend/nextjs-app/app/generated/page.tsx`:
 ## Files Created/Modified
 
 ### Backend (New)
+
 - `backend/app/services/tts_service.py` (268 lines)
 - `backend/app/services/podcast_generation_service.py` (295 lines)
 - `backend/app/routes/podcasts_routes.py` (386 lines)
 
 ### Frontend (New)
+
 - `frontend/nextjs-app/lib/podcast-api.ts` (150 lines)
 
 ### Frontend (Modified)
+
 - `frontend/nextjs-app/components/papers/GenerateContentPanel.tsx` (240 lines)
 - `frontend/nextjs-app/app/papers/[paperId]/page.tsx` (integrated panel)
 
 ### Documentation
+
 - `docs/UI_INTEGRATION_PLAN.md` (comprehensive UI guide)
 - `docs/SERVICE_PROVISION_STRATEGY.md` (BYOK architecture)
 - `docs/OPENROUTER_MODEL_OPTIONS.md` (model recommendations)
@@ -244,6 +271,7 @@ Create `frontend/nextjs-app/app/generated/page.tsx`:
 **Status**: ✅ All changes pushed to GitHub
 
 Latest commits:
+
 1. `961a29b` - feat: Connect frontend to podcast generation API
 2. `a648dbe` - feat: Add podcast generation backend services
 3. `a4ed235` - feat: Add GenerateContentPanel UI component
@@ -308,6 +336,7 @@ I've completed a comprehensive research and created **5 detailed implementation 
 
 1. **`IMPLEMENTATION_SUMMARY.md`** - Executive overview with timelines, costs, and quick decisions
 2. **`implementation_guide.md`** - 822-line detailed guide with:
+
    - Complete PostgreSQL schema design
    - Python project structure
    - Code examples for all 5 core modules
@@ -317,12 +346,14 @@ I've completed a comprehensive research and created **5 detailed implementation 
    - Cost estimates
 
 3. **`prompts_and_config.md`** - 730 lines of:
+
    - Detailed system prompts for all 3 chains
    - Three persona configurations (Academic, Policy, General Audience)
    - Configuration templates and usage examples
    - Configuration classes for managing settings
 
 4. **`podcast_generation_architecture.md`** - Technical foundations covering:
+
    - Best practice architectures
    - TTS provider comparison table
    - Key implementation learnings
@@ -330,7 +361,7 @@ I've completed a comprehensive research and created **5 detailed implementation 
 
 5. **`QUICK_REFERENCE.md`** - Quick lookup guide with checklists, code templates, and decision matrices
 
-***
+---
 
 ## 🎯 Core Architecture Decision
 
@@ -339,7 +370,7 @@ I've completed a comprehensive research and created **5 detailed implementation 
 ```
 Planning Chain ($0.08) → Extract structure
     ↓
-Dialogue Generation Chain ($0.20) → Create 3-speaker script
+Dialogue Generation Chain ($0.20) → Create 2-speaker script (Alex & Jordan)
     ↓
 Enhancement Chain ($0.06) → Polish transitions
     ↓
@@ -350,51 +381,67 @@ Assembly & Storage
 
 **Result**: ~$0.47/paper, 2-5 minutes processing, high-quality dialogue
 
-***
+---
 
-## 🗣️ Multi-Speaker Personas (Recommended)
+## 🗣️ Current Implementation: Two-Host Architecture
+
+The current implementation uses **2 AI hosts**:
+
+1. **Alex** - Expert guide who introduces topics and provides context
+2. **Jordan** - Analyst who asks critical questions and discusses implications
+
+This architecture is implemented in `backend/app/services/podcast_generation_service.py` and generates conversational scripts with natural dialogue between these two hosts.
+
+---
+
+## 🔬 Research: Three-Persona Architecture (Future Enhancement)
+
+Research suggests a **3-persona approach** may provide optimal dialogue dynamics:
 
 1. **Host (Dr. Amara)** - Expert guide, sets context
 2. **Analyst (Dr. Sam)** - Critical thinker, questions methodology
 3. **Clarifier (Amina)** - Explains concepts, stakeholder perspective
 
-Each gets distinct ElevenLabs voice for natural, engaging dialogue.
+_Note: This is a research recommendation for future enhancement, not the current implementation._
 
-***
+---
 
 ## 💾 Technology Stack
 
-| Component | Recommendation | Why |
-|-----------|---|---|
-| **LLM** | OpenAI GPT-4 Turbo | Best quality for dialogue generation |
-| **TTS** | ElevenLabs (primary), OpenAI (fallback) | Better quality + speed; cost-control option |
-| **PDF Extraction** | Docling | Modern, accurate text extraction |
-| **Database** | PostgreSQL (already using) | Relational + full-text search |
-| **Storage** | S3 (audio/transcripts) + PostgreSQL (metadata) | Scalable, cost-effective |
-| **Task Queue** | Celery + Redis | Async processing without blocking |
-| **Framework** | FastAPI | Modern, async-ready |
+| Component          | Recommendation                                 | Why                                         |
+| ------------------ | ---------------------------------------------- | ------------------------------------------- |
+| **LLM**            | OpenAI GPT-4 Turbo                             | Best quality for dialogue generation        |
+| **TTS**            | ElevenLabs (primary), OpenAI (fallback)        | Better quality + speed; cost-control option |
+| **PDF Extraction** | Docling                                        | Modern, accurate text extraction            |
+| **Database**       | PostgreSQL (already using)                     | Relational + full-text search               |
+| **Storage**        | S3 (audio/transcripts) + PostgreSQL (metadata) | Scalable, cost-effective                    |
+| **Task Queue**     | Celery + Redis                                 | Async processing without blocking           |
+| **Framework**      | FastAPI                                        | Modern, async-ready                         |
 
-***
+---
 
 ## 💰 Cost Estimates
 
 **Per Paper**: ~$0.47 (with ElevenLabs TTS)
+
 - LLM chains: $0.34
 - TTS: $0.15
 - Storage: negligible
 
 **Monthly (100 papers)**:
+
 - LLM: $30
 - TTS: $99 (ElevenLabs Pro plan)
 - Database: $30
 - Hosting: $100
 - **Total**: ~$275/month
 
-***
+---
 
 ## 📊 Database Design
 
 **Key Tables**:
+
 - `papers` - Metadata + extracted text (searchable via full-text index)
 - `podcasts` - One per paper, tracks generation status & S3 paths
 - `dialogue_segments` - Individual speaker turns
@@ -403,19 +450,20 @@ Each gets distinct ElevenLabs voice for natural, engaging dialogue.
 
 Audio files stored in S3, not PostgreSQL (for scalability).
 
-***
+---
 
 ## ✨ Key Implementation Insights from Research
 
 1. **Don't use complex agent frameworks** - Simple LangChain chains sufficient
-2. **Three personas optimal** - Creates dynamic dialogue without complexity
-3. **Token optimization critical** - Design chains for 3-5 targeted API calls max
-4. **ElevenLabs faster than OpenAI** - 75ms vs 200ms latency
-5. **Store audio in S3, metadata in PostgreSQL** - Database stays lean
-6. **Handle references separately** - Exclude from dialogue generation
-7. **Transcript script before TTS** - Significantly improves consistency
+2. **Two-persona architecture implemented** - Current system uses Alex & Jordan for engaging dialogue
+3. **Research suggests three personas may be optimal** - Future enhancement opportunity (Dr. Amara, Dr. Sam, Amina)
+4. **Token optimization critical** - Design chains for 3-5 targeted API calls max
+5. **ElevenLabs faster than OpenAI** - 75ms vs 200ms latency
+6. **Store audio in S3, metadata in PostgreSQL** - Database stays lean
+7. **Handle references separately** - Exclude from dialogue generation
+8. **Transcript script before TTS** - Significantly improves consistency
 
-***
+---
 
 ## 🚀 Next Steps
 
@@ -426,7 +474,7 @@ Audio files stored in S3, not PostgreSQL (for scalability).
 5. **Test with real papers** - Iterate on prompts based on output
 6. **Deploy with background processing** - Use Celery for async job queue
 
-***
+---
 
 All documents are saved in your workspace and ready for reference during implementation. The architecture is production-ready and balances quality (engaging dialogue), cost efficiency, and your existing Python/PostgreSQL stack.
 

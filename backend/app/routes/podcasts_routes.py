@@ -4,9 +4,9 @@ Podcast API Routes for generating and managing podcasts from scientific papers.
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import List, Optional
-from uuid import UUID
 
 from app.db import (
     Document,
@@ -19,7 +19,7 @@ from app.db import (
 from app.middleware.clerk_auth import require_clerk_auth
 from app.services.podcast_generation_service import PodcastGenerationService
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +28,48 @@ from sqlalchemy.orm import selectinload
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/podcasts", tags=["podcasts"])
+
+
+def sanitize_filename(title: str, max_length: int = 200) -> str:
+    """
+    Sanitize a title for use as a filename.
+
+    Removes or replaces unsafe characters:
+    - Null bytes
+    - Path separators (/, \)
+    - Parent directory references (..)
+    - Limits length to prevent filesystem issues
+
+    Args:
+        title: The title to sanitize
+        max_length: Maximum length for the sanitized filename (default: 200)
+
+    Returns:
+        Sanitized filename-safe string
+    """
+    if not title:
+        return ""
+
+    # Remove null bytes
+    sanitized = title.replace("\x00", "")
+
+    # Replace path separators with underscores
+    sanitized = sanitized.replace("/", "_").replace("\\", "_")
+
+    # Remove parent directory references
+    sanitized = sanitized.replace("..", "")
+
+    # Remove any remaining problematic characters (control chars, etc.)
+    sanitized = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", sanitized)
+
+    # Strip whitespace
+    sanitized = sanitized.strip()
+
+    # Limit length
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length]
+
+    return sanitized
 
 
 # Request/Response Schemas
@@ -94,11 +136,12 @@ async def get_user_api_keys(user: User, tts_provider: str = "openai") -> dict:
     elif tts_provider == "elevenlabs":
         keys["openai_api_key"] = None  # Not needed for ElevenLabs TTS
         keys["elevenlabs_api_key"] = user.elevenlabs_api_key
-    else:
-        # Default to OpenAI if provider not recognized
-        keys["openai_api_key"] = user.openai_api_key
+    elif tts_provider == "kokoro":
+        # Kokoro uses local TTS - no API key needed
+        keys["openai_api_key"] = None
         keys["elevenlabs_api_key"] = None
-
+    else:
+        raise ValueError(f"Unsupported TTS provider: {tts_provider}")
     return keys
 
 
@@ -208,8 +251,6 @@ async def generate_podcast(
                 raise HTTPException(
                     status_code=500, detail="Failed to generate podcast"
                 )
-
-            await podcast_service.close()
 
             return PodcastResponse(
                 id=podcast.id,
@@ -412,18 +453,19 @@ async def download_podcast(
                 status_code=404, detail=f"Audio file not found for podcast {podcast_id}"
             )
 
+        # Sanitize the title for filename use
+        sanitized_title = sanitize_filename(podcast.title) if podcast.title else ""
+
+        # Fall back to podcast ID if sanitized title is empty
+        if not sanitized_title:
+            sanitized_title = f"podcast_{podcast.id}"
+
+        filename = f"{sanitized_title}.mp3"
+
         return FileResponse(
             path=str(file_path),
-            filename=f"{podcast.title}.mp3",
+            filename=filename,
             media_type="audio/mpeg",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to download podcast: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to download podcast: {str(e)}"
         )
 
     except HTTPException:

@@ -57,9 +57,7 @@ fi
 
 # Create database
 print_status "Creating database '$DB_NAME'..."
-psql -h localhost -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;"
-
-if [ $? -eq 0 ]; then
+if psql -h localhost -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;"; then
     print_status "✓ Database created successfully"
 else
     print_error "Failed to create database"
@@ -68,9 +66,7 @@ fi
 
 # Install pgvector extension
 print_status "Installing pgvector extension..."
-psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-if [ $? -eq 0 ]; then
+if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS vector;"; then
     print_status "✓ pgvector extension installed"
 else
     print_error "Failed to install pgvector extension"
@@ -100,9 +96,7 @@ fi
 # Run migrations
 if [ -d "alembic" ]; then
     print_status "Running database migrations..."
-    alembic upgrade head
-    
-    if [ $? -eq 0 ]; then
+    if alembic upgrade head; then
         print_status "✓ Database schema created successfully"
     else
         print_error "Failed to run migrations"
@@ -128,9 +122,7 @@ async def init_db():
 asyncio.run(init_db())
 PYEOF
 
-    python /tmp/init_db.py
-    
-    if [ $? -eq 0 ]; then
+    if python /tmp/init_db.py; then
         print_status "✓ Database tables created"
         rm /tmp/init_db.py
     else

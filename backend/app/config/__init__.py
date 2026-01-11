@@ -306,6 +306,17 @@ class Config:
     # OAuth JWT
     SECRET_KEY = os.getenv("SECRET_KEY")
 
+    # Database encryption key for sensitive data (API keys, credentials)
+    # IMPORTANT: Generate a secure key and store in .env file
+    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+    ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+    if not ENCRYPTION_KEY:
+        logger.warning(
+            "ENCRYPTION_KEY not set - user API keys will not be encrypted at rest. "
+            "This is a security risk in production. Generate a key with: "
+            "python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
+
     # Clerk Authentication
     # Note: Clerk exports CLERK_SECRET_KEY, which we use for backend API calls
     CLERK_API_KEY = os.getenv("CLERK_SECRET_KEY")  # Clerk API key for backend

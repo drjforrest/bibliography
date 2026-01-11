@@ -8,11 +8,11 @@ Supports:
 """
 
 import logging
-import os
 import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 
+import aiofiles
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -154,8 +154,8 @@ class TTSService:
 
                 # Save audio file
                 audio_data = await response.read()
-                with open(output_path, "wb") as f:
-                    f.write(audio_data)
+                async with aiofiles.open(output_path, "wb") as f:
+                    await f.write(audio_data)
 
                 # Estimate duration (rough estimate: ~150 words per minute, average 5 chars per word)
                 # OpenAI TTS typically generates ~150-160 words per minute
@@ -216,8 +216,8 @@ class TTSService:
 
                 # Save audio file
                 audio_data = await response.read()
-                with open(output_path, "wb") as f:
-                    f.write(audio_data)
+                async with aiofiles.open(output_path, "wb") as f:
+                    await f.write(audio_data)
 
                 # Estimate duration (ElevenLabs is typically faster, ~160-170 words per minute)
                 word_count = len(text.split())

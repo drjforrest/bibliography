@@ -100,8 +100,8 @@ class PodcastGenerationService:
             headers["Authorization"] = f"Bearer {self.api_key}"
             if self.openrouter_api_key:
                 # OpenRouter also requires HTTP-Referer header
-                headers["HTTP-Referer"] = "https://hero-evidence-library"
-                headers["X-Title"] = "Hero Evidence Library Podcast Generator"
+                headers["HTTP-Referer"] = "https://library.counterforce-hero.tech"
+                headers["X-Title"] = "HERO Evidence Library"
         return headers
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -188,7 +188,11 @@ class PodcastGenerationService:
 
             # Include full text (truncated for context)
             document = getattr(paper, "document", None)
-            if document is not None and hasattr(document, "content") and document.content:
+            if (
+                document is not None
+                and hasattr(document, "content")
+                and document.content
+            ):
                 # Use first 8000 chars to leave room for script generation
                 content_parts.append(f"\nFull Text:\n{document.content[:8000]}")
 
@@ -248,7 +252,7 @@ Do not include stage directions, sound effects, or metadata. Only include the di
 
         user_prompt = f"""Please create a podcast script based on this scientific paper:
 
-{paper_data['content']}
+{paper_data["content"]}
 
 Generate a conversational script between Alex and Jordan discussing this paper."""
 
@@ -300,7 +304,9 @@ Generate a conversational script between Alex and Jordan discussing this paper."
 
             try:
                 output_filename = f"podcast_{paper_id}_{uuid.uuid4().hex[:8]}"
-                audio_path, duration = await tts_service.generate(script, output_filename)
+                audio_path, duration = await tts_service.generate(
+                    script, output_filename
+                )
                 await tts_service.close()
 
                 # Step 3: Parse script into transcript format

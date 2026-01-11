@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
+from app.config import config
 from app.db import ScientificPaper, User, VisualAbstract, get_async_session
 from app.middleware.clerk_auth import require_clerk_auth
 from app.services.visual_abstract_service import VisualAbstractService
@@ -179,7 +180,7 @@ async def generate_visual_abstract(
         except Exception as e:
             logger.error(f"Failed to generate visual abstract: {str(e)}")
             raise HTTPException(
-                status_code=500, detail=f"Failed to generate visual abstract: {str(e)}"
+                status_code=500, detail="Failed to generate visual abstract"
             )
 
     except HTTPException:
@@ -187,7 +188,7 @@ async def generate_visual_abstract(
     except Exception as e:
         logger.error(f"Unexpected error generating visual abstract: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate visual abstract: {str(e)}"
+            status_code=500, detail="Failed to generate visual abstract"
         )
 
 
@@ -333,15 +334,49 @@ async def get_visual_abstract_image(
                 detail=f"Visual abstract {visual_abstract_id} not found",
             )
 
-        file_path = Path(visual_abstract.file_path)
-        if not file_path.exists():
+        # Get base directory for visual abstracts (same logic as service)
+        base_dir = Path(
+            getattr(config, "VISUAL_ABSTRACT_STORAGE_ROOT", "./data/visual_abstracts")
+        ).resolve()
+
+        # Resolve the stored path to prevent path traversal attacks
+        resolved_path = Path(visual_abstract.file_path).resolve()
+
+        # Verify the resolved path is inside the expected base directory
+        try:
+            # Use os.path.commonpath to verify the path is within base_dir
+            common_path = os.path.commonpath([str(base_dir), str(resolved_path)])
+            if common_path != str(base_dir):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: Path traversal attempt detected",
+                )
+        except ValueError:
+            # commonpath raises ValueError if paths are on different drives (Windows)
+            # Fallback: check if resolved path starts with base_dir
+            resolved_path_str = str(resolved_path)
+            base_dir_str = str(base_dir) + os.sep
+            if not resolved_path_str.startswith(base_dir_str):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: Path traversal attempt detected",
+                )
+
+        # Ensure the file exists and is a file (not a directory)
+        if not resolved_path.exists():
             raise HTTPException(
                 status_code=404,
                 detail=f"Image file not found for visual abstract {visual_abstract_id}",
             )
 
+        if not resolved_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Path is not a file for visual abstract {visual_abstract_id}",
+            )
+
         return FileResponse(
-            path=str(file_path),
+            path=str(resolved_path),
             filename=f"visual_abstract_{visual_abstract_id}.png",
             media_type="image/png",
         )
@@ -421,15 +456,18 @@ async def delete_visual_abstract(
                 detail=f"Visual abstract {visual_abstract_id} not found",
             )
 
-        # Delete image file
-        file_path = Path(visual_abstract.file_path)
-        if file_path.exists():
-            file_path.unlink()
-            logger.info(f"Deleted image file: {file_path}")
-
-        # Delete database record
+        # Delete database record first
         await session.delete(visual_abstract)
         await session.commit()
+
+        # After successful commit, attempt to delete image file
+        file_path = Path(visual_abstract.file_path)
+        if file_path.exists():
+            try:
+                file_path.unlink()
+                logger.info(f"Deleted image file: {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete image file {file_path}: {e}")
 
         return {"message": f"Visual abstract {visual_abstract_id} deleted successfully"}
 

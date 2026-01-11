@@ -72,9 +72,7 @@ print_success "Plist file installed to $LAUNCHD_PLIST"
 
 # Load the service
 print_info "Loading launchd service..."
-launchctl load "$LAUNCHD_PLIST"
-
-if [ $? -eq 0 ]; then
+if launchctl load "$LAUNCHD_PLIST"; then
     print_success "Service loaded successfully"
 else
     print_error "Failed to load service"

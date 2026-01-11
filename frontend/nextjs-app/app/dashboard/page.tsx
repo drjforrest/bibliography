@@ -4,16 +4,17 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import LibraryGrowthChart from "@/components/dashboard/LibraryGrowthChart";
 import PapersByTopicChart from "@/components/dashboard/PapersByTopicChart";
 import Sidebar from "@/components/layout/Sidebar";
-import { api, createAuthenticatedClient } from "@/lib/api";
+import { useApi } from "@/lib/api";
 import type { DashboardStats, LiteratureTypeStats, Topic } from "@/types";
 import { LITERATURE_TYPE_COLORS, LITERATURE_TYPE_LABELS, LiteratureType } from "@/types";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const api = useApi();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,9 +24,7 @@ export default function DashboardPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [visualAbstracts, setVisualAbstracts] = useState<any[]>([]);
   const [visualAbstractsLoading, setVisualAbstractsLoading] = useState(false);
-
-  // Create authenticated API client
-  const authenticatedApi = useMemo(() => createAuthenticatedClient(getToken), [getToken]);
+  const [visualAbstractsError, setVisualAbstractsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) {
@@ -39,10 +38,10 @@ export default function DashboardPage() {
         setError(null);
 
         const [dashboardStats, tagsData, activityData, notificationsData] = await Promise.all([
-          authenticatedApi.get('/api/v1/dashboard/user').then(r => r.data),
-          authenticatedApi.get('/api/v1/tags/hierarchy').then(r => r.data),
-          authenticatedApi.get('/api/v1/dashboard/activity', { params: { limit: 10 } }).then(r => r.data),
-          authenticatedApi.get('/api/v1/notifications', { params: { unread_only: false, limit: 10, offset: 0 } }).then(r => r.data),
+          api.getDashboardStats(),
+          api.getTagHierarchy(),
+          api.getActivityFeed(10),
+          api.getNotifications(false, 10, 0),
         ]);
 
         setStats(dashboardStats);
@@ -52,11 +51,13 @@ export default function DashboardPage() {
 
         // Fetch visual abstracts
         setVisualAbstractsLoading(true);
+        setVisualAbstractsError(null);
         try {
-          const visualAbstractsData = await authenticatedApi.listVisualAbstracts(10, 0);
+          const visualAbstractsData = await api.listVisualAbstracts(10, 0);
           setVisualAbstracts(visualAbstractsData.visual_abstracts || []);
         } catch (err) {
           console.error('Failed to fetch visual abstracts:', err);
+          setVisualAbstractsError('Failed to load visual abstracts. Please try again later.');
         } finally {
           setVisualAbstractsLoading(false);
         }
@@ -80,7 +81,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [isLoaded, isSignedIn, authenticatedApi]);
+  }, [isLoaded, isSignedIn, api]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
@@ -119,11 +120,21 @@ export default function DashboardPage() {
     return formatDate(dateString);
   };
 
+  const escapeHtml = (unsafe: string) => {
+    if (!unsafe) return '';
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
   const handleMarkNotificationAsRead = async (notificationId: number) => {
     try {
-      await authenticatedApi.post(`/api/v1/notifications/${notificationId}/read`);
+      await api.markNotificationAsRead(notificationId);
       // Refresh notifications
-      const notificationsData = await authenticatedApi.get('/api/v1/notifications', { params: { unread_only: false, limit: 10, offset: 0 } }).then(r => r.data);
+      const notificationsData = await api.getNotifications(false, 10, 0);
       setNotifications(notificationsData.notifications || []);
       setUnreadCount(notificationsData.unread_count || 0);
     } catch (error) {
@@ -443,6 +454,15 @@ export default function DashboardPage() {
                         <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-[#4e989e] mx-auto"></div>
                         <p className="text-gray-600 dark:text-gray-400 mt-2">Loading visual abstracts...</p>
                       </div>
+                    ) : visualAbstractsError ? (
+                      <div className="p-8 text-center">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mx-4">
+                          <span className="material-symbols-outlined text-red-500 dark:text-red-400 text-4xl mb-2 block">
+                            error
+                          </span>
+                          <p className="text-red-800 dark:text-red-200">{visualAbstractsError}</p>
+                        </div>
+                      </div>
                     ) : visualAbstracts.length === 0 ? (
                       <div className="p-8 text-center">
                         <span className="material-symbols-outlined text-5xl text-gray-400 dark:text-gray-600 mb-3">
@@ -457,24 +477,33 @@ export default function DashboardPage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-                        {visualAbstracts.map((abstract) => {
-                          const imageUrl = authenticatedApi.getVisualAbstractImageUrl(abstract.id);
-                          const expiresDate = new Date(abstract.expires_at);
-                          const daysLeft = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                          
-                          return (
+                        {visualAbstracts
+                          .map((abstract) => {
+                            const imageUrl = api.getVisualAbstractImageUrl(abstract.id);
+                            const expiresDate = new Date(abstract.expires_at);
+                            const daysLeft = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                            return { abstract, imageUrl, daysLeft };
+                          })
+                          .filter(({ daysLeft }) => daysLeft > 0)
+                          .map(({ abstract, imageUrl, daysLeft }) => (
                             <div
                               key={abstract.id}
                               className="relative group cursor-pointer"
                               onClick={() => {
                                 const previewWindow = window.open('', '_blank');
                                 if (previewWindow) {
+                                  // Escape user input to prevent XSS attacks
+                                  const safeTitle = escapeHtml(abstract.paper_title || 'Untitled');
+                                  // imageUrl comes from authenticatedApi.getVisualAbstractImageUrl which should return safe URLs
+                                  // but we escape quotes to be safe
+                                  const safeImageUrl = imageUrl.replace(/"/g, "&quot;");
+                                  
                                   previewWindow.document.write(`
                                     <!DOCTYPE html>
                                     <html>
                                       <head>
                                         <meta charset="UTF-8">
-                                        <title>Visual Abstract - ${abstract.paper_title || 'Paper'}</title>
+                                        <title>Visual Abstract - ${safeTitle}</title>
                                         <style>
                                           body {
                                             font-family: system-ui;
@@ -503,8 +532,8 @@ export default function DashboardPage() {
                                       </head>
                                       <body>
                                         <h1>Visual Abstract</h1>
-                                        <p><strong>${abstract.paper_title || 'Untitled'}</strong></p>
-                                        <img src="${imageUrl}" alt="Visual Abstract" />
+                                        <p><strong>${safeTitle}</strong></p>
+                                        <img src="${safeImageUrl}" alt="Visual Abstract" />
                                         <div class="info">
                                           <p>Generated: ${formatDate(abstract.created_at)}</p>
                                           <p>Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</p>
@@ -540,8 +569,7 @@ export default function DashboardPage() {
                                 {formatDate(abstract.created_at)}
                               </p>
                             </div>
-                          );
-                        })}
+                          ))}
                       </div>
                     )}
                   </div>

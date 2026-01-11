@@ -18,10 +18,18 @@ BACKEND_DIR="$PROJECT_ROOT/backend"
 cd "$BACKEND_DIR"
 
 # Activate virtual environment if it exists
+VENV_ACTIVATED=0
 if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
+    VENV_ACTIVATED=1
 elif [ -f "../venv/bin/activate" ]; then
     source ../venv/bin/activate
+    VENV_ACTIVATED=1
+fi
+
+if [ $VENV_ACTIVATED -eq 0 ]; then
+    echo "Warning: No virtual environment found. Using system Python." >&2
+    echo "This may fail if dependencies are not installed system-wide." >&2
 fi
 
 # Run the cleanup script

@@ -5,6 +5,7 @@ description = "Bibliography Backend"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiofiles>=25.0.0",
     "alembic>=1.13.0",
     "asyncpg>=0.30.0",
     # chonkie removed - using LangChain text splitters instead (no torch/sentence-transformers required)
@@ -23,6 +24,8 @@ dependencies = [
     "pgvector>=0.3.6",
     "playwright>=1.50.0",
     "python-ffmpeg>=2.0.12",
+    "sqlalchemy-utils>=0.41.2",
+    "cryptography>=43.0.0",
     "slack-sdk>=3.34.0",
     "static-ffmpeg>=2.13",
     "tavily-python>=0.3.2",

@@ -234,7 +234,7 @@ trigger_manual_ingestion() {
     source venv/bin/activate
 
     # Create a simple Python script to ingest files
-    python3 << 'EOF'
+    if python3 << 'EOF'
 import asyncio
 import sys
 from pathlib import Path
@@ -260,8 +260,7 @@ async def main():
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
 EOF
-
-    if [ $? -eq 0 ]; then
+    then
         print_success "Ingestion completed"
         log "Manual ingestion completed successfully"
     else

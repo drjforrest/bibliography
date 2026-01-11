@@ -77,7 +77,7 @@ export default function ProfilePage() {
     const originalDisplayName = profile?.display_name || "";
     const originalBio = profile?.bio || "";
     setHasUnsavedChanges(displayName !== originalDisplayName || bio !== originalBio || !!avatarFile || !!openrouterKey.trim() || !!openaiKey.trim() || !!elevenlabsKey.trim());
-  }, [displayName, bio, avatarFile, openrouterKey, profile]);
+  }, [displayName, bio, avatarFile, openrouterKey, openaiKey, elevenlabsKey, profile]);
 
   const showMessage = (type: "success" | "error", text: string) => {
     setMessage({ type, text });
