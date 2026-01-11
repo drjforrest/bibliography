@@ -59,7 +59,7 @@ export const actionDefinitions: Record<string, Omit<PaperAction, 'onClick'>> = {
     title: 'Chat with PDF',
     description: 'Ask questions and get answers from this paper',
     icon: 'chat',
-    category: 'content',
+    category: 'ai-powered',
     keyboardShortcut: 'C',
     supportsBatch: false, // Currently single-paper only
   },

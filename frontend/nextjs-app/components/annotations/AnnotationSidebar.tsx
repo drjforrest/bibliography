@@ -18,9 +18,35 @@ export default function AnnotationSidebar({ annotations, paperTitle, paperSummar
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
   const [isInsightsExpanded, setIsInsightsExpanded] = useState(true);
 
+  // Parse insights if they come as a JSON string (defensive check)
+  const parsedInsights = (() => {
+    if (!insights) return [];
+    if (Array.isArray(insights)) return insights;
+    if (typeof insights === 'string') {
+      try {
+        const parsed = JSON.parse(insights);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        // Try to extract array from string using regex
+        const match = insights.match(/\[.*\]/s);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[0]);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e2) {
+            console.warn('Failed to parse insights:', e2);
+            return [];
+          }
+        }
+        return [];
+      }
+    }
+    return [];
+  })();
+
   return (
-    <aside className="w-96 shrink-0 border-l border-gray-200 dark:border-gray-700 bg-background-light dark:bg-background-dark overflow-y-auto">
-      <div className="p-6">
+    <aside className="h-full w-96 shrink-0 border-l border-gray-200 dark:border-gray-700 bg-background-light dark:bg-background-dark flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-6">
         {/* Summary Section - Always visible at top */}
         <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-3">
@@ -69,12 +95,12 @@ export default function AnnotationSidebar({ annotations, paperTitle, paperSummar
         </div>
 
         {/* Key Insights Section (LLM-generated) */}
-        {insights && insights.length > 0 && (
+        {parsedInsights && parsedInsights.length > 0 && (
           <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-[#4e989e]">lightbulb</span>
-                Key Insights ({insights.length})
+                Key Insights ({parsedInsights.length})
               </h3>
               <button
                 onClick={() => setIsInsightsExpanded(!isInsightsExpanded)}
@@ -87,7 +113,7 @@ export default function AnnotationSidebar({ annotations, paperTitle, paperSummar
             </div>
             {isInsightsExpanded && (
               <ul className="space-y-2">
-                {insights.map((insight, index) => (
+                {parsedInsights.map((insight, index) => (
                   <li key={index} className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed bg-gray-50 dark:bg-gray-800/50 p-2 rounded flex gap-2">
                     <span className="text-[#4e989e] font-semibold shrink-0">{index + 1}.</span>
                     <span>{insight}</span>

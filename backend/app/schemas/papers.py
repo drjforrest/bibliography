@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List, Optional, Dict
 from pydantic import BaseModel, field_validator
 from enum import Enum
+import json
 
 
 class LiteratureType(str, Enum):
@@ -89,14 +90,43 @@ class PaperResponse(BaseModel):
                 data['short_description'] = metadata.get('short_description')
                 # Ensure insights is always a list of strings
                 insights_raw = metadata.get('insights', [])
+                
+                # Parse JSON string if insights is stored as a string
+                if isinstance(insights_raw, str):
+                    try:
+                        # Clean up the string - remove markdown code blocks if present
+                        cleaned = insights_raw.strip()
+                        if cleaned.startswith("```json"):
+                            cleaned = cleaned[7:]
+                        if cleaned.startswith("```"):
+                            cleaned = cleaned[3:]
+                        if cleaned.endswith("```"):
+                            cleaned = cleaned[:-3]
+                        cleaned = cleaned.strip()
+                        
+                        insights_raw = json.loads(cleaned)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        # If parsing fails, try to extract JSON array from string using regex
+                        import re
+                        json_match = re.search(r'\[.*\]', insights_raw, re.DOTALL)
+                        if json_match:
+                            try:
+                                insights_raw = json.loads(json_match.group(0))
+                            except json.JSONDecodeError:
+                                insights_raw = []
+                        else:
+                            insights_raw = []
+                
                 if isinstance(insights_raw, dict):
                     # If it's a dict, extract values or convert to list
                     if 'insights' in insights_raw:
                         insights_raw = insights_raw['insights']
                     elif isinstance(insights_raw, dict):
                         insights_raw = list(insights_raw.values()) if insights_raw else []
+                
                 if not isinstance(insights_raw, list):
                     insights_raw = []
+                
                 # Ensure all items are strings
                 data['insights'] = [str(item) for item in insights_raw if item]
                 data['citations'] = metadata.get('citations', {})

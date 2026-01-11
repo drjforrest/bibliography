@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.db import get_async_session, User
+from app.middleware.clerk_auth import require_clerk_auth
 from app.services.semantic_search_service import SemanticSearchService
-from app.users import current_active_user
 from app.schemas.semantic_search import (
     SemanticSearchRequest,
     SemanticSearchResponse,
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/semantic-search", tags=["semantic-search"])
 @router.post("/", response_model=SemanticSearchResponse)
 async def semantic_search(
     search_request: SemanticSearchRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -47,7 +47,7 @@ async def semantic_search(
 async def find_similar_papers(
     paper_id: int,
     limit: int = Query(5, le=20),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -77,7 +77,7 @@ async def get_search_suggestions(
     query: str = Query(..., min_length=2),
     search_space_id: Optional[int] = Query(None),
     limit: int = Query(5, le=20),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -106,7 +106,7 @@ async def quick_search(
     query: str,
     limit: int = Query(5, le=20),
     search_type: str = Query("hybrid", regex="^(semantic|keyword|hybrid)$"),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
     session: AsyncSession = Depends(get_async_session),
 ):
     """

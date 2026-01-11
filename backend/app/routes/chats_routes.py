@@ -4,6 +4,7 @@ from app.db import Chat, SearchSpace, User, get_async_session
 from app.schemas import AISDKChatRequest, ChatCreate, ChatRead, ChatUpdate
 from app.tasks.stream_connector_search_results import stream_connector_search_results
 from app.users import current_active_user
+from app.middleware.clerk_auth import require_clerk_auth
 from app.utils.check_ownership import check_ownership
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -20,7 +21,7 @@ router = APIRouter()
 async def handle_chat_data(
     request: AISDKChatRequest,
     session: AsyncSession = Depends(get_async_session),
-    user: User = Depends(current_active_user),
+    user: User = Depends(require_clerk_auth),
 ):
     messages = request.messages
     if messages[-1]["role"] != "user":

@@ -1,6 +1,7 @@
 'use client';
 
-import axios from 'axios';
+import { getApiBaseUrl } from '@/lib/api';
+import { useAuth } from '@clerk/nextjs';
 import { useEffect, useRef, useState } from 'react';
 
 interface Message {
@@ -16,14 +17,18 @@ interface ChatPanelProps {
   selectedDocumentId?: number;
   initialMessages?: Message[];
   onMessagesChange?: (messages: Message[]) => void;
+  embedded?: boolean; // When true, renders as sidebar content instead of floating widget
 }
 
-export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initialMessages = [], onMessagesChange }: ChatPanelProps) {
+export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initialMessages = [], onMessagesChange, embedded = false }: ChatPanelProps) {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Note: We use fetch directly for streaming since axios doesn't support streaming in browsers
 
   // Update messages when initialMessages changes
   useEffect(() => {
@@ -50,7 +55,7 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
   }, [isOpen]);
 
   const sendMessage = async (content: string) => {
-    if (!content.trim()) return;
+    if (!content.trim() || !isLoaded || !isSignedIn || !getToken) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -80,20 +85,33 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
         }
       };
 
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/chat`,
-        requestData,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          responseType: 'stream',
-          withCredentials: true
-        }
-      );
+      // Get the token for authentication
+      const token = await getToken({ template: 'hero-library-jwt' });
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Use fetch for streaming response
+      const apiUrl = getApiBaseUrl();
+      const response = await fetch(`${apiUrl}/api/v1/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chat request failed: ${response.statusText}`);
+      }
 
       // Handle streaming response
-      const reader = response.data.getReader();
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
       const decoder = new TextDecoder();
       let assistantContent = '';
 
@@ -152,7 +170,8 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
     }
   };
 
-  if (!isOpen) {
+  // If embedded in sidebar, don't show floating button when closed
+  if (!isOpen && !embedded) {
     return (
       <button
         onClick={onToggle}
@@ -164,21 +183,36 @@ export default function ChatPanel({ isOpen, onToggle, selectedDocumentId, initia
     );
   }
 
+  // If not open and embedded, return null (parent handles visibility)
+  if (!isOpen && embedded) {
+    return null;
+  }
+
   return (
-    <div className="fixed right-4 bottom-4 z-50 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col">
+    <div className={`${embedded ? 'h-full w-full' : 'fixed right-4 bottom-4 z-50 w-96 h-[600px]'} ${embedded ? 'bg-transparent' : 'bg-white dark:bg-gray-800 rounded-lg shadow-xl'} flex flex-col`}>
       {/* Header */}
-      <div className="flex items-center justify-between pt-12 px-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="font-semibold text-gray-900 dark:text-white">
-          AI Document Chat
-          {selectedDocumentId && <span className="text-sm font-normal ml-2">(Document)</span>}
-        </h3>
-        <button
-          onClick={onToggle}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          <span className="material-symbols-outlined">close</span>
-        </button>
-      </div>
+      {!embedded && (
+        <div className="flex items-center justify-between pt-12 px-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="font-semibold text-gray-900 dark:text-white">
+            AI Document Chat
+            {selectedDocumentId && <span className="text-sm font-normal ml-2">(Document)</span>}
+          </h3>
+          <button
+            onClick={onToggle}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      )}
+      
+      {embedded && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+            Chat with Paper
+          </h3>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
