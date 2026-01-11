@@ -76,6 +76,7 @@ async def handle_chat_data(
             selected_connectors,
             langchain_chat_history,
             search_mode_str,
+            openrouter_api_key=user.openrouter_api_key,  # Pass user's OpenRouter key
         )
     )
     response.headers["x-vercel-ai-data-stream"] = "v1"

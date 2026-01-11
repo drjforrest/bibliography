@@ -120,6 +120,163 @@ export default function PaperActionPanel({
         },
         status: actionStates['delete']?.status,
       },
+      // AI Report Generation Actions
+      {
+        ...actionDefinitions['generate-quick-summary']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-quick-summary': { status: 'processing' } }));
+            const result = await api.generatePaperReport(paperId, 'quick-summary');
+            // Open report in new window/modal
+            const reportWindow = window.open('', '_blank');
+            if (reportWindow) {
+              reportWindow.document.write(`
+                <html>
+                  <head><title>Quick Summary - ${paper.title}</title></head>
+                  <body style="font-family: system-ui; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6;">
+                    <h1>Quick Summary</h1>
+                    <h2>${paper.title}</h2>
+                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
+                  </body>
+                </html>
+              `);
+            }
+            setActionStates(prev => ({ ...prev, 'generate-quick-summary': { status: 'completed' } }));
+            onActionComplete?.('generate-quick-summary');
+            onClose();
+          } catch (error: any) {
+            console.error('Failed to generate quick summary:', error);
+            setActionStates(prev => ({ ...prev, 'generate-quick-summary': { status: 'error' } }));
+            alert(error?.response?.data?.detail || 'Failed to generate report. Please check your API key configuration.');
+          }
+        },
+        status: actionStates['generate-quick-summary']?.status,
+      },
+      {
+        ...actionDefinitions['generate-comprehensive-analysis']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-comprehensive-analysis': { status: 'processing' } }));
+            const result = await api.generatePaperReport(paperId, 'comprehensive');
+            const reportWindow = window.open('', '_blank');
+            if (reportWindow) {
+              reportWindow.document.write(`
+                <html>
+                  <head><title>Comprehensive Analysis - ${paper.title}</title></head>
+                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
+                    <h1>Comprehensive Analysis</h1>
+                    <h2>${paper.title}</h2>
+                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
+                  </body>
+                </html>
+              `);
+            }
+            setActionStates(prev => ({ ...prev, 'generate-comprehensive-analysis': { status: 'completed' } }));
+            onActionComplete?.('generate-comprehensive-analysis');
+            onClose();
+          } catch (error: any) {
+            console.error('Failed to generate comprehensive analysis:', error);
+            setActionStates(prev => ({ ...prev, 'generate-comprehensive-analysis': { status: 'error' } }));
+            alert(error?.response?.data?.detail || 'Failed to generate report. Please check your API key configuration.');
+          }
+        },
+        status: actionStates['generate-comprehensive-analysis']?.status,
+      },
+      {
+        ...actionDefinitions['generate-critical-appraisal']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-critical-appraisal': { status: 'processing' } }));
+            const result = await api.generatePaperReport(paperId, 'critical-appraisal');
+            const reportWindow = window.open('', '_blank');
+            if (reportWindow) {
+              reportWindow.document.write(`
+                <html>
+                  <head><title>Critical Appraisal - ${paper.title}</title></head>
+                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
+                    <h1>Critical Appraisal</h1>
+                    <h2>${paper.title}</h2>
+                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
+                  </body>
+                </html>
+              `);
+            }
+            setActionStates(prev => ({ ...prev, 'generate-critical-appraisal': { status: 'completed' } }));
+            onActionComplete?.('generate-critical-appraisal');
+            onClose();
+          } catch (error: any) {
+            console.error('Failed to generate critical appraisal:', error);
+            setActionStates(prev => ({ ...prev, 'generate-critical-appraisal': { status: 'error' } }));
+            alert(error?.response?.data?.detail || 'Failed to generate report. Please check your API key configuration.');
+          }
+        },
+        status: actionStates['generate-critical-appraisal']?.status,
+      },
+      {
+        ...actionDefinitions['generate-methodology-assessment']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-methodology-assessment': { status: 'processing' } }));
+            const result = await api.generatePaperReport(paperId, 'methodology');
+            const reportWindow = window.open('', '_blank');
+            if (reportWindow) {
+              reportWindow.document.write(`
+                <html>
+                  <head><title>Methodology Assessment - ${paper.title}</title></head>
+                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
+                    <h1>Methodology Assessment</h1>
+                    <h2>${paper.title}</h2>
+                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
+                  </body>
+                </html>
+              `);
+            }
+            setActionStates(prev => ({ ...prev, 'generate-methodology-assessment': { status: 'completed' } }));
+            onActionComplete?.('generate-methodology-assessment');
+            onClose();
+          } catch (error: any) {
+            console.error('Failed to generate methodology assessment:', error);
+            setActionStates(prev => ({ ...prev, 'generate-methodology-assessment': { status: 'error' } }));
+            alert(error?.response?.data?.detail || 'Failed to generate report. Please check your API key configuration.');
+          }
+        },
+        status: actionStates['generate-methodology-assessment']?.status,
+      },
+      {
+        ...actionDefinitions['generate-research-gaps']!,
+        onClick: async (paperIds: number[]) => {
+          const paperId = paperIds[0] || paper.id;
+          try {
+            setActionStates(prev => ({ ...prev, 'generate-research-gaps': { status: 'processing' } }));
+            const result = await api.generatePaperReport(paperId, 'research-gaps');
+            const reportWindow = window.open('', '_blank');
+            if (reportWindow) {
+              reportWindow.document.write(`
+                <html>
+                  <head><title>Research Gap Analysis - ${paper.title}</title></head>
+                  <body style="font-family: system-ui; max-width: 900px; margin: 40px auto; padding: 20px; line-height: 1.6;">
+                    <h1>Research Gap Analysis</h1>
+                    <h2>${paper.title}</h2>
+                    <div style="white-space: pre-wrap; margin-top: 20px;">${result.report_content}</div>
+                  </body>
+                </html>
+              `);
+            }
+            setActionStates(prev => ({ ...prev, 'generate-research-gaps': { status: 'completed' } }));
+            onActionComplete?.('generate-research-gaps');
+            onClose();
+          } catch (error: any) {
+            console.error('Failed to generate research gap analysis:', error);
+            setActionStates(prev => ({ ...prev, 'generate-research-gaps': { status: 'error' } }));
+            alert(error?.response?.data?.detail || 'Failed to generate report. Please check your API key configuration.');
+          }
+        },
+        status: actionStates['generate-research-gaps']?.status,
+      },
     ];
 
     // Group by category

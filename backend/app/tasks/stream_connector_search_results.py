@@ -18,6 +18,7 @@ async def stream_connector_search_results(
     selected_connectors: List[str],
     langchain_chat_history: List[Any],
     search_mode_str: str,
+    openrouter_api_key: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream connector search results to the client
@@ -29,6 +30,9 @@ async def stream_connector_search_results(
         session: The database session
         research_mode: The research mode
         selected_connectors: List of selected connectors
+        langchain_chat_history: Chat history messages
+        search_mode_str: Search mode string (CHUNKS or DOCUMENTS)
+        openrouter_api_key: User's OpenRouter API key for BYOK (optional)
 
     Yields:
         str: Formatted response strings
@@ -49,7 +53,7 @@ async def stream_connector_search_results(
     elif search_mode_str == "DOCUMENTS":
         search_mode = SearchMode.DOCUMENTS
 
-    # Sample configuration
+    # Configuration with user's OpenRouter key
     config = {
         "configurable": {
             "user_query": user_query,
@@ -58,6 +62,7 @@ async def stream_connector_search_results(
             "user_id": user_id_str,
             "search_space_id": search_space_id,
             "search_mode": search_mode,
+            "openrouter_api_key": openrouter_api_key,  # Pass user's OpenRouter key
         }
     }
     # Initialize state with database session and streaming service

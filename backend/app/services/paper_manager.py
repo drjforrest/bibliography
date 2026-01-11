@@ -256,6 +256,37 @@ class PaperManagerService:
             logger.error(f"Error in enrichment pipeline for paper {paper_id}: {str(e)}")
             # Don't re-raise - enrichment failures shouldn't block paper creation
 
+    def _needs_enrichment(self, paper: ScientificPaper) -> bool:
+        """
+        Check if a paper needs enrichment.
+
+        Returns True if any enrichment fields are missing:
+        - lay_summary
+        - short_description (in extraction_metadata)
+        - insights (in extraction_metadata)
+        - citations (in extraction_metadata)
+        - document embedding (for semantic search)
+        """
+        # Check lay_summary
+        if not paper.lay_summary or len(paper.lay_summary.strip()) == 0:
+            return True
+
+        # Check extraction_metadata fields
+        metadata = paper.extraction_metadata or {}
+        if not metadata.get("short_description"):
+            return True
+        if not metadata.get("insights"):
+            return True
+        if not metadata.get("citations"):
+            return True
+
+        # Check if document needs vectorization (if document exists but has no embedding)
+        if paper.document and paper.document.content:
+            if not paper.document.embedding or len(paper.document.embedding) == 0:
+                return True
+
+        return False
+
     async def get_paper_by_id(self, paper_id: int) -> Optional[ScientificPaper]:
         """Get a scientific paper by ID."""
         from sqlalchemy.orm import selectinload

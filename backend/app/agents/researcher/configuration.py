@@ -27,6 +27,8 @@ class Configuration:
     user_id: str
     search_space_id: int
     search_mode: SearchMode
+    # User's OpenRouter API key for BYOK (Bring Your Own Key)
+    openrouter_api_key: Optional[str] = None
 
     @classmethod
     def from_runnable_config(

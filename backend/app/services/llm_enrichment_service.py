@@ -26,38 +26,86 @@ logger = logging.getLogger(__name__)
 class LLMEnrichmentService:
     """Service for enriching papers with LLM-generated content."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, use_cloud_llm: bool = False):
+        """
+        Initialize LLM Enrichment Service.
+        
+        Args:
+            session: Database session
+            use_cloud_llm: If True, forces use of cloud-based LLM configuration.
+                          Used for event-based enrichment (when users view papers).
+                          If False (default), allows localhost for on-demand/manual enrichment.
+        """
         self.session = session
+        self.use_cloud_llm = use_cloud_llm
 
-        # Use LM Studio (OpenAI-compatible API)
-        self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv(
-            "LLM_API_BASE", "http://192.168.1.88:1234/v1"
-        )
-        # Default to mistral-7b-v0.1 if FAST_LLM not set
-        # Set FAST_LLM in .env to match your LMStudio model name
-        # Available models: mistral-7b-v0.1, google/gemma-3-27b, google/gemma-3n-e4b
-        self.llm_model = os.getenv("FAST_LLM", "mistral-7b-v0.1")
+        if use_cloud_llm:
+            # For event-based enrichment (user-triggered): require cloud LLM configuration
+            # Require FAST_LLM_API_BASE (no localhost fallback)
+            self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv("LLM_API_BASE")
+            if not self.llm_base:
+                raise ValueError(
+                    "FAST_LLM_API_BASE or LLM_API_BASE must be set for cloud-based LLM enrichment. "
+                    "Event-based enrichment (user-triggered) requires a cloud LLM endpoint."
+                )
+            
+            # Require API key for cloud LLMs
+            self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+            if not self.api_key:
+                logger.warning(
+                    "OPENAI_API_KEY or LLM_API_KEY not set. Cloud LLM requests may fail."
+                )
+            
+            # Use FAST_LLM model (should be cloud model like gpt-3.5-turbo, gpt-4, etc.)
+            self.llm_model = os.getenv("FAST_LLM")
+            if not self.llm_model:
+                raise ValueError(
+                    "FAST_LLM must be set for cloud-based LLM enrichment. "
+                    "Set to a cloud model (e.g., gpt-3.5-turbo, gpt-4, claude-3-haiku)"
+                )
+            
+            logger.info(
+                f"✅ LLM Enrichment Service initialized with cloud endpoint: {self.llm_base} "
+                f"(model: {self.llm_model})"
+            )
+        else:
+            # For on-demand/manual enrichment (dev scripts): allow localhost fallback
+            self.llm_base = os.getenv("FAST_LLM_API_BASE") or os.getenv(
+                "LLM_API_BASE", "http://192.168.1.88:1234/v1"
+            )
+            self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+            self.llm_model = os.getenv("FAST_LLM", "mistral-7b-v0.1")
+            logger.info(
+                f"LLM Enrichment Service initialized: {self.llm_base} with model {self.llm_model}"
+            )
+        
         self.http_session: Optional[aiohttp.ClientSession] = None
         self.timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout
 
-        logger.info(
-            f"LLM Enrichment Service initialized: {self.llm_base} with model {self.llm_model}"
-        )
+    def _get_headers(self) -> dict:
+        """Get HTTP headers with API key if available."""
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            # Use Authorization header for OpenAI-compatible APIs
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session."""
         if self.http_session is None or self.http_session.closed:
             self.http_session = aiohttp.ClientSession(
-                timeout=self.timeout, headers={"Content-Type": "application/json"}
+                timeout=self.timeout, headers=self._get_headers()
             )
         return self.http_session
 
     async def _call_llm(
         self, messages: list, max_tokens: int = 500, temperature: float = 0.7
     ) -> Optional[str]:
-        """Call OpenAI-compatible LLM API."""
+        """Call OpenAI-compatible LLM API (works with cloud-based and local LLMs)."""
         try:
             session = await self._get_session()
+            # Ensure headers are up-to-date (API key might have been set after session creation)
+            headers = self._get_headers()
             async with session.post(
                 f"{self.llm_base}/chat/completions",
                 json={
@@ -66,6 +114,7 @@ class LLMEnrichmentService:
                     "max_tokens": max_tokens,
                     "temperature": temperature,
                 },
+                headers=headers,  # Pass headers explicitly to ensure API key is included
             ) as response:
                 if response.status == 200:
                     result = await response.json()

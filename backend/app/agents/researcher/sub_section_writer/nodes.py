@@ -1,11 +1,83 @@
 from .configuration import Configuration
 from langchain_core.runnables import RunnableConfig
 from .state import State
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from app.config import config as app_config
 from .prompts import get_citation_system_prompt
 from langchain_core.messages import HumanMessage, SystemMessage
 from .configuration import SubSectionType
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Try to import ChatLiteLLM from the new package first
+try:
+    from langchain_litellm import ChatLiteLLM
+except ImportError:
+    # Fallback to old import
+    from langchain_community.chat_models import ChatLiteLLM
+
+
+def get_llm_with_user_key(
+    llm_type: str = "fast",
+    openrouter_api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    api_base: Optional[str] = None,
+):
+    """
+    Get LLM instance, using user's OpenRouter key if provided, otherwise fallback to config.
+    
+    Args:
+        llm_type: Type of LLM ("strategic", "fast", "long_context")
+        openrouter_api_key: User's OpenRouter API key (optional)
+        model: Model name (optional, uses config default if not provided)
+        api_base: API base URL (optional, uses config default if not provided)
+    
+    Returns:
+        ChatLiteLLM instance configured with user key or config defaults
+    """
+    # If user provided OpenRouter key, use it with OpenRouter
+    if openrouter_api_key:
+        # Use OpenRouter API for user keys
+        openrouter_api_base = "https://openrouter.ai/api/v1"
+        
+        # Get model from config if not provided
+        if not model:
+            if llm_type == "strategic":
+                model = os.getenv("STRATEGIC_LLM", "openrouter/openai/gpt-4")
+            elif llm_type == "fast":
+                model = os.getenv("FAST_LLM", "openrouter/openai/gpt-3.5-turbo")
+            elif llm_type == "long_context":
+                model = os.getenv("LONG_CONTEXT_LLM", "openrouter/anthropic/claude-3-sonnet")
+            else:
+                model = os.getenv("FAST_LLM", "openrouter/openai/gpt-3.5-turbo")
+        
+        # Ensure model uses openrouter/ prefix if not already
+        if not model.startswith("openrouter/"):
+            # If it's a provider/model format, add openrouter prefix
+            if "/" in model:
+                model = f"openrouter/{model}"
+            else:
+                # Default to OpenAI via OpenRouter
+                model = f"openrouter/openai/{model}"
+        
+        logger.info(f"Using user's OpenRouter key for {llm_type} LLM with model {model}")
+        return ChatLiteLLM(
+            model=model,
+            api_key=openrouter_api_key,
+            api_base=openrouter_api_base,
+        )
+    else:
+        # Fallback to config instances (uses .env keys)
+        if llm_type == "strategic":
+            return app_config.strategic_llm_instance
+        elif llm_type == "fast":
+            return app_config.fast_llm_instance
+        elif llm_type == "long_context":
+            return app_config.long_context_llm_instance
+        else:
+            return app_config.fast_llm_instance
 
 
 async def rerank_documents(state: State, config: RunnableConfig) -> Dict[str, Any]:
@@ -97,8 +169,11 @@ async def write_sub_section(state: State, config: RunnableConfig) -> Dict[str, A
     configuration = Configuration.from_runnable_config(config)
     documents = configuration.relevant_documents
 
-    # Initialize LLM
-    llm = app_config.fast_llm_instance
+    # Initialize LLM - use user's OpenRouter key if available
+    llm = get_llm_with_user_key(
+        llm_type="fast",
+        openrouter_api_key=configuration.openrouter_api_key,
+    )
 
     # If no documents were provided, return a message indicating this
     if not documents or len(documents) == 0:

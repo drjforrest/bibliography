@@ -1,6 +1,8 @@
 import asyncio
 import json
-from typing import Any, Dict, List
+import logging
+import os
+from typing import Any, Dict, List, Optional
 
 from app.config import config as app_config
 from app.db import async_session_maker
@@ -20,6 +22,76 @@ from app.utils.query_service import QueryService
 
 
 from langgraph.types import StreamWriter
+
+logger = logging.getLogger(__name__)
+
+# Try to import ChatLiteLLM from the new package first
+try:
+    from langchain_litellm import ChatLiteLLM
+except ImportError:
+    # Fallback to old import
+    from langchain_community.chat_models import ChatLiteLLM
+
+
+def get_llm_with_user_key(
+    llm_type: str = "strategic",
+    openrouter_api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    api_base: Optional[str] = None,
+):
+    """
+    Get LLM instance, using user's OpenRouter key if provided, otherwise fallback to config.
+    
+    Args:
+        llm_type: Type of LLM ("strategic", "fast", "long_context")
+        openrouter_api_key: User's OpenRouter API key (optional)
+        model: Model name (optional, uses config default if not provided)
+        api_base: API base URL (optional, uses config default if not provided)
+    
+    Returns:
+        ChatLiteLLM instance configured with user key or config defaults
+    """
+    # If user provided OpenRouter key, use it with OpenRouter
+    if openrouter_api_key:
+        # Use OpenRouter API for user keys
+        openrouter_api_base = "https://openrouter.ai/api/v1"
+        
+        # Get model from config if not provided
+        if not model:
+            if llm_type == "strategic":
+                model = os.getenv("STRATEGIC_LLM", "openrouter/openai/gpt-4")
+            elif llm_type == "fast":
+                model = os.getenv("FAST_LLM", "openrouter/openai/gpt-3.5-turbo")
+            elif llm_type == "long_context":
+                model = os.getenv("LONG_CONTEXT_LLM", "openrouter/anthropic/claude-3-sonnet")
+            else:
+                model = os.getenv("STRATEGIC_LLM", "openrouter/openai/gpt-4")
+        
+        # Ensure model uses openrouter/ prefix if not already
+        if not model.startswith("openrouter/"):
+            # If it's a provider/model format, add openrouter prefix
+            if "/" in model:
+                model = f"openrouter/{model}"
+            else:
+                # Default to OpenAI via OpenRouter
+                model = f"openrouter/openai/{model}"
+        
+        logger.info(f"Using user's OpenRouter key for {llm_type} LLM with model {model}")
+        return ChatLiteLLM(
+            model=model,
+            api_key=openrouter_api_key,
+            api_base=openrouter_api_base,
+        )
+    else:
+        # Fallback to config instances (uses .env keys)
+        if llm_type == "strategic":
+            return app_config.strategic_llm_instance
+        elif llm_type == "fast":
+            return app_config.fast_llm_instance
+        elif llm_type == "long_context":
+            return app_config.long_context_llm_instance
+        else:
+            return app_config.strategic_llm_instance
 
 
 class Section(BaseModel):
@@ -68,8 +140,12 @@ async def write_answer_outline(
     )
     writer({"yeild_value": streaming_service._format_annotations()})
 
-    # Initialize LLM
-    llm = app_config.strategic_llm_instance
+    # Initialize LLM - use user's OpenRouter key if available
+    configuration = Configuration.from_runnable_config(config)
+    llm = get_llm_with_user_key(
+        llm_type="strategic",
+        openrouter_api_key=configuration.openrouter_api_key,
+    )
 
     # Create the human message content
     human_message_content = f"""
@@ -706,6 +782,7 @@ async def process_sections(
                 writer=writer,
                 sub_section_type=sub_section_type,
                 section_contents=section_contents,
+                openrouter_api_key=configuration.openrouter_api_key,  # Pass user's OpenRouter key
             )
         )
 
@@ -772,6 +849,7 @@ async def process_section_with_documents(
     writer: StreamWriter = None,
     sub_section_type: SubSectionType = SubSectionType.MIDDLE,
     section_contents: Dict[int, Dict[str, Any]] = None,
+    openrouter_api_key: Optional[str] = None,
 ) -> str:
     """
     Process a single section using pre-fetched documents.
@@ -829,6 +907,7 @@ async def process_section_with_documents(
                     "relevant_documents": documents_to_use,
                     "user_id": user_id,
                     "search_space_id": search_space_id,
+                    "openrouter_api_key": openrouter_api_key,  # Pass user's OpenRouter key
                 }
             }
 
